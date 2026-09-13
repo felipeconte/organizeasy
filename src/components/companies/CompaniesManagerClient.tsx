@@ -33,17 +33,29 @@ import {
   COMPANY_CATEGORIES
 } from '@/types/companies'
 import { cleanDigits, maskPhone } from '@/lib/formatters-and-validators'
+import { ProfilePermissions, hasPermission } from '@/types/profiles'
+import { usePermissions } from '@/contexts/PermissionsContext'
 import CompanyModal from './CompanyModal'
 
 interface CompaniesManagerClientProps {
   initialCompanies: CompanyData[]
   organizationId: string
+  isOwner?: boolean
+  userPermissions?: ProfilePermissions
 }
 
 export default function CompaniesManagerClient({
   initialCompanies,
   organizationId,
+  isOwner: propIsOwner,
+  userPermissions: propUserPermissions,
 }: CompaniesManagerClientProps) {
+  const permissionsContext = usePermissions()
+  const isOwner = propIsOwner ?? permissionsContext.isOwner
+  const userPermissions = propUserPermissions ?? permissionsContext.permissions
+  const canManage = hasPermission(isOwner, userPermissions, 'companies_manage')
+  const canViewSensitive = hasPermission(isOwner, userPermissions, 'financial_view_sensitive')
+
   const [companies, setCompanies] = useState<CompanyData[]>(initialCompanies)
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('todas')
@@ -162,6 +174,10 @@ export default function CompaniesManagerClient({
     }).format(val)
   }
 
+  const displayMoney = (val: number) => {
+    return canViewSensitive ? formatCurrency(val) : '••••••'
+  }
+
   return (
     <div className="space-y-6">
       {/* Metric Cards Banner */}
@@ -171,10 +187,10 @@ export default function CompaniesManagerClient({
           <div>
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Total de Parceiros</span>
             <span className="text-2xl font-black text-slate-900 mt-1 block">
-              {metrics.total}
+              {companies.length}
             </span>
             <span className="text-xs font-medium text-slate-400 mt-0.5 block">
-              empresas e prestadores
+              empresas cadastradas
             </span>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-2xs">
@@ -203,7 +219,7 @@ export default function CompaniesManagerClient({
           <div>
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Comissões Recebidas (RT)</span>
             <span className="text-xl font-black text-emerald-600 mt-1 block">
-              {formatCurrency(metrics.received)}
+              {displayMoney(metrics.received)}
             </span>
             <span className="text-xs font-medium text-emerald-700/80 mt-0.5 flex items-center gap-1">
               <CheckCircle2 className="w-3.5 h-3.5" /> Total faturado pelo escritório
@@ -219,7 +235,7 @@ export default function CompaniesManagerClient({
           <div>
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Comissões Previstas</span>
             <span className="text-xl font-black text-amber-600 mt-1 block">
-              {formatCurrency(metrics.pending)}
+              {displayMoney(metrics.pending)}
             </span>
             <span className="text-xs font-medium text-amber-700/80 mt-0.5 flex items-center gap-1">
               <Clock className="w-3.5 h-3.5" /> A receber de projetos ativos
@@ -288,12 +304,14 @@ export default function CompaniesManagerClient({
           </div>
 
           {/* Add Company Button */}
-          <button
-            onClick={handleOpenNew}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-xs shadow-indigo-500/20 shrink-0 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> Nova Empresa
-          </button>
+          {canManage && (
+            <button
+              onClick={handleOpenNew}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-xs shadow-indigo-500/20 shrink-0 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> Nova Empresa
+            </button>
+          )}
         </div>
       </div>
 
@@ -327,12 +345,14 @@ export default function CompaniesManagerClient({
                 Limpar Filtros
               </button>
             ) : null}
-            <button
-              onClick={handleOpenNew}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-xs shadow-indigo-500/20"
-            >
-              <Plus className="w-4 h-4" /> Cadastrar Primeira Empresa
-            </button>
+            {canManage && (
+              <button
+                onClick={handleOpenNew}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-xs shadow-indigo-500/20"
+              >
+                <Plus className="w-4 h-4" /> Cadastrar Primeira Empresa
+              </button>
+            )}
           </div>
         </div>
       ) : viewMode === 'grid' ? (
@@ -508,22 +528,26 @@ export default function CompaniesManagerClient({
                   </div>
 
                   <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleOpenEdit(company)}
-                      title="Editar Empresa"
-                      className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
+                    {canManage && (
+                      <button
+                        onClick={() => handleOpenEdit(company)}
+                        title="Editar Empresa"
+                        className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    )}
 
-                    <button
-                      onClick={() => handleDelete(company.id, company.name)}
-                      disabled={deletingId === company.id}
-                      title="Excluir Empresa"
-                      className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {canManage && (
+                      <button
+                        onClick={() => handleDelete(company.id, company.name)}
+                        disabled={deletingId === company.id}
+                        title="Excluir Empresa"
+                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
 
                     <Link
                       href={`/app/empresas/${company.id}`}
@@ -708,22 +732,26 @@ export default function CompaniesManagerClient({
                             <ExternalLink className="w-4 h-4" />
                           </Link>
 
-                          <button
-                            onClick={() => handleOpenEdit(company)}
-                            title="Editar"
-                            className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
+                          {canManage && (
+                            <button
+                              onClick={() => handleOpenEdit(company)}
+                              title="Editar"
+                              className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                          )}
 
-                          <button
-                            onClick={() => handleDelete(company.id, company.name)}
-                            disabled={deletingId === company.id}
-                            title="Excluir"
-                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {canManage && (
+                            <button
+                              onClick={() => handleDelete(company.id, company.name)}
+                              disabled={deletingId === company.id}
+                              title="Excluir"
+                              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

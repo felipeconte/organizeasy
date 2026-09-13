@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { requireAuth } from '@/lib/server/guard'
+import { requireAuth, requirePermission } from '@/lib/server/guard'
 
 export interface ClientUpdateRequestItem {
   id: string
@@ -121,6 +121,8 @@ export async function reviewClientUpdateRequestAction(
     if (!organizationId) {
       return { success: false, error: 'Organização não encontrada.' }
     }
+
+    await requirePermission(organizationId, 'clients_portal')
 
     const { data: requestRow, error: fetchErr } = await supabase
       .from('client_update_requests')

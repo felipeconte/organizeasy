@@ -54,6 +54,8 @@ import {
   getFutureCashFlowProjectionAction
 } from '@/lib/actions/financial'
 import TransactionModal from './TransactionModal'
+import { usePermissions } from '@/contexts/PermissionsContext'
+import { hasPermission, ProfilePermissions } from '@/types/profiles'
 
 interface ProjectOption {
   id: string
@@ -83,6 +85,8 @@ interface FinancialManagerClientProps {
   projects: ProjectOption[]
   companies: CompanyOption[]
   clients?: ClientOption[]
+  isOwner?: boolean
+  userPermissions?: ProfilePermissions
 }
 
 type TabType = 'visao_geral' | 'extrato' | 'projetos' | 'projecao'
@@ -96,8 +100,18 @@ export default function FinancialManagerClient({
   initialProjection,
   projects,
   companies,
-  clients = []
+  clients = [],
+  isOwner,
+  userPermissions
 }: FinancialManagerClientProps) {
+  const permContext = usePermissions()
+  const effectiveIsOwner = isOwner ?? permContext.isOwner
+  const effectivePermissions = userPermissions ?? permContext.permissions
+
+  const canCreateEdit = hasPermission(effectiveIsOwner, effectivePermissions, 'financial_create_edit')
+  const canDelete = hasPermission(effectiveIsOwner, effectivePermissions, 'financial_delete')
+  const canViewSensitive = hasPermission(effectiveIsOwner, effectivePermissions, 'financial_view_sensitive')
+
   const [activeTab, setActiveTab] = useState<TabType>('visao_geral')
 
   // Estado dos dados
@@ -125,6 +139,7 @@ export default function FinancialManagerClient({
 
   // Formatador de Moeda BRL
   const formatBRL = (val: number) => {
+    if (!canViewSensitive) return '••••••'
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
@@ -312,23 +327,25 @@ export default function FinancialManagerClient({
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
-          <button
-            onClick={() => handleOpenNewTransaction('expense')}
-            className="inline-flex items-center gap-1.5 py-2.5 px-4.5 rounded-xl bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 text-sm font-semibold transition-all shadow-xs cursor-pointer"
-          >
-            <TrendingDown className="w-4 h-4 text-rose-600" />
-            Nova Despesa
-          </button>
+        {canCreateEdit && (
+          <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+            <button
+              onClick={() => handleOpenNewTransaction('expense')}
+              className="inline-flex items-center gap-1.5 py-2.5 px-4.5 rounded-xl bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 text-sm font-semibold transition-all shadow-xs cursor-pointer"
+            >
+              <TrendingDown className="w-4 h-4 text-rose-600" />
+              Nova Despesa
+            </button>
 
-          <button
-            onClick={() => handleOpenNewTransaction('income')}
-            className="inline-flex items-center gap-1.5 py-2.5 px-4.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-all shadow-xs shadow-emerald-600/20 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            Nova Receita
-          </button>
-        </div>
+            <button
+              onClick={() => handleOpenNewTransaction('income')}
+              className="inline-flex items-center gap-1.5 py-2.5 px-4.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-all shadow-xs shadow-emerald-600/20 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              Nova Receita
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tabs Navigation */}
@@ -526,13 +543,15 @@ export default function FinancialManagerClient({
                         <span className="font-mono font-bold text-rose-600">
                           {formatBRL(bill.amount)}
                         </span>
-                        <button
-                          onClick={() => handleToggleStatus(bill)}
-                          className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-colors cursor-pointer"
-                          title="Marcar como Pago"
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
+                        {canCreateEdit && (
+                          <button
+                            onClick={() => handleToggleStatus(bill)}
+                            className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-colors cursor-pointer"
+                            title="Marcar como Pago"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -739,20 +758,22 @@ export default function FinancialManagerClient({
                   </p>
                 )}
 
-                <div className="mt-4 flex items-center justify-center gap-2">
-                  <button
-                    onClick={() => handleOpenNewTransaction('income')}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors shadow-xs cursor-pointer"
-                  >
-                    + Nova Receita
-                  </button>
-                  <button
-                    onClick={() => handleOpenNewTransaction('expense')}
-                    className="px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors shadow-xs cursor-pointer"
-                  >
-                    + Nova Despesa
-                  </button>
-                </div>
+                {canCreateEdit && (
+                  <div className="mt-4 flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => handleOpenNewTransaction('income')}
+                      className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors shadow-xs cursor-pointer"
+                    >
+                      + Nova Receita
+                    </button>
+                    <button
+                      onClick={() => handleOpenNewTransaction('expense')}
+                      className="px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors shadow-xs cursor-pointer"
+                    >
+                      + Nova Despesa
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -781,28 +802,51 @@ export default function FinancialManagerClient({
                         >
                           {/* Status Toggle */}
                           <td className="py-4 px-4 whitespace-nowrap">
-                            <button
-                              onClick={() => handleToggleStatus(tx)}
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${isPaid
-                                ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                                : tx.status === 'overdue'
-                                  ? 'bg-rose-100 text-rose-800 hover:bg-rose-200'
-                                  : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
-                                }`}
-                              title="Clique para alternar entre Pago e Pendente"
-                            >
-                              {isPaid ? (
-                                <>
-                                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                                  <span>Pago</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Clock className="w-4 h-4 text-amber-600" />
-                                  <span>Pendente</span>
-                                </>
-                              )}
-                            </button>
+                            {canCreateEdit ? (
+                              <button
+                                onClick={() => handleToggleStatus(tx)}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${isPaid
+                                  ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                                  : tx.status === 'overdue'
+                                    ? 'bg-rose-100 text-rose-800 hover:bg-rose-200'
+                                    : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                                  }`}
+                                title="Clique para alternar entre Pago e Pendente"
+                              >
+                                {isPaid ? (
+                                  <>
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                    <span>Pago</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock className="w-4 h-4 text-amber-600" />
+                                    <span>Pendente</span>
+                                  </>
+                                )}
+                              </button>
+                            ) : (
+                              <span
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs cursor-default ${isPaid
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : tx.status === 'overdue'
+                                    ? 'bg-rose-100 text-rose-800'
+                                    : 'bg-amber-100 text-amber-800'
+                                  }`}
+                              >
+                                {isPaid ? (
+                                  <>
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                    <span>Pago</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock className="w-4 h-4 text-amber-600" />
+                                    <span>Pendente</span>
+                                  </>
+                                )}
+                              </span>
+                            )}
                           </td>
 
                           {/* Title & Category & Recurrence Badge */}
@@ -878,13 +922,15 @@ export default function FinancialManagerClient({
 
                           {/* Actions */}
                           <td className="py-4 px-4 whitespace-nowrap text-right">
-                            <button
-                              onClick={() => handleOpenEditTransaction(tx)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
-                              title="Editar Lançamento"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
+                            {canCreateEdit && (
+                              <button
+                                onClick={() => handleOpenEditTransaction(tx)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                                title="Editar Lançamento"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </td>
                         </tr>
                       )

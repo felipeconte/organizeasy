@@ -1,5 +1,6 @@
-import { requireProjectAccess } from '@/lib/server/guard'
+import { requireProjectAccess, hasPermission } from '@/lib/server/guard'
 import { notFound } from 'next/navigation'
+import AccessDenied from '@/components/ui/AccessDenied'
 import { getProjectCompaniesAction } from '@/lib/actions/project-companies'
 import { getCompaniesAction } from '@/lib/actions/companies'
 import ProjectCompaniesClient from '@/components/projects/ProjectCompaniesClient'
@@ -16,10 +17,21 @@ export default async function ProjectFornecedoresPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const { project } = await requireProjectAccess(id)
+  const { project, isOwner, permissions } = await requireProjectAccess(id)
 
   if (!project) {
     notFound()
+  }
+
+  if (!hasPermission(isOwner, permissions, 'module_companies')) {
+    return (
+      <AccessDenied
+        moduleName="Empresas & Fornecedores"
+        title="Acesso Restrito ao Módulo de Empresas"
+        message="Seu perfil de acesso não possui permissão para visualizar empresas parceiras ou serviços contratados deste projeto."
+        backHref={`/app/projetos/${id}`}
+      />
+    )
   }
 
   // Busca itens vinculados a este projeto
@@ -52,6 +64,8 @@ export default async function ProjectFornecedoresPage({
         initialItems={items || []}
         availableCompanies={companies || []}
         initialSummary={summary}
+        isOwner={isOwner}
+        userPermissions={permissions}
       />
     </>
   )

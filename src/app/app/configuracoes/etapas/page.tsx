@@ -1,4 +1,7 @@
-import { requireAuth } from '@/lib/server/guard'
+import { getActiveOrganization } from '@/lib/server/active-org'
+import { redirect } from 'next/navigation'
+import { hasPermission } from '@/lib/server/guard'
+import AccessDenied from '@/components/ui/AccessDenied'
 import StageTemplatesManager, {
   TemplateData
 } from '@/components/templates/StageTemplatesManager'
@@ -57,47 +60,24 @@ const DEFAULT_STAGES = [
 ]
 
 export default async function StageTemplatesPage() {
-  const { supabase, user } = await requireAuth()
+  const { supabase, user, activeOrg, isOwner, userPermissions } = await getActiveOrganization()
 
-  // 1. Resolução segura da organização
-  let orgId = ''
-  const { data: member } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .limit(1)
-    .maybeSingle()
-
-  if (member?.organization_id) {
-    orgId = member.organization_id
-  } else {
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('id')
-      .eq('owner_id', user.id)
-      .limit(1)
-      .maybeSingle()
-
-    if (org?.id) {
-      orgId = org.id
-    } else {
-      const slug = `escritorio-${user.id.slice(0, 6)}`
-      const { data: newOrg } = await supabase
-        .from('organizations')
-        .insert({
-          name: 'Meu Escritório de Arquitetura',
-          slug,
-          owner_id: user.id,
-          email: user.email || null,
-        })
-        .select('id')
-        .single()
-
-      if (newOrg?.id) {
-        orgId = newOrg.id
-      }
-    }
+  if (!activeOrg) {
+    redirect('/onboarding')
   }
+
+  // Proteção do endpoint: impede que perfis sem permissão acessem pela URL
+  if (!hasPermission(isOwner, userPermissions, 'settings_stages')) {
+    return (
+      <AccessDenied
+        moduleName="Templates de Tarefas"
+        userProfileName={activeOrg.profile_name}
+        userProfileColor={activeOrg.profile_color}
+      />
+    )
+  }
+
+  const orgId = activeOrg.id
 
   // 2. Busca todos os templates da organização
   let templatesList: TemplateData[] = []

@@ -90,6 +90,8 @@ import {
   deleteWorkflowStageAction
 } from '@/lib/actions/workflow-stages'
 import DeleteWorkflowStageModal from '@/components/workflow/DeleteWorkflowStageModal'
+import { usePermissions } from '@/contexts/PermissionsContext'
+import { ProfilePermissions } from '@/types/profiles'
 
 const COLOR_OPTIONS: WorkflowStageColor[] = [
   'slate',
@@ -113,6 +115,8 @@ export interface ProjectHubClientProps {
   initialWorkflowStages?: WorkflowStage[]
   initialView?: 'lista' | 'kanban' | 'gantt'
   initialDeletedStages?: DeletedStageInfo[]
+  isOwner?: boolean
+  userPermissions?: ProfilePermissions
 }
 
 export default function ProjectHubClient({
@@ -124,9 +128,15 @@ export default function ProjectHubClient({
   initialWorkflowStages,
   initialView = 'lista',
   initialDeletedStages = [],
+  isOwner: propIsOwner,
+  userPermissions: propPermissions,
 }: ProjectHubClientProps) {
   const confirm = useConfirm()
   const showAlert = useAlert()
+  const { can, isOwner: contextIsOwner } = usePermissions()
+  const effectiveIsOwner = propIsOwner !== undefined ? propIsOwner : contextIsOwner
+  const canManageTasks = effectiveIsOwner || can('tasks_manage')
+  const canConfigureStages = effectiveIsOwner || can('settings_stages')
 
   const [stages, setStages] = useState<TaskDetailData[]>(initialStages)
   const [deletedStages, setDeletedStages] = useState<DeletedStageInfo[]>(initialDeletedStages)
@@ -1977,12 +1987,14 @@ export default function ProjectHubClient({
             </button>
           )}
 
-          <button
-            onClick={() => handleOpenCreateModal()}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all shadow-sm cursor-pointer hover:shadow-md"
-          >
-            <Plus className="w-4 h-4" /> Nova Tarefa
-          </button>
+          {canManageTasks && (
+            <button
+              onClick={() => handleOpenCreateModal()}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all shadow-sm cursor-pointer hover:shadow-md"
+            >
+              <Plus className="w-4 h-4" /> Nova Tarefa
+            </button>
+          )}
         </div>
       </div>
 
@@ -2014,19 +2026,21 @@ export default function ProjectHubClient({
                     — Excluída em <strong>{formatDeletedAt(dt.deleted_at)}</strong> por <strong className="text-slate-700">{dt.deleted_by_name || 'Usuário'}</strong>
                   </span>
                 </div>
-                <button
-                  type="button"
-                  disabled={restoringStageId === dt.id}
-                  onClick={() => handleRestoreDeletedStage(dt.id)}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg border border-amber-300 transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
-                >
-                  {restoringStageId === dt.id ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <RotateCcw className="w-3.5 h-3.5" />
-                  )}
-                  Restaurar Tarefa
-                </button>
+                {canManageTasks && (
+                  <button
+                    type="button"
+                    disabled={restoringStageId === dt.id}
+                    onClick={() => handleRestoreDeletedStage(dt.id)}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg border border-amber-300 transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
+                  >
+                    {restoringStageId === dt.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    )}
+                    Restaurar Tarefa
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -2079,9 +2093,9 @@ export default function ProjectHubClient({
                   return (
                     <Fragment key={st.id}>
                       <tr
-                        draggable={item.level === 0}
-                        onDragStart={(e) => item.level === 0 && handleListDragStart(e, st.id)}
-                        onDragOver={(e) => item.level === 0 && handleListDragOver(e, st.id)}
+                        draggable={canManageTasks && item.level === 0}
+                        onDragStart={(e) => canManageTasks && item.level === 0 && handleListDragStart(e, st.id)}
+                        onDragOver={(e) => canManageTasks && item.level === 0 && handleListDragOver(e, st.id)}
                         onDragLeave={handleListDragLeave}
                         onDrop={(e) => item.level === 0 && handleListDrop(e, st.id)}
                         onClick={() => setSelectedTask(st)}
@@ -2337,15 +2351,17 @@ export default function ProjectHubClient({
                               <Edit2 className="w-4 h-4" />
                             </button>
 
-                            <button
-                              type="button"
-                              disabled={loadingStageId === st.id}
-                              onClick={() => onRequestDeleteStage(st)}
-                              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                              title="Excluir tarefa"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            {canManageTasks && (
+                              <button
+                                type="button"
+                                disabled={loadingStageId === st.id}
+                                onClick={() => onRequestDeleteStage(st)}
+                                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="Excluir tarefa"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -2354,17 +2370,19 @@ export default function ProjectHubClient({
                 })}
 
                 {/* Quick Add Row at Bottom */}
-                <tr>
-                  <td colSpan={8} className="p-3.5 bg-slate-50/50 hover:bg-blue-50/30 transition-colors text-center border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenCreateModal()}
-                      className="inline-flex items-center gap-2 py-1.5 px-4 text-sm font-semibold text-blue-600 hover:text-blue-700 rounded-xl hover:bg-blue-100/50 transition-all cursor-pointer"
-                    >
-                      <Plus className="w-4 h-4" /> Adicionar Nova Tarefa à Lista
-                    </button>
-                  </td>
-                </tr>
+                {canManageTasks && (
+                  <tr>
+                    <td colSpan={8} className="p-3.5 bg-slate-50/50 hover:bg-blue-50/30 transition-colors text-center border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCreateModal()}
+                        className="inline-flex items-center gap-2 py-1.5 px-4 text-sm font-semibold text-blue-600 hover:text-blue-700 rounded-xl hover:bg-blue-100/50 transition-all cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4" /> Adicionar Nova Tarefa à Lista
+                      </button>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -2519,24 +2537,26 @@ export default function ProjectHubClient({
                             >
                               {col.name}
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingColId(col.id)
-                                setEditingColName(col.name)
-                                setEditingColColor(col.color)
-                              }}
-                              className="opacity-50 hover:opacity-100 group-hover/col-header:opacity-100 p-0.5 text-slate-400 hover:text-blue-600 rounded transition-opacity cursor-pointer shrink-0"
-                              title="Renomear etapa"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
+                            {canConfigureStages && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingColId(col.id)
+                                  setEditingColName(col.name)
+                                  setEditingColColor(col.color)
+                                }}
+                                className="opacity-50 hover:opacity-100 group-hover/col-header:opacity-100 p-0.5 text-slate-400 hover:text-blue-600 rounded transition-opacity cursor-pointer shrink-0"
+                                title="Renomear etapa"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0 ml-1.5">
                             <span className="text-xs font-bold text-slate-500 bg-white px-2 py-0.5 rounded-full shadow-2xs">
                               {columnStages.length}
                             </span>
-                            {workflowStages.length > 1 && (
+                            {canConfigureStages && workflowStages.length > 1 && (
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -2564,17 +2584,17 @@ export default function ProjectHubClient({
                         return (
                           <div
                             key={st.id}
-                            draggable={true}
-                            onDragStart={(e) => handleKanbanCardDragStart(e, st.id)}
-                            onDragOver={(e) => handleKanbanCardDragOver(e, st.id, col.id)}
-                            onDragLeave={(e) => handleKanbanCardDragLeave(e, st.id)}
-                            onDrop={(e) => handleKanbanCardDrop(e, st, col.id)}
+                            draggable={canManageTasks}
+                            onDragStart={(e) => canManageTasks && handleKanbanCardDragStart(e, st.id)}
+                            onDragOver={(e) => canManageTasks && handleKanbanCardDragOver(e, st.id, col.id)}
+                            onDragLeave={(e) => canManageTasks && handleKanbanCardDragLeave(e, st.id)}
+                            onDrop={(e) => canManageTasks && handleKanbanCardDrop(e, st, col.id)}
                             onClick={() => {
                               if (!hasDraggedKanbanBoardRef.current) {
                                 setSelectedTask(st)
                               }
                             }}
-                            className={`bg-white p-4 rounded-xl border shadow-xs space-y-2.5 hover:shadow-md hover:border-blue-300 transition-all cursor-grab active:cursor-grabbing group relative ${isDragging
+                            className={`bg-white p-4 rounded-xl border shadow-xs space-y-2.5 hover:shadow-md hover:border-blue-300 transition-all ${canManageTasks ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} group relative ${isDragging
                               ? 'opacity-30 border-dashed border-blue-400'
                               : isOverCard
                                 ? 'border-blue-400 shadow-sm'
@@ -2839,7 +2859,7 @@ export default function ProjectHubClient({
                     </button>
                   </div>
                 </div>
-              ) : (
+              ) : canConfigureStages ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -2851,7 +2871,7 @@ export default function ProjectHubClient({
                 >
                   <Plus className="w-4 h-4" /> Adicionar Nova Etapa
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
@@ -3442,6 +3462,7 @@ export default function ProjectHubClient({
         members={members}
         workflowStages={workflowStages}
         allStages={stages}
+        readOnly={!canManageTasks}
         onClose={() => setSelectedTask(null)}
         onUpdateStage={handleStageUpdatedFromDrawer}
         onDeleteStage={(stageId, subtaskMode) => handleLocalStageDeleted(stageId, subtaskMode)}

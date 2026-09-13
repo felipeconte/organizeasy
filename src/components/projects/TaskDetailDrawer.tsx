@@ -116,6 +116,7 @@ export interface TaskDetailDrawerProps {
   members?: MemberOption[]
   workflowStages?: WorkflowStage[]
   allStages?: TaskDetailData[]
+  readOnly?: boolean
   onClose: () => void
   onUpdateStage: (updated: TaskDetailData) => void
   onDeleteStage?: (stageId: string, subtaskMode?: 'cascade' | 'unlink') => void
@@ -131,6 +132,7 @@ export default function TaskDetailDrawer({
   members = [],
   workflowStages = [],
   allStages = [],
+  readOnly = false,
   onClose,
   onUpdateStage,
   onDeleteStage,
@@ -1158,36 +1160,44 @@ export default function TaskDetailDrawer({
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleDeleteCurrentStage}
-                disabled={deletingStage}
-                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
-                title="Excluir permanentemente esta tarefa"
-              >
-                {deletingStage ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-rose-600" />
-                ) : (
-                  <Trash2 className="w-4 h-4" />
-                )}
-              </button>
+              {readOnly ? (
+                <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-500 rounded-lg">
+                  Somente Leitura
+                </span>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleDeleteCurrentStage}
+                    disabled={deletingStage}
+                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+                    title="Excluir permanentemente esta tarefa"
+                  >
+                    {deletingStage ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-rose-600" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </button>
 
-              <button
-                type="button"
-                onClick={handleSaveDetails}
-                disabled={saving}
-                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-sm font-semibold transition-all shadow-xs disabled:opacity-50 cursor-pointer ${isDirty ? 'bg-blue-600 hover:bg-blue-700 ring-2 ring-blue-500/20' : 'bg-slate-700 hover:bg-slate-800'
-                  }`}
-              >
-                {saving ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : saveSuccess ? (
-                  <Check className="w-3.5 h-3.5 text-emerald-300" />
-                ) : (
-                  <Save className="w-3.5 h-3.5" />
-                )}
-                {saveSuccess ? 'Salvo!' : isDirty ? 'Salvar' : 'Salvar'}
-              </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveDetails}
+                    disabled={saving}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-sm font-semibold transition-all shadow-xs disabled:opacity-50 cursor-pointer ${isDirty ? 'bg-blue-600 hover:bg-blue-700 ring-2 ring-blue-500/20' : 'bg-slate-700 hover:bg-slate-800'
+                      }`}
+                  >
+                    {saving ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : saveSuccess ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-300" />
+                    ) : (
+                      <Save className="w-3.5 h-3.5" />
+                    )}
+                    {saveSuccess ? 'Salvo!' : isDirty ? 'Salvar' : 'Salvar'}
+                  </button>
+                </>
+              )}
 
               <button
                 type="button"

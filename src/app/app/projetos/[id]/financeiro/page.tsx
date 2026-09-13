@@ -1,5 +1,6 @@
-import { requireProjectAccess } from '@/lib/server/guard'
+import { requireProjectAccess, hasPermission } from '@/lib/server/guard'
 import { notFound } from 'next/navigation'
+import AccessDenied from '@/components/ui/AccessDenied'
 import {
   getFinancialTransactionsAction,
   getProjectsProfitabilityAction
@@ -20,10 +21,21 @@ export default async function ProjectFinanceiroPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const { project } = await requireProjectAccess(id)
+  const { project, isOwner, permissions } = await requireProjectAccess(id)
 
   if (!project) {
     notFound()
+  }
+
+  if (!hasPermission(isOwner, permissions, 'module_financial')) {
+    return (
+      <AccessDenied
+        moduleName="Financeiro do Projeto"
+        title="Acesso Restrito ao Módulo Financeiro"
+        message="Seu perfil de acesso não possui permissão para visualizar o controle financeiro deste projeto."
+        backHref={`/app/projetos/${id}`}
+      />
+    )
   }
 
   // 1. Busca transações financeiras, relatórios e fornecedores vinculados
@@ -73,6 +85,8 @@ export default async function ProjectFinanceiroPage({
         initialProfitability={initialProfitability}
         companies={companies}
         projectCompaniesSummary={projectCompaniesRes.summary}
+        isOwner={isOwner}
+        userPermissions={permissions}
       />
     </>
   )

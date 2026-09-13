@@ -43,11 +43,24 @@ export interface UserProfileData {
 export interface UserProfileSettingsClientProps {
   initialProfile: UserProfileData
   role: string
+  profileName?: string
+  profileColor?: string
+}
+
+const ROLE_LABELS: Record<string, { label: string; bg: string; text: string; border: string }> = {
+  owner: { label: 'Proprietário', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200' },
+  admin: { label: 'Administrador', bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200' },
+  collaborator: { label: 'Colaborador', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
+  architect: { label: 'Colaborador', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
+  intern: { label: 'Estagiário', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+  estagiario: { label: 'Estagiário', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
 }
 
 export default function UserProfileSettingsClient({
   initialProfile,
   role,
+  profileName,
+  profileColor,
 }: UserProfileSettingsClientProps) {
   const showAlert = useAlert()
   const confirm = useConfirm()
@@ -515,9 +528,50 @@ export default function UserProfileSettingsClient({
                   <span className="text-sm text-slate-500 font-medium">
                     {profile.jobRole || 'Membro da Equipe'}
                   </span>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 capitalize">
-                    {role}
-                  </span>
+                  {(() => {
+                    const normalizedRole = (role || '').toLowerCase()
+                    const roleConfig = ROLE_LABELS[normalizedRole] || {
+                      label:
+                        normalizedRole === 'intern'
+                          ? 'Estagiário'
+                          : normalizedRole === 'admin'
+                          ? 'Administrador'
+                          : normalizedRole === 'owner'
+                          ? 'Proprietário'
+                          : 'Colaborador',
+                      bg: 'bg-amber-50',
+                      text: 'text-amber-700',
+                      border: 'border-amber-200',
+                    }
+
+                    const displayProfileName =
+                      profileName?.toLowerCase() === 'intern'
+                        ? 'Estagiário'
+                        : profileName?.toLowerCase() === 'architect'
+                        ? 'Colaborador'
+                        : profileName?.toLowerCase() === 'collaborator'
+                        ? 'Colaborador'
+                        : profileName?.toLowerCase() === 'admin'
+                        ? 'Administrador'
+                        : profileName?.toLowerCase() === 'owner'
+                        ? 'Proprietário'
+                        : profileName
+
+                    return displayProfileName ? (
+                      <span
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold text-white shadow-2xs"
+                        style={{ backgroundColor: profileColor || '#2563EB' }}
+                      >
+                        {displayProfileName}
+                      </span>
+                    ) : (
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold border ${roleConfig.bg} ${roleConfig.text} ${roleConfig.border}`}
+                      >
+                        {roleConfig.label}
+                      </span>
+                    )
+                  })()}
                 </div>
               </div>
             </div>

@@ -41,6 +41,9 @@ import TransactionModal from '@/components/financial/TransactionModal'
 import BackButton from '@/components/ui/BackButton'
 import { formatProjectClientDisplay } from '@/lib/formatters-and-validators'
 
+import { ProfilePermissions, hasPermission } from '@/types/profiles'
+import { usePermissions } from '@/contexts/PermissionsContext'
+
 interface ProjectFinancialClientProps {
   project: {
     id: string
@@ -61,6 +64,8 @@ interface ProjectFinancialClientProps {
     totalReceivedCommission: number
     totalPendingCommission: number
   } | null
+  isOwner?: boolean
+  userPermissions?: ProfilePermissions
 }
 
 export default function ProjectFinancialClient({
@@ -68,8 +73,16 @@ export default function ProjectFinancialClient({
   initialTransactions,
   initialProfitability,
   companies,
-  projectCompaniesSummary
+  projectCompaniesSummary,
+  isOwner: propIsOwner,
+  userPermissions: propUserPermissions,
 }: ProjectFinancialClientProps) {
+  const permissionsContext = usePermissions()
+  const isOwner = propIsOwner ?? permissionsContext.isOwner
+  const userPermissions = propUserPermissions ?? permissionsContext.permissions
+  const canCreateEdit = hasPermission(isOwner, userPermissions, 'financial_create_edit')
+  const canViewSensitive = hasPermission(isOwner, userPermissions, 'financial_view_sensitive')
+
   const [transactions, setTransactions] = useState<FinancialTransaction[]>(initialTransactions)
   const [isTxModalOpen, setIsTxModalOpen] = useState(false)
   const [selectedTx, setSelectedTx] = useState<FinancialTransaction | null>(null)
@@ -77,6 +90,7 @@ export default function ProjectFinancialClient({
   const [isPending, startTransition] = useTransition()
 
   const formatBRL = (val: number) => {
+    if (!canViewSensitive) return '••••••'
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
@@ -260,21 +274,25 @@ export default function ProjectFinancialClient({
             Comissões & Parceiros
           </Link>
 
-          <button
-            onClick={() => handleOpenModal('expense')}
-            className="inline-flex items-center gap-2 py-2.5 px-4 rounded-xl bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 text-sm font-semibold transition-all shadow-xs cursor-pointer"
-          >
-            <TrendingDown className="w-4 h-4 text-rose-600" />
-            + Nova Despesa
-          </button>
+          {canCreateEdit && (
+            <button
+              onClick={() => handleOpenModal('expense')}
+              className="inline-flex items-center gap-2 py-2.5 px-4 rounded-xl bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 text-sm font-semibold transition-all shadow-xs cursor-pointer"
+            >
+              <TrendingDown className="w-4 h-4 text-rose-600" />
+              + Nova Despesa
+            </button>
+          )}
 
-          <button
-            onClick={() => handleOpenModal('income')}
-            className="inline-flex items-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-all shadow-xs shadow-emerald-600/20 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            + Nova Receita
-          </button>
+          {canCreateEdit && (
+            <button
+              onClick={() => handleOpenModal('income')}
+              className="inline-flex items-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-all shadow-xs shadow-emerald-600/20 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              + Nova Receita
+            </button>
+          )}
         </div>
       </div>
 
@@ -373,7 +391,7 @@ export default function ProjectFinancialClient({
                   : 'bg-rose-100 text-rose-800'
               }`}
             >
-              {stats.profitMargin.toFixed(1)}%
+              {canViewSensitive ? `${stats.profitMargin.toFixed(1)}%` : '••••••'}
             </span>
           </div>
           <div className="mt-4">
@@ -476,20 +494,22 @@ export default function ProjectFinancialClient({
             <p className="text-sm text-slate-500">Histórico de todas as entradas e saídas associadas a este contrato.</p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => handleOpenModal('expense')}
-              className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition-colors cursor-pointer"
-            >
-              + Despesa
-            </button>
-            <button
-              onClick={() => handleOpenModal('income')}
-              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors shadow-xs cursor-pointer"
-            >
-              + Receita
-            </button>
-          </div>
+          {canCreateEdit && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleOpenModal('expense')}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                + Despesa
+              </button>
+              <button
+                onClick={() => handleOpenModal('income')}
+                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors shadow-xs cursor-pointer"
+              >
+                + Receita
+              </button>
+            </div>
+          )}
         </div>
 
         {transactions.length === 0 ? (
@@ -524,26 +544,48 @@ export default function ProjectFinancialClient({
                     <tr key={tx.id} className="hover:bg-slate-50/70 transition-colors group">
                       {/* Status Toggle */}
                       <td className="py-4 px-4 whitespace-nowrap">
-                        <button
-                          onClick={() => handleToggleStatus(tx)}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
-                            isPaid
-                              ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                              : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
-                          }`}
-                        >
-                          {isPaid ? (
-                            <>
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>Pago</span>
-                            </>
-                          ) : (
-                            <>
-                              <Clock className="w-3.5 h-3.5 text-amber-600" />
-                              <span>Pendente</span>
-                            </>
-                          )}
-                        </button>
+                        {canCreateEdit ? (
+                          <button
+                            onClick={() => handleToggleStatus(tx)}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                              isPaid
+                                ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                                : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                            }`}
+                          >
+                            {isPaid ? (
+                              <>
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Pago</span>
+                              </>
+                            ) : (
+                              <>
+                                <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                <span>Pendente</span>
+                              </>
+                            )}
+                          </button>
+                        ) : (
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs ${
+                              isPaid
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}
+                          >
+                            {isPaid ? (
+                              <>
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Pago</span>
+                              </>
+                            ) : (
+                              <>
+                                <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                <span>Pendente</span>
+                              </>
+                            )}
+                          </span>
+                        )}
                       </td>
 
                       {/* Title */}
@@ -582,12 +624,16 @@ export default function ProjectFinancialClient({
 
                       {/* Actions */}
                       <td className="py-4 px-4 whitespace-nowrap text-right">
-                        <button
-                          onClick={() => handleOpenEdit(tx)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
+                        {canCreateEdit ? (
+                          <button
+                            onClick={() => handleOpenEdit(tx)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <span className="text-slate-300 text-xs">-</span>
+                        )}
                       </td>
                     </tr>
                   )

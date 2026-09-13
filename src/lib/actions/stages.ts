@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { requireProjectAccess } from '@/lib/server/guard'
+import { requireProjectAccess, requirePermission } from '@/lib/server/guard'
 import { sanitizeText } from '@/lib/server/sanitize'
 import { normalizeWorkflowStages, canMoveToFinalStage } from '@/lib/workflow-stages'
 
@@ -38,7 +38,8 @@ export async function updateStageStatusAction(
   stageId: string,
   newStatus: string
 ) {
-  const { supabase, user } = await requireProjectAccess(projectId)
+  const { supabase, user, project } = await requireProjectAccess(projectId)
+  await requirePermission(project.organization_id, 'tasks_manage')
 
   // 1. Busca etapa atual e workflow_stages da organização para validação de integridade
   const { data: stageRecord } = await supabase
@@ -205,7 +206,8 @@ export async function updateStageProgressAction(
   stageId: string,
   progressPercent: number
 ) {
-  const { supabase } = await requireProjectAccess(projectId)
+  const { supabase, project } = await requireProjectAccess(projectId)
+  await requirePermission(project.organization_id, 'tasks_manage')
 
   const clamped = Math.max(0, Math.min(100, Math.round(progressPercent)))
   const newStatus = clamped === 100 ? 'concluido' : clamped === 0 ? 'a_iniciar' : 'em_producao'
@@ -241,7 +243,8 @@ export async function updateStageFullDetailsAction(
     parent_stage_id?: string | null
   }
 ) {
-  const { supabase, user } = await requireProjectAccess(projectId)
+  const { supabase, user, project } = await requireProjectAccess(projectId)
+  await requirePermission(project.organization_id, 'tasks_manage')
 
   const updatePayload: Record<string, any> = {}
 
@@ -401,7 +404,8 @@ export async function createStageAction(
     parent_stage_id?: string | null
   }
 ) {
-  const { supabase } = await requireProjectAccess(projectId)
+  const { supabase, project } = await requireProjectAccess(projectId)
+  await requirePermission(project.organization_id, 'tasks_manage')
   const cleanName = sanitizeText(data.name)
   if (!cleanName) return { error: 'O nome da tarefa é obrigatório' }
 
@@ -463,7 +467,8 @@ export async function deleteStageAction(
   stageId: string,
   subtaskMode: 'cascade' | 'unlink' = 'cascade'
 ) {
-  const { supabase, user } = await requireProjectAccess(projectId)
+  const { supabase, user, project } = await requireProjectAccess(projectId)
+  await requirePermission(project.organization_id, 'tasks_manage')
   const now = new Date().toISOString()
 
   // Se o modo for 'unlink', desvincula as subtarefas filhas transformando-as em tarefas independentes
@@ -564,7 +569,8 @@ export async function getDeletedStagesAction(projectId: string): Promise<{
 }
 
 export async function restoreStageAction(projectId: string, stageId: string) {
-  const { supabase } = await requireProjectAccess(projectId)
+  const { supabase, project } = await requireProjectAccess(projectId)
+  await requirePermission(project.organization_id, 'tasks_manage')
 
   const { error } = await (supabase
     .from('project_stages') as any)

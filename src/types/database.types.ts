@@ -95,21 +95,24 @@ export type Database = {
           id: string
           organization_id: string
           user_id: string
-          role: 'owner' | 'admin' | 'architect' | 'intern'
+          role: 'owner' | 'admin' | 'collaborator' | 'intern'
+          profile_id: string | null
           created_at: string
         }
         Insert: {
           id?: string
           organization_id: string
           user_id: string
-          role?: 'owner' | 'admin' | 'architect' | 'intern'
+          role?: 'owner' | 'admin' | 'collaborator' | 'intern'
+          profile_id?: string | null
           created_at?: string
         }
         Update: {
           id?: string
           organization_id?: string
           user_id?: string
-          role?: 'owner' | 'admin' | 'architect' | 'intern'
+          role?: 'owner' | 'admin' | 'collaborator' | 'intern'
+          profile_id?: string | null
           created_at?: string
         }
         Relationships: [
@@ -118,6 +121,111 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_members_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "access_profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      access_profiles: {
+        Row: {
+          id: string
+          organization_id: string
+          name: string
+          description: string | null
+          color: string
+          is_owner_profile: boolean
+          is_system: boolean
+          permissions: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          name: string
+          description?: string | null
+          color?: string
+          is_owner_profile?: boolean
+          is_system?: boolean
+          permissions?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          name?: string
+          description?: string | null
+          color?: string
+          is_owner_profile?: boolean
+          is_system?: boolean
+          permissions?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_profiles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      organization_invites: {
+        Row: {
+          id: string
+          organization_id: string
+          email: string
+          profile_id: string | null
+          invite_code: string
+          invited_by: string | null
+          status: string
+          created_at: string
+          expires_at: string | null
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          email: string
+          profile_id?: string | null
+          invite_code: string
+          invited_by?: string | null
+          status?: string
+          created_at?: string
+          expires_at?: string | null
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          email?: string
+          profile_id?: string | null
+          invite_code?: string
+          invited_by?: string | null
+          status?: string
+          created_at?: string
+          expires_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_invites_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_invites_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "access_profiles"
             referencedColumns: ["id"]
           }
         ]
@@ -1244,7 +1352,7 @@ export type Database = {
       }
     }
     Enums: {
-      user_role: 'owner' | 'admin' | 'architect' | 'intern'
+      user_role: 'owner' | 'admin' | 'collaborator' | 'intern'
       project_status: 'ativo' | 'pausado' | 'concluido' | 'cancelado'
       stage_status: 'a_iniciar' | 'em_producao' | 'em_aprovacao' | 'concluido'
       task_priority: 'low' | 'medium' | 'high' | 'urgent'

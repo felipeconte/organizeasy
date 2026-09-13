@@ -33,10 +33,10 @@ export default function RegisterPage() {
           <span className="text-2xl font-bold text-slate-900 tracking-tight">Orgarq</span>
         </Link>
         <h2 className="text-xl font-bold text-slate-800 tracking-tight">
-          Crie a conta do seu escritório
+          Crie sua conta no Orgarq
         </h2>
         <p className="text-xs text-slate-500">
-          Template com as 10 etapas da arquitetura será ativado automaticamente
+          Você poderá criar o seu escritório ou ingressar na equipe de um parceiro no próximo passo
         </p>
       </div>
 
@@ -51,7 +51,7 @@ export default function RegisterPage() {
 
           <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center gap-2 text-xs text-blue-700">
             <Sparkles className="w-4 h-4 shrink-0 text-blue-600" />
-            <span>Inclui tarefas do padrão do sistema + Portal do Cliente</span>
+            <span>Fluxo simplificado: crie sua conta e escolha seu escritório</span>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -68,24 +68,6 @@ export default function RegisterPage() {
                   name="name"
                   required
                   placeholder="Arq. Mariana Souza"
-                  className="block w-full pl-10 pr-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Nome do Escritório / Estúdio
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                  <Briefcase className="w-4 h-4" />
-                </div>
-                <input
-                  type="text"
-                  name="officeName"
-                  required
-                  placeholder="Souza & Associados Arquitetura"
                   className="block w-full pl-10 pr-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
                 />
               </div>

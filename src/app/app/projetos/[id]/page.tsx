@@ -1,4 +1,6 @@
-import { requireProjectAccess } from '@/lib/server/guard'
+import { requireProjectAccess, hasPermission } from '@/lib/server/guard'
+import { getActiveOrganization } from '@/lib/server/active-org'
+import AccessDenied from '@/components/ui/AccessDenied'
 import { notFound } from 'next/navigation'
 import { cookies } from 'next/headers'
 import ProjectHubClient from '@/components/projects/ProjectHubClient'
@@ -20,6 +22,19 @@ export default async function ProjectDetailPage({
 
   if (!project) {
     notFound()
+  }
+
+  const { activeOrg, isOwner, userPermissions } = await getActiveOrganization()
+
+  // Proteção de rota
+  if (!hasPermission(isOwner, userPermissions, 'module_projects')) {
+    return (
+      <AccessDenied
+        moduleName="Projetos e Tarefas"
+        userProfileName={activeOrg?.profile_name}
+        userProfileColor={activeOrg?.profile_color}
+      />
+    )
   }
 
   // Identifica a visão inicial (URL searchParams > Cookie > 'lista')
@@ -168,6 +183,8 @@ export default async function ProjectDetailPage({
         clients={(clientsData || []) as any[]}
         organizationId={project.organization_id}
         projectId={id}
+        isOwner={isOwner}
+        userPermissions={userPermissions}
       />
 
 
@@ -180,6 +197,8 @@ export default async function ProjectDetailPage({
         members={membersList}
         initialWorkflowStages={workflowStages}
         initialView={initialView}
+        isOwner={isOwner}
+        userPermissions={userPermissions}
         initialDeletedStages={(rawDeletedStages || []).map((ds: any) => ({
           id: ds.id,
           name: ds.name,

@@ -1,4 +1,7 @@
-import { requireAuth } from '@/lib/server/guard'
+import { getActiveOrganization } from '@/lib/server/active-org'
+import { redirect } from 'next/navigation'
+import { hasPermission } from '@/lib/server/guard'
+import AccessDenied from '@/components/ui/AccessDenied'
 import {
   getFinancialTransactionsAction,
   getFinancialSummaryAction,
@@ -16,30 +19,24 @@ export const metadata = {
 }
 
 export default async function FinanceiroPage() {
-  const { supabase, user } = await requireAuth()
+  const { supabase, user, activeOrg, isOwner, userPermissions } = await getActiveOrganization()
 
-  // 1. Busca organização do usuário
-  let { data: member } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .limit(1)
-    .maybeSingle()
-
-  let orgId = member?.organization_id || ''
-
-  if (!orgId) {
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('id')
-      .eq('owner_id', user.id)
-      .limit(1)
-      .maybeSingle()
-
-    if (org?.id) {
-      orgId = org.id
-    }
+  if (!activeOrg) {
+    redirect('/onboarding')
   }
+
+  // Proteção de rota
+  if (!hasPermission(isOwner, userPermissions, 'module_financial')) {
+    return (
+      <AccessDenied
+        moduleName="Gestão Financeira"
+        userProfileName={activeOrg.profile_name}
+        userProfileColor={activeOrg.profile_color}
+      />
+    )
+  }
+
+  const orgId = activeOrg.id
 
   // 2. Busca lista de projetos da organização para dropdowns
   const { data: projectsData } = await supabase
@@ -128,6 +125,8 @@ export default async function FinanceiroPage() {
       projects={projectsList}
       companies={companiesList}
       clients={clientsList}
+      isOwner={isOwner}
+      userPermissions={userPermissions}
     />
   )
 }

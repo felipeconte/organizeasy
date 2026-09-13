@@ -1,18 +1,10 @@
-import { requireAuth } from '@/lib/server/guard'
+import { getActiveOrganization } from '@/lib/server/active-org'
 import UserProfileSettingsClient, { UserProfileData } from '@/components/profile/UserProfileSettingsClient'
 
 export default async function UserProfilePage() {
-  const { supabase, user } = await requireAuth()
+  const { supabase, user, activeOrg } = await getActiveOrganization()
 
-  // 1. Busca o papel do usuário na organização
-  const { data: member } = await supabase
-    .from('organization_members')
-    .select('role')
-    .eq('user_id', user.id)
-    .limit(1)
-    .maybeSingle()
-
-  // 2. Busca perfil na tabela dedicada user_profiles
+  // 1. Busca perfil na tabela dedicada user_profiles
   const { data: dbProfile } = await supabase
     .from('user_profiles')
     .select('*')
@@ -35,7 +27,9 @@ export default async function UserProfilePage() {
   return (
     <UserProfileSettingsClient
       initialProfile={profileData}
-      role={member?.role || 'owner'}
+      role={activeOrg?.role || 'collaborator'}
+      profileName={activeOrg?.profile_name || (activeOrg?.is_owner ? 'Proprietário' : undefined)}
+      profileColor={activeOrg?.profile_color || undefined}
     />
   )
 }

@@ -29,19 +29,32 @@ import { ClientData, ClientProjectItem, resendClientPortalAccessAction } from '@
 import { maskCPFOrCNPJ, maskPhone, maskCEP } from '@/lib/formatters-and-validators'
 import { formatDateBR } from '@/lib/date-utils'
 import { useConfirm, useAlert } from '@/components/ui/ConfirmDialog'
+import { ProfilePermissions, hasPermission } from '@/types/profiles'
+import { usePermissions } from '@/contexts/PermissionsContext'
 import ClientModal from './ClientModal'
 
 export interface ClientDetailClientProps {
   client: ClientData
   projects: ClientProjectItem[]
   organizationId?: string
+  isOwner?: boolean
+  userPermissions?: ProfilePermissions
 }
 
 export default function ClientDetailClient({
   client: initialClient,
   projects,
   organizationId,
+  isOwner: propIsOwner,
+  userPermissions: propUserPermissions,
 }: ClientDetailClientProps) {
+  const permissionsContext = usePermissions()
+  const isOwner = propIsOwner ?? permissionsContext.isOwner
+  const userPermissions = propUserPermissions ?? permissionsContext.permissions
+  const canCreateEdit = hasPermission(isOwner, userPermissions, 'clients_create_edit')
+  const canPortal = hasPermission(isOwner, userPermissions, 'clients_portal')
+  const canCreateProject = hasPermission(isOwner, userPermissions, 'projects_create')
+
   const confirm = useConfirm()
   const showAlert = useAlert()
   const [client, setClient] = useState<ClientData>(initialClient)
@@ -139,20 +152,24 @@ export default function ClientDetailClient({
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsEditModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:text-blue-600 hover:bg-slate-50 text-sm font-semibold transition-all shadow-xs cursor-pointer"
-          >
-            <Edit2 className="w-4 h-4" /> Editar Cadastro
-          </button>
+          {canCreateEdit && (
+            <button
+              type="button"
+              onClick={() => setIsEditModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:text-blue-600 hover:bg-slate-50 text-sm font-semibold transition-all shadow-xs cursor-pointer"
+            >
+              <Edit2 className="w-4 h-4" /> Editar Cadastro
+            </button>
+          )}
 
-          <Link
-            href={`/app/projetos/novo?clientId=${client.id}`}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all shadow-sm shadow-blue-500/20 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> Novo Projeto para este Cliente
-          </Link>
+          {canCreateProject && (
+            <Link
+              href={`/app/projetos/novo?clientId=${client.id}`}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all shadow-sm shadow-blue-500/20 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> Novo Projeto para este Cliente
+            </Link>
+          )}
         </div>
       </div>
 
@@ -239,24 +256,26 @@ export default function ClientDetailClient({
             )}
 
             {/* Acesso ao Portal do Cliente */}
-            <div className="pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={handleResendAccess}
-                disabled={resendingAccess}
-                className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200/80 hover:border-blue-300 text-sm font-semibold transition-all cursor-pointer disabled:opacity-50"
-              >
-                {resendingAccess ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Enviando Acesso...
-                  </>
-                ) : (
-                  <>
-                    <KeyRound className="w-4 h-4 text-blue-600" /> Reenviar Acesso ao Portal
-                  </>
-                )}
-              </button>
-            </div>
+            {canPortal && (
+              <div className="pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={handleResendAccess}
+                  disabled={resendingAccess}
+                  className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200/80 hover:border-blue-300 text-sm font-semibold transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {resendingAccess ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Enviando Acesso...
+                    </>
+                  ) : (
+                    <>
+                      <KeyRound className="w-4 h-4 text-blue-600" /> Reenviar Acesso ao Portal
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -316,12 +335,14 @@ export default function ClientDetailClient({
             </div>
           </div>
 
-          <Link
-            href={`/app/projetos/novo?clientId=${client.id}`}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-semibold transition-all cursor-pointer w-fit"
-          >
-            <Plus className="w-4 h-4" /> Adicionar Projeto
-          </Link>
+          {canCreateProject && (
+            <Link
+              href={`/app/projetos/novo?clientId=${client.id}`}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-semibold transition-all cursor-pointer w-fit"
+            >
+              <Plus className="w-4 h-4" /> Adicionar Projeto
+            </Link>
+          )}
         </div>
 
         {projects.length === 0 ? (
@@ -331,12 +352,14 @@ export default function ClientDetailClient({
             <p className="text-xs text-slate-400 mt-1">
               Crie o primeiro projeto para começar o cronograma e aprovações no portal.
             </p>
-            <Link
-              href={`/app/projetos/novo?clientId=${client.id}`}
-              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all cursor-pointer"
-            >
-              <Plus className="w-4 h-4" /> Criar Primeiro Projeto
-            </Link>
+            {canCreateProject && (
+              <Link
+                href={`/app/projetos/novo?clientId=${client.id}`}
+                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all cursor-pointer"
+              >
+                <Plus className="w-4 h-4" /> Criar Primeiro Projeto
+              </Link>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

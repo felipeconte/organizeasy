@@ -1,9 +1,10 @@
-import { requireAuth } from '@/lib/server/guard'
+import { getActiveOrganization } from '@/lib/server/active-org'
 import { getFinancialSummaryAction } from '@/lib/actions/financial'
 import OverviewDashboardClient, {
   DashboardProject,
   DashboardFinancialSummary,
 } from '@/components/dashboard/OverviewDashboardClient'
+import { redirect } from 'next/navigation'
 
 export const metadata = {
   title: 'Visão Geral | Orgarq',
@@ -11,44 +12,29 @@ export const metadata = {
 }
 
 export default async function DashboardPage() {
-  const { supabase, user } = await requireAuth()
+  const { supabase, user, activeOrg, isOwner, userPermissions } = await getActiveOrganization()
 
-  // 1. Busca todas as organizações onde o usuário é membro ou owner
-  const { data: memberOrgs } = await supabase
-    .from('organization_members')
-    .select('organization_id, role, organizations(id, name, slug)')
-    .eq('user_id', user.id)
-
-  const { data: ownedOrgs } = await supabase
-    .from('organizations')
-    .select('id, name, slug')
-    .eq('owner_id', user.id)
-
-  const orgIdsSet = new Set<string>()
-  let officeName = 'Meu Escritório'
-  let primaryOrgId = ''
-
-  if (ownedOrgs && ownedOrgs.length > 0) {
-    ownedOrgs.forEach((o) => {
-      orgIdsSet.add(o.id)
-      if (!primaryOrgId) {
-        primaryOrgId = o.id
-        officeName = o.name || officeName
-      }
-    })
+  if (!activeOrg) {
+    redirect('/onboarding')
   }
 
-  if (memberOrgs && memberOrgs.length > 0) {
-    memberOrgs.forEach((m: any) => {
-      orgIdsSet.add(m.organization_id)
-      if (!primaryOrgId) {
-        primaryOrgId = m.organization_id
-        officeName = m.organizations?.name || officeName
-      }
-    })
+  // Se o usuário não tiver permissão para o dashboard (Visão Geral), redireciona para o primeiro módulo que ele tem acesso
+  if (!isOwner && !userPermissions?.module_dashboard) {
+    if (userPermissions?.module_projects) {
+      redirect('/app/projetos')
+    } else if (userPermissions?.module_clients) {
+      redirect('/app/clientes')
+    } else if (userPermissions?.module_companies) {
+      redirect('/app/empresas')
+    } else if (userPermissions?.module_financial) {
+      redirect('/app/financeiro')
+    } else {
+      redirect('/app/configuracoes/perfil')
+    }
   }
 
-  const allOrgIds = Array.from(orgIdsSet)
+  const officeName = activeOrg.name
+  const primaryOrgId = activeOrg.id
 
   // 2. Busca perfil do usuário
   const { data: dbProfile } = await supabase
@@ -66,8 +52,8 @@ export default async function DashboardPage() {
     user.email?.split('@')[0] ||
     'Arquiteto'
 
-  // 3. Monta consulta de projetos com etapas aninhadas
-  let query = supabase
+  // 3. Monta consulta de projetos do escritório ativo com etapas aninhadas
+  const { data: projs, error: projsError } = await supabase
     .from('projects')
     .select(`
       id,
@@ -92,15 +78,8 @@ export default async function DashboardPage() {
         deleted_at
       )
     `)
+    .eq('organization_id', activeOrg.id)
     .order('created_at', { ascending: false })
-
-  if (allOrgIds.length > 0) {
-    query = query.or(`organization_id.in.(${allOrgIds.join(',')}),created_by.eq.${user.id}`)
-  } else {
-    query = query.eq('created_by', user.id)
-  }
-
-  const { data: projs, error: projsError } = await query
 
   if (projsError) {
     console.error('Erro ao buscar projetos no dashboard:', projsError)
@@ -128,7 +107,7 @@ export default async function DashboardPage() {
     }
   }
 
-  // 5. Busca dados consolidados do financeiro (se houver organização)
+  // 5. Busca dados consolidados do financeiro para o escritório ativo
   let financialSummary: DashboardFinancialSummary | null = null
 
   if (primaryOrgId) {

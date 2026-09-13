@@ -37,6 +37,8 @@ import ClientMultiSelect from '@/components/projects/ClientMultiSelect'
 import TypologySelect from '@/components/projects/TypologySelect'
 import { useAlert } from '@/components/ui/ConfirmDialog'
 import { formatProjectClientDisplay, formatAreaOnlyNumbers, formatNumberBRL } from '@/lib/formatters-and-validators'
+import { usePermissions } from '@/contexts/PermissionsContext'
+import { ProfilePermissions } from '@/types/profiles'
 
 const ProjectLocationMap = dynamic(
   () => import('./ProjectLocationMap'),
@@ -124,6 +126,8 @@ export interface ProjectsManagerClientProps {
   initialProjects: ProjectItem[]
   initialClients?: ClientData[]
   organizationId?: string
+  isOwner?: boolean
+  userPermissions?: ProfilePermissions
 }
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; label: string }> = {
@@ -138,8 +142,16 @@ export default function ProjectsManagerClient({
   initialProjects,
   initialClients = [],
   organizationId,
+  isOwner: propIsOwner,
+  userPermissions: propPermissions,
 }: ProjectsManagerClientProps) {
   const showAlert = useAlert()
+  const { can, isOwner: contextIsOwner } = usePermissions()
+  const effectiveIsOwner = propIsOwner !== undefined ? propIsOwner : contextIsOwner
+  const canCreate = effectiveIsOwner || can('projects_create')
+  const canEdit = effectiveIsOwner || can('projects_edit')
+  const canDelete = effectiveIsOwner || can('projects_delete')
+
   const [projects, setProjects] = useState<ProjectItem[]>(initialProjects)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('todos')
@@ -512,12 +524,14 @@ export default function ProjectsManagerClient({
           </p>
         </div>
 
-        <Link
-          href="/app/projetos/novo"
-          className="inline-flex items-center gap-1.5 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm shadow-blue-500/25 cursor-pointer shrink-0"
-        >
-          <Plus className="w-4 h-4" /> Novo Projeto
-        </Link>
+        {canCreate && (
+          <Link
+            href="/app/projetos/novo"
+            className="inline-flex items-center gap-1.5 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm shadow-blue-500/25 cursor-pointer shrink-0"
+          >
+            <Plus className="w-4 h-4" /> Novo Projeto
+          </Link>
+        )}
       </div>
 
       {/* Filter & Search Bar */}
@@ -607,14 +621,14 @@ export default function ProjectsManagerClient({
             >
               Limpar Filtros
             </button>
-          ) : (
+          ) : canCreate ? (
             <Link
               href="/app/projetos/novo"
               className="inline-flex items-center gap-1.5 py-2.5 px-4 rounded-xl bg-blue-600 text-white text-sm font-semibold shadow-xs hover:bg-blue-700 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Cadastrar Projeto Agora
             </Link>
-          )}
+          ) : null}
         </div>
       ) : viewMode === 'grid' ? (
         /* GRID VIEW */
@@ -642,21 +656,25 @@ export default function ProjectsManagerClient({
                       </span>
 
                       {/* Edit & Delete Action Buttons */}
-                      <button
-                        onClick={() => handleOpenEdit(proj)}
-                        className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                        title="Editar Informações do Projeto"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => handleOpenEdit(proj)}
+                          className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                          title="Editar Informações do Projeto"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      )}
 
-                      <button
-                        onClick={() => setDeletingProject(proj)}
-                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                        title="Excluir Projeto"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {canDelete && (
+                        <button
+                          onClick={() => setDeletingProject(proj)}
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          title="Excluir Projeto"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -776,20 +794,24 @@ export default function ProjectsManagerClient({
                         >
                           <ArrowRight className="w-4 h-4" />
                         </Link>
-                        <button
-                          onClick={() => handleOpenEdit(proj)}
-                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg inline-flex items-center transition-colors cursor-pointer"
-                          title="Editar"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setDeletingProject(proj)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg inline-flex items-center transition-colors cursor-pointer"
-                          title="Excluir"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {canEdit && (
+                          <button
+                            onClick={() => handleOpenEdit(proj)}
+                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg inline-flex items-center transition-colors cursor-pointer"
+                            title="Editar"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button
+                            onClick={() => setDeletingProject(proj)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg inline-flex items-center transition-colors cursor-pointer"
+                            title="Excluir"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   )

@@ -29,12 +29,12 @@ export async function loginAction(formData: FormData) {
 
 export async function registerAction(formData: FormData) {
   const name = sanitizeText(formData.get('name') as string)
-  const officeName = sanitizeText(formData.get('officeName') as string)
   const email = sanitizeText(formData.get('email') as string)
   const password = formData.get('password') as string
+  const officeName = formData.get('officeName') ? sanitizeText(formData.get('officeName') as string) : ''
 
-  if (!name || !officeName || !email || !password) {
-    return { error: 'Todos os campos são obrigatórios.' }
+  if (!name || !email || !password) {
+    return { error: 'Nome, e-mail e senha são obrigatórios.' }
   }
 
   if (password.length < 6) {
@@ -59,25 +59,31 @@ export async function registerAction(formData: FormData) {
   }
 
   const userId = authData.user.id
-  const slug = officeName
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)+/g, '') + '-' + Math.floor(1000 + Math.random() * 9000)
 
-  // 2. Cria a Organização (o trigger no Postgres criará automaticamente as 10 etapas padrão)
-  const { error: orgError } = await supabase
-    .from('organizations')
-    .insert({
-      name: officeName,
-      slug,
-      owner_id: userId,
-      email,
-    })
+  // 2. Se o usuário já informou nome do escritório diretamente, cria a Organização
+  if (officeName) {
+    const slug =
+      officeName
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '') +
+      '-' +
+      Math.floor(1000 + Math.random() * 9000)
 
-  if (orgError) {
-    console.error('Erro ao criar organização inicial:', orgError)
+    const { error: orgError } = await supabase
+      .from('organizations')
+      .insert({
+        name: officeName,
+        slug,
+        owner_id: userId,
+        email,
+      })
+
+    if (orgError) {
+      console.error('Erro ao criar organização inicial:', orgError)
+    }
   }
 
   // 3. Se confirmação de e-mail estiver ativa (sem sessão imediata), envia e-mail com layout Orgarq via Resend
@@ -93,7 +99,7 @@ export async function registerAction(formData: FormData) {
         password,
         options: {
           data: { full_name: name },
-          redirectTo: `${baseUrl}/app`,
+          redirectTo: `${baseUrl}/onboarding`,
         },
       })
       if (linkData?.properties?.action_link) {
@@ -108,7 +114,7 @@ export async function registerAction(formData: FormData) {
     }
   }
 
-  redirect('/app')
+  redirect('/onboarding')
 }
 
 export async function logoutAction() {

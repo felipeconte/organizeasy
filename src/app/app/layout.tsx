@@ -1,36 +1,26 @@
-import { requireAuth } from '@/lib/server/guard'
+import { getActiveOrganization } from '@/lib/server/active-org'
 import { AppShellClient } from '@/components/layout/AppShellClient'
+import { redirect } from 'next/navigation'
+import { PermissionsProvider } from '@/contexts/PermissionsContext'
 
 export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const { supabase, user } = await requireAuth()
+  const {
+    supabase,
+    user,
+    activeOrg,
+    userOrganizations,
+    isOwner,
+    userPermissions,
+  } = await getActiveOrganization()
 
-  // Busca dados da organização do usuário
-  const { data: member } = await supabase
-    .from('organization_members')
-    .select('role, organizations(id, name, slug, logo_url)')
-    .eq('user_id', user.id)
-    .limit(1)
-    .maybeSingle()
-
-  let org = member?.organizations as { id: string; name: string; slug: string; logo_url: string | null } | null
-
-  if (!org) {
-    const { data: ownedOrg } = await supabase
-      .from('organizations')
-      .select('id, name, slug, logo_url')
-      .eq('owner_id', user.id)
-      .limit(1)
-      .maybeSingle()
-    if (ownedOrg) {
-      org = ownedOrg
-    }
+  // Se o usuário não pertence a nenhum escritório, redireciona para o Onboarding
+  if (!activeOrg) {
+    redirect('/onboarding')
   }
-
-  const officeName = org?.name || 'Meu Escritório'
 
   // Busca perfil na tabela dedicada user_profiles
   const { data: dbProfile } = await supabase
@@ -49,29 +39,36 @@ export default async function AppLayout({
     user.email?.split('@')[0] ||
     'Arquiteto'
   const userAvatarUrl = dbProfile?.avatar_url || meta.avatar_url || null
-  const userRole = member?.role || 'owner'
+  const userRole = activeOrg.profile_name || (isOwner ? 'Proprietário' : 'Membro')
 
   // Busca se há solicitações de atualização cadastral de clientes pendentes
   let pendingClientUpdatesCount = 0
-  if (org?.id) {
+  if (activeOrg.id) {
     const { count } = await supabase
       .from('client_update_requests')
       .select('*', { count: 'exact', head: true })
-      .eq('organization_id', org.id)
+      .eq('organization_id', activeOrg.id)
       .eq('status', 'pending')
     pendingClientUpdatesCount = count || 0
   }
 
   return (
-    <AppShellClient
-      officeName={officeName}
-      orgLogoUrl={org?.logo_url || null}
-      userDisplayName={userDisplayName}
-      userAvatarUrl={userAvatarUrl}
-      userRole={userRole}
-      pendingClientUpdatesCount={pendingClientUpdatesCount}
-    >
-      {children}
-    </AppShellClient>
+    <PermissionsProvider isOwner={isOwner} permissions={userPermissions}>
+      <AppShellClient
+        organizationId={activeOrg.id}
+        officeName={activeOrg.name}
+        orgLogoUrl={activeOrg.logo_url}
+        userDisplayName={userDisplayName}
+        userAvatarUrl={userAvatarUrl}
+        userRole={userRole}
+        isOwner={isOwner}
+        userPermissions={userPermissions}
+        pendingClientUpdatesCount={pendingClientUpdatesCount}
+        userOrganizations={userOrganizations}
+        activeOrgId={activeOrg.id}
+      >
+        {children}
+      </AppShellClient>
+    </PermissionsProvider>
   )
 }

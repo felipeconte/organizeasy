@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { requireAuth, requireOrgAccess, requireProjectAccess } from '@/lib/server/guard'
+import { requireAuth, requireOrgAccess, requireProjectAccess, requirePermission } from '@/lib/server/guard'
 import { sanitizeText } from '@/lib/server/sanitize'
 
 export interface ProjectCompanyItem {
@@ -188,7 +188,8 @@ export async function addProjectCompanyAction(input: ProjectCompanyInput): Promi
   error?: string
 }> {
   try {
-    const { supabase } = await requireProjectAccess(input.projectId)
+    const { supabase, project } = await requireProjectAccess(input.projectId)
+    await requirePermission(project.organization_id, 'companies_manage')
 
     // Busca dados da empresa para obter regras de comissão padrão caso não fornecidas
     const { data: company, error: compErr } = await supabase
@@ -322,7 +323,7 @@ export async function updateProjectCompanyAction(
       return { success: false, error: 'Vínculo não encontrado.' }
     }
 
-    await requireOrgAccess(existing.organization_id)
+    await requirePermission(existing.organization_id, 'companies_manage')
 
     const updatePayload: Record<string, any> = {}
 
@@ -460,7 +461,7 @@ export async function quickUpdateCommissionStatusAction(
       return { success: false, error: 'Registro não encontrado.' }
     }
 
-    await requireOrgAccess(existing.organization_id)
+    await requirePermission(existing.organization_id, 'companies_manage')
 
     const payload: Record<string, any> = {
       commission_status: status,
@@ -539,7 +540,7 @@ export async function removeProjectCompanyAction(linkId: string): Promise<{
       return { success: false, error: 'Registro não encontrado.' }
     }
 
-    await requireOrgAccess(link.organization_id)
+    await requirePermission(link.organization_id, 'companies_manage')
 
     // Remove primeiro qualquer lançamento financeiro vinculado
     await supabase

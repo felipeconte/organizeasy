@@ -1,6 +1,6 @@
 'use server'
 
-import { requireAuth, requireOrgAccess, requireProjectAccess } from '@/lib/server/guard'
+import { requireAuth, requireOrgAccess, requireProjectAccess, requirePermission } from '@/lib/server/guard'
 import { revalidatePath } from 'next/cache'
 import { Database } from '@/types/database.types'
 import {
@@ -715,7 +715,7 @@ export async function createFinancialTransactionAction(
   input: CreateTransactionInput
 ): Promise<{ success: boolean; transaction?: FinancialTransaction; error?: string }> {
   try {
-    const { supabase, user } = await requireOrgAccess(input.organizationId)
+    const { supabase, user } = await requirePermission(input.organizationId, 'financial_create_edit')
 
     if (!input.title || !input.title.trim()) {
       return { success: false, error: 'O título do lançamento é obrigatório.' }
@@ -845,7 +845,7 @@ export async function updateFinancialTransactionAction(
   input: UpdateTransactionInput
 ): Promise<{ success: boolean; transaction?: FinancialTransaction; error?: string }> {
   try {
-    const { supabase } = await requireOrgAccess(input.organizationId)
+    const { supabase } = await requirePermission(input.organizationId, 'financial_create_edit')
 
     const updatePayload: TransactionUpdate = {}
 
@@ -919,7 +919,7 @@ export async function deleteFinancialTransactionAction({
   deleteSeries?: boolean
 }): Promise<{ success: boolean; deletedRecurringId?: string | null; error?: string }> {
   try {
-    const { supabase } = await requireOrgAccess(organizationId)
+    const { supabase } = await requirePermission(organizationId, 'financial_delete')
 
     const { data: existing } = await supabase
       .from('financial_transactions')
@@ -983,7 +983,7 @@ export async function toggleTransactionStatusAction({
   paymentDate?: string
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const { supabase } = await requireOrgAccess(organizationId)
+    const { supabase } = await requirePermission(organizationId, 'financial_create_edit')
 
     const actualDate = paymentDate || (status === 'paid' ? new Date().toISOString().split('T')[0] : null)
 
@@ -1112,7 +1112,7 @@ export async function createRecurringExpenseAction(
   input: CreateRecurringExpenseInput
 ): Promise<{ success: boolean; expense?: RecurringExpense; error?: string }> {
   try {
-    const { supabase } = await requireOrgAccess(input.organizationId)
+    const { supabase } = await requirePermission(input.organizationId, 'financial_create_edit')
 
     if (!input.title || !input.title.trim()) {
       return { success: false, error: 'O nome da recorrência é obrigatório.' }
@@ -1206,7 +1206,7 @@ export async function updateRecurringExpenseAction(
   input: UpdateRecurringExpenseInput
 ): Promise<{ success: boolean; expense?: RecurringExpense; error?: string }> {
   try {
-    const { supabase } = await requireOrgAccess(input.organizationId)
+    const { supabase } = await requirePermission(input.organizationId, 'financial_create_edit')
 
     const updatePayload: RecurringExpenseUpdate = {}
 
@@ -1293,7 +1293,7 @@ export async function deleteRecurringExpenseAction({
   organizationId: string
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const { supabase } = await requireOrgAccess(organizationId)
+    const { supabase } = await requirePermission(organizationId, 'financial_delete')
 
     // Remove todos os lançamentos vinculados a essa regra
     await supabase

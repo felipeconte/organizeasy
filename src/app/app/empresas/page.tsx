@@ -1,4 +1,7 @@
-import { requireAuth } from '@/lib/server/guard'
+import { getActiveOrganization } from '@/lib/server/active-org'
+import { redirect } from 'next/navigation'
+import { hasPermission } from '@/lib/server/guard'
+import AccessDenied from '@/components/ui/AccessDenied'
 import { getCompaniesAction } from '@/lib/actions/companies'
 import CompaniesManagerClient from '@/components/companies/CompaniesManagerClient'
 
@@ -8,30 +11,24 @@ export const metadata = {
 }
 
 export default async function EmpresasPage() {
-  const { supabase, user } = await requireAuth()
+  const { supabase, user, activeOrg, isOwner, userPermissions } = await getActiveOrganization()
 
-  // Busca a organização do usuário
-  let { data: member } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .limit(1)
-    .maybeSingle()
-
-  let orgId = member?.organization_id || ''
-
-  if (!orgId) {
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('id')
-      .eq('owner_id', user.id)
-      .limit(1)
-      .maybeSingle()
-
-    if (org?.id) {
-      orgId = org.id
-    }
+  if (!activeOrg) {
+    redirect('/onboarding')
   }
+
+  // Proteção de rota
+  if (!hasPermission(isOwner, userPermissions, 'module_companies')) {
+    return (
+      <AccessDenied
+        moduleName="Empresas e Prestadores de Serviços"
+        userProfileName={activeOrg.profile_name}
+        userProfileColor={activeOrg.profile_color}
+      />
+    )
+  }
+
+  const orgId = activeOrg.id
 
   const res = await getCompaniesAction({ organizationId: orgId })
   const initialCompanies = res.companies || []
@@ -54,6 +51,8 @@ export default async function EmpresasPage() {
       <CompaniesManagerClient
         initialCompanies={initialCompanies}
         organizationId={orgId}
+        isOwner={isOwner}
+        userPermissions={userPermissions}
       />
     </div>
   )

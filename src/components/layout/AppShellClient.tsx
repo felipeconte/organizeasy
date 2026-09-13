@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   Building2,
   LayoutDashboard,
@@ -18,32 +18,53 @@ import {
   KanbanSquare,
   Briefcase,
   CircleDollarSign,
+  Shield,
+  ChevronsUpDown,
+  Check,
+  PlusCircle,
+  Loader2,
 } from 'lucide-react'
 import { logoutAction } from '@/lib/actions/auth'
+import { switchActiveOrganizationAction } from '@/lib/actions/organization'
+import type { UserOrganizationItem } from '@/types/organization'
 import { BreadcrumbProvider } from '@/contexts/BreadcrumbContext'
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs'
+import { PermissionKey, ProfilePermissions } from '@/types/profiles'
 
 interface AppShellClientProps {
+  organizationId?: string
   officeName: string
   orgLogoUrl: string | null
   userDisplayName: string
   userAvatarUrl: string | null
   userRole: string
+  isOwner?: boolean
+  userPermissions?: Partial<ProfilePermissions>
   pendingClientUpdatesCount: number
+  userOrganizations?: UserOrganizationItem[]
+  activeOrgId?: string
   children: React.ReactNode
 }
 
 export function AppShellClient({
+  organizationId,
   officeName,
   orgLogoUrl,
   userDisplayName,
   userAvatarUrl,
   userRole,
+  isOwner = false,
+  userPermissions,
   pendingClientUpdatesCount,
+  userOrganizations = [],
+  activeOrgId,
   children,
 }: AppShellClientProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false)
+  const [isOrgMenuOpen, setIsOrgMenuOpen] = useState<boolean>(false)
+  const [switchingOrgId, setSwitchingOrgId] = useState<string | null>(null)
 
   // Sincroniza estado inicial com localStorage de forma segura para SSR
   useEffect(() => {
@@ -82,27 +103,32 @@ export function AppShellClient({
       label: 'Visão Geral',
       icon: LayoutDashboard,
       exact: true,
+      permissionKey: 'module_dashboard' as PermissionKey,
     },
     {
       href: '/app/clientes',
       label: 'Clientes',
       icon: Users,
       badge: pendingClientUpdatesCount,
+      permissionKey: 'module_clients' as PermissionKey,
     },
     {
       href: '/app/projetos',
       label: 'Projetos',
       icon: FolderGit2,
+      permissionKey: 'module_projects' as PermissionKey,
     },
     {
       href: '/app/empresas',
       label: 'Empresas e Serviços',
       icon: Briefcase,
+      permissionKey: 'module_companies' as PermissionKey,
     },
     {
       href: '/app/financeiro',
       label: 'Financeiro',
       icon: CircleDollarSign,
+      permissionKey: 'module_financial' as PermissionKey,
     },
   ]
 
@@ -111,16 +137,25 @@ export function AppShellClient({
       href: '/app/configuracoes/etapas-fluxo',
       label: 'Etapas do Projeto',
       icon: KanbanSquare,
+      permissionKey: 'settings_stages' as PermissionKey,
     },
     {
       href: '/app/configuracoes/etapas',
       label: 'Template de Tarefas',
       icon: SlidersHorizontal,
+      permissionKey: 'settings_stages' as PermissionKey,
     },
     {
       href: '/app/configuracoes/escritorio',
       label: 'Dados do Escritório',
       icon: Settings,
+      permissionKey: ['settings_office', 'settings_team'] as PermissionKey[],
+    },
+    {
+      href: '/app/configuracoes/perfis',
+      label: 'Perfis de Acesso',
+      icon: Shield,
+      permissionKey: 'settings_profiles' as PermissionKey,
     },
     {
       href: '/app/configuracoes/perfil',
@@ -128,6 +163,18 @@ export function AppShellClient({
       icon: User,
     },
   ]
+
+  const checkPerm = (key?: PermissionKey | PermissionKey[]) => {
+    if (isOwner) return true
+    if (!key) return true
+    if (Array.isArray(key)) {
+      return key.some((k) => userPermissions?.[k] === true)
+    }
+    return userPermissions?.[key] === true
+  }
+
+  const visibleMainNavItems = mainNavItems.filter((item) => checkPerm(item.permissionKey))
+  const visibleConfigNavItems = configNavItems.filter((item) => checkPerm(item.permissionKey as any))
 
   const checkIsActive = (href: string, exact?: boolean) => {
     if (exact) return pathname === href
@@ -159,15 +206,16 @@ export function AppShellClient({
         </button>
 
         <div className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden">
-          {/* Logo & Nome da Empresa */}
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+          {/* Logo & Nome da Empresa / Seletor de Escritório */}
+          <div className="p-3 border-b border-slate-100 relative">
             {isCollapsed ? (
-              <Link
-                href="/app"
-                className="flex items-center justify-center w-full group"
-                title={officeName}
+              <button
+                type="button"
+                onClick={() => setIsOrgMenuOpen(!isOrgMenuOpen)}
+                className="flex items-center justify-center w-full group cursor-pointer"
+                title={`${officeName} (Clique para alternar escritório)`}
               >
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-xs shadow-blue-500/10 overflow-hidden shrink-0 border border-slate-200/80 group-hover:scale-105 transition-transform">
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-xs overflow-hidden shrink-0 border border-slate-200/80 group-hover:scale-105 transition-transform">
                   {orgLogoUrl ? (
                     <img
                       src={orgLogoUrl}
@@ -178,56 +226,155 @@ export function AppShellClient({
                     <Building2 className="w-5 h-5" />
                   )}
                 </div>
-              </Link>
+              </button>
             ) : (
-              <Link
-                href="/app"
-                className="flex items-center gap-3 min-w-0 flex-1 group"
-                title={officeName}
+              <button
+                type="button"
+                onClick={() => setIsOrgMenuOpen(!isOrgMenuOpen)}
+                className="w-full flex items-center justify-between gap-2.5 p-2 rounded-xl hover:bg-slate-50 transition-colors text-left group cursor-pointer border border-transparent hover:border-slate-200"
+                title="Clique para alternar escritório"
               >
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-xs shadow-blue-500/10 overflow-hidden shrink-0 border border-slate-200/80 group-hover:scale-105 transition-transform">
-                  {orgLogoUrl ? (
-                    <img
-                      src={orgLogoUrl}
-                      alt={officeName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <Building2 className="w-5 h-5" />
-                  )}
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-xs overflow-hidden shrink-0 border border-slate-200/80 group-hover:scale-105 transition-transform">
+                    {orgLogoUrl ? (
+                      <img
+                        src={orgLogoUrl}
+                        alt={officeName}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Building2 className="w-4.5 h-4.5" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-xs font-bold text-slate-900 leading-snug line-clamp-1 group-hover:text-blue-600 transition-colors">
+                      {officeName}
+                    </span>
+                    <span className="text-[11px] font-medium text-slate-400 block truncate">
+                      {userRole}
+                    </span>
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <span className="text-sm font-bold text-slate-900 leading-snug line-clamp-2 group-hover:text-blue-600 transition-colors">
-                    {officeName}
-                  </span>
+                <ChevronsUpDown className="w-4 h-4 text-slate-400 shrink-0 group-hover:text-slate-600" />
+              </button>
+            )}
+
+            {/* Dropdown Menu do Seletor de Escritórios */}
+            {isOrgMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setIsOrgMenuOpen(false)}
+                />
+                <div
+                  className={`absolute ${
+                    isCollapsed ? 'left-20 top-2' : 'left-2 right-2 top-16'
+                  } z-50 bg-white rounded-2xl border border-slate-200 shadow-2xl p-2 animate-in fade-in zoom-in-95 min-w-[240px]`}
+                >
+                  <div className="px-3 py-1.5 border-b border-slate-100 flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Seus Escritórios ({userOrganizations.length})
+                    </span>
+                  </div>
+
+                  <div className="py-1 max-h-60 overflow-y-auto space-y-1">
+                    {userOrganizations.map((o) => {
+                      const isActive = o.id === (activeOrgId || organizationId)
+                      const isSwitching = switchingOrgId === o.id
+
+                      return (
+                        <button
+                          key={o.id}
+                          type="button"
+                          disabled={isSwitching}
+                          onClick={async () => {
+                            if (isActive || isSwitching) return
+                            setSwitchingOrgId(o.id)
+                            const res = await switchActiveOrganizationAction(o.id)
+                            if (res.success) {
+                              setIsOrgMenuOpen(false)
+                              router.refresh()
+                            }
+                            setSwitchingOrgId(null)
+                          }}
+                          className={`w-full flex items-center justify-between gap-2.5 p-2 rounded-xl text-left transition-colors cursor-pointer ${
+                            isActive
+                              ? 'bg-blue-50/80 text-blue-900 font-semibold'
+                              : 'hover:bg-slate-50 text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <div className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 shrink-0 overflow-hidden">
+                              {o.logo_url ? (
+                                <img
+                                  src={o.logo_url}
+                                  alt={o.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <Building2 className="w-3.5 h-3.5" />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <span className="text-xs font-bold block truncate">
+                                {o.name}
+                              </span>
+                              <span className="text-[10px] text-slate-400 block font-normal capitalize">
+                                {o.profile_name || (o.is_owner ? 'Proprietário' : 'Membro')}
+                              </span>
+                            </div>
+                          </div>
+
+                          {isSwitching ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600 shrink-0" />
+                          ) : isActive ? (
+                            <Check className="w-4 h-4 text-blue-600 shrink-0" />
+                          ) : null}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <div className="pt-1 mt-1 border-t border-slate-100">
+                    <Link
+                      href="/onboarding"
+                      onClick={() => setIsOrgMenuOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" />
+                      <span>Criar novo escritório</span>
+                    </Link>
+                  </div>
                 </div>
-              </Link>
+              </>
             )}
           </div>
 
           {/* Botão de Ação Rápida: Novo Projeto */}
-          <div className="p-3">
-            {isCollapsed ? (
-              <div className="flex justify-center">
+          {(isOwner || userPermissions?.projects_create !== false) && (
+            <div className="p-3">
+              {isCollapsed ? (
+                <div className="flex justify-center">
+                  <Link
+                    href="/app/projetos/novo"
+                    className="flex items-center justify-center w-11 h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-xs shadow-blue-500/20 group hover:scale-105"
+                    title="Novo Projeto"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </Link>
+                </div>
+              ) : (
                 <Link
                   href="/app/projetos/novo"
-                  className="flex items-center justify-center w-11 h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-xs shadow-blue-500/20 group hover:scale-105"
+                  className="flex items-center justify-center gap-2 w-full py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all shadow-xs shadow-blue-500/20"
                   title="Novo Projeto"
                 >
-                  <Plus className="w-5 h-5" />
+                  <Plus className="w-4.5 h-4.5 shrink-0" />
+                  <span>Novo Projeto</span>
                 </Link>
-              </div>
-            ) : (
-              <Link
-                href="/app/projetos/novo"
-                className="flex items-center justify-center gap-2 w-full py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all shadow-xs shadow-blue-500/20"
-                title="Novo Projeto"
-              >
-                <Plus className="w-4.5 h-4.5 shrink-0" />
-                <span>Novo Projeto</span>
-              </Link>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           {/* Links de Navegação Principal */}
           <nav className="px-3 space-y-1">
@@ -243,7 +390,7 @@ export function AppShellClient({
               </div>
             )}
 
-            {mainNavItems.map((item) => {
+            {visibleMainNavItems.map((item) => {
               const isActive = checkIsActive(item.href, item.exact)
               const Icon = item.icon
 
@@ -313,7 +460,7 @@ export function AppShellClient({
             )}
 
             {/* Links de Configuração */}
-            {configNavItems.map((item) => {
+            {visibleConfigNavItems.map((item) => {
               const isActive = checkIsActive(item.href)
               const Icon = item.icon
 

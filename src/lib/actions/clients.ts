@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { requireAuth, requireOrgAccess } from '@/lib/server/guard'
+import { requireAuth, requireOrgAccess, requirePermission } from '@/lib/server/guard'
 import { sanitizeText } from '@/lib/server/sanitize'
 import {
   cleanDigits,
@@ -288,7 +288,7 @@ export async function createClientAction(input: ClientInput): Promise<{
       return { success: false, error: 'Organização não identificada.' }
     }
 
-    await requireOrgAccess(orgId)
+    await requirePermission(orgId, 'clients_create_edit')
 
     const name = sanitizeText(input.name)
     if (!name || name.trim().length < 2) {
@@ -431,7 +431,7 @@ export async function updateClientAction(
       return { success: false, error: 'Cliente não encontrado.' }
     }
 
-    await requireOrgAccess(existingClient.organization_id)
+    await requirePermission(existingClient.organization_id, 'clients_create_edit')
 
     const updatePayload: Record<string, any> = {}
 
@@ -540,7 +540,7 @@ export async function deleteClientAction(clientId: string): Promise<{
       return { success: false, error: 'Cliente não encontrado.' }
     }
 
-    await requireOrgAccess(client.organization_id)
+    await requirePermission(client.organization_id, 'clients_delete')
 
     // Desvincula projetos para não quebrar integridade
     await supabase
@@ -590,7 +590,7 @@ export async function resendClientPortalAccessAction(clientId: string): Promise<
       return { success: false, error: 'Cliente não encontrado.' }
     }
 
-    await requireOrgAccess(client.organization_id)
+    await requirePermission(client.organization_id, 'clients_portal')
 
     const cpf = cleanDigits(client.document_number)
     if (!cpf || cpf.length !== 11) {

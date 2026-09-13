@@ -32,6 +32,7 @@ import {
   updateFinancialTransactionAction,
   deleteFinancialTransactionAction
 } from '@/lib/actions/financial'
+import { usePermissions } from '@/contexts/PermissionsContext'
 
 interface ProjectOption {
   id: string
@@ -70,6 +71,8 @@ export default function TransactionModal({
   defaultType = 'income'
 }: TransactionModalProps) {
   const isEditing = Boolean(initialTransaction)
+  const { can } = usePermissions()
+  const canDelete = can('financial_delete')
 
   const [type, setType] = useState<TransactionType>(defaultType)
   const [title, setTitle] = useState('')
@@ -570,7 +573,7 @@ export default function TransactionModal({
 
           {/* Footer Actions */}
           <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
-            {isEditing ? (
+            {isEditing && canDelete ? (
               <div className="flex items-center gap-2">
                 {initialTransaction?.recurring_expense_id ? (
                   <>

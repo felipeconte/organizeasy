@@ -23,6 +23,8 @@ import {
 } from 'lucide-react'
 import { ClientData, deleteClientAction } from '@/lib/actions/clients'
 import { maskCPFOrCNPJ, maskPhone } from '@/lib/formatters-and-validators'
+import { ProfilePermissions, hasPermission } from '@/types/profiles'
+import { usePermissions } from '@/contexts/PermissionsContext'
 import ClientModal from './ClientModal'
 import ClientUpdateRequestsBanner from './ClientUpdateRequestsBanner'
 import { useConfirm, useAlert } from '@/components/ui/ConfirmDialog'
@@ -30,12 +32,24 @@ import { useConfirm, useAlert } from '@/components/ui/ConfirmDialog'
 export interface ClientsManagerClientProps {
   initialClients: ClientData[]
   organizationId?: string
+  isOwner?: boolean
+  userPermissions?: ProfilePermissions
 }
 
 export default function ClientsManagerClient({
   initialClients,
   organizationId,
+  isOwner: propIsOwner,
+  userPermissions: propUserPermissions,
 }: ClientsManagerClientProps) {
+  const permissionsContext = usePermissions()
+  const isOwner = propIsOwner ?? permissionsContext.isOwner
+  const userPermissions = propUserPermissions ?? permissionsContext.permissions
+  const canCreateEdit = hasPermission(isOwner, userPermissions, 'clients_create_edit')
+  const canDelete = hasPermission(isOwner, userPermissions, 'clients_delete')
+  const canCreateProject = hasPermission(isOwner, userPermissions, 'projects_create')
+  const canAccessPortal = hasPermission(isOwner, userPermissions, 'clients_portal')
+
   const [clients, setClients] = useState<ClientData[]>(initialClients)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'ativo' | 'inativo'>('all')
@@ -133,7 +147,9 @@ export default function ClientsManagerClient({
   return (
     <div className="space-y-6 antialiased">
       {/* 0. BANNER DE SOLICITAÇÕES DE ATUALIZAÇÃO CADASTRAL PENDENTES */}
-      <ClientUpdateRequestsBanner onRefreshClients={() => window.location.reload()} />
+      {canAccessPortal && (
+        <ClientUpdateRequestsBanner onRefreshClients={() => window.location.reload()} />
+      )}
 
       {/* 1. TOP METRICS CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -215,13 +231,15 @@ export default function ClientsManagerClient({
           </select>
         </div>
 
-        <button
-          type="button"
-          onClick={handleOpenCreate}
-          className="w-full md:w-auto inline-flex items-center justify-center gap-1.5 px-4.5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all shadow-sm shadow-blue-500/20 cursor-pointer"
-        >
-          <UserPlus className="w-4 h-4" /> Novo Cliente
-        </button>
+        {canCreateEdit && (
+          <button
+            type="button"
+            onClick={handleOpenCreate}
+            className="w-full md:w-auto inline-flex items-center justify-center gap-1.5 px-4.5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all shadow-sm shadow-blue-500/20 cursor-pointer"
+          >
+            <UserPlus className="w-4 h-4" /> Novo Cliente
+          </button>
+        )}
       </div>
 
       {/* 3. CLIENTS TABLE */}
@@ -230,16 +248,16 @@ export default function ClientsManagerClient({
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider text-xs">
               <tr>
-                <th className="py-3.5 px-4">Cliente / Razão Social</th>
+                <th className="py-3.5 px-4">Cliente</th>
                 <th className="py-3.5 px-4">Documento</th>
-                <th className="py-3.5 px-4">Contato (E-mail / WhatsApp)</th>
+                <th className="py-3.5 px-4">Contato</th>
                 <th className="py-3.5 px-4">Localização</th>
                 <th className="py-3.5 px-4 text-center">Projetos</th>
                 <th className="py-3.5 px-4">Status</th>
                 <th className="py-3.5 px-4 text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
+            <tbody className="divide-y divide-slate-100">
               {filteredClients.length === 0 && (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400">
@@ -250,13 +268,15 @@ export default function ClientsManagerClient({
                         ? 'Tente ajustar os filtros ou o termo de busca.'
                         : 'Cadastre seu primeiro cliente para vincular aos projetos.'}
                     </p>
-                    <button
-                      type="button"
-                      onClick={handleOpenCreate}
-                      className="mt-3.5 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all cursor-pointer"
-                    >
-                      <Plus className="w-4 h-4" /> Cadastrar Cliente
-                    </button>
+                    {canCreateEdit && (
+                      <button
+                        type="button"
+                        onClick={handleOpenCreate}
+                        className="mt-3.5 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4" /> Cadastrar Cliente
+                      </button>
+                    )}
                   </td>
                 </tr>
               )}
@@ -388,31 +408,37 @@ export default function ClientsManagerClient({
                     {/* Ações */}
                     <td className="py-4 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1.5">
-                        <Link
-                          href={`/app/projetos/novo?clientId=${client.id}`}
-                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                          title="Criar novo projeto para este cliente"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </Link>
+                        {canCreateProject && (
+                          <Link
+                            href={`/app/projetos/novo?clientId=${client.id}`}
+                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                            title="Criar novo projeto para este cliente"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </Link>
+                        )}
 
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEdit(client)}
-                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                          title="Editar cadastro do cliente"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
+                        {canCreateEdit && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(client)}
+                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                            title="Editar cadastro do cliente"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        )}
 
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteClient(client)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                          title="Excluir cliente"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteClient(client)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            title="Excluir cliente"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -1,4 +1,7 @@
-import { requireAuth } from '@/lib/server/guard'
+import { getActiveOrganization } from '@/lib/server/active-org'
+import { redirect } from 'next/navigation'
+import { hasPermission } from '@/lib/server/guard'
+import AccessDenied from '@/components/ui/AccessDenied'
 import Link from 'next/link'
 import NewProjectForm from '@/components/projects/NewProjectForm'
 import { getClientsAction } from '@/lib/actions/clients'
@@ -9,32 +12,26 @@ export default async function NewProjectPage({
 }: {
   searchParams: Promise<{ clientId?: string }>
 }) {
-  const { supabase, user } = await requireAuth()
-  const { clientId } = await searchParams
+  const { supabase, user, activeOrg, isOwner, userPermissions } = await getActiveOrganization()
 
-  // Busca a organização do usuário
-  let { data: member } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .limit(1)
-    .maybeSingle()
-
-  let orgId = member?.organization_id || ''
-
-  // Se não tiver registro de membro, verifica se existe organização onde é dono
-  if (!orgId) {
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('id')
-      .eq('owner_id', user.id)
-      .limit(1)
-      .maybeSingle()
-
-    if (org?.id) {
-      orgId = org.id
-    }
+  if (!activeOrg) {
+    redirect('/onboarding')
   }
+
+  // Proteção de rota: Requer permissão para criar novos projetos
+  if (!hasPermission(isOwner, userPermissions, 'projects_create')) {
+    return (
+      <AccessDenied
+        moduleName="Cadastrar Novo Projeto"
+        userProfileName={activeOrg.profile_name}
+        userProfileColor={activeOrg.profile_color}
+        backHref="/app/projetos"
+      />
+    )
+  }
+
+  const { clientId } = await searchParams
+  const orgId = activeOrg.id
 
   // Busca templates disponíveis para o escritório
   let templates: { id: string; name: string; description: string | null; is_default: boolean; count?: number }[] = []

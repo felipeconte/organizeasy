@@ -27,6 +27,8 @@ import {
   quickUpdateCommissionStatusAction
 } from '@/lib/actions/project-companies'
 import { cleanDigits, maskPhone, formatProjectClientDisplay } from '@/lib/formatters-and-validators'
+import { ProfilePermissions, hasPermission } from '@/types/profiles'
+import { usePermissions } from '@/contexts/PermissionsContext'
 import AddProjectCompanyModal from './AddProjectCompanyModal'
 
 interface ProjectCompaniesClientProps {
@@ -46,6 +48,8 @@ interface ProjectCompaniesClientProps {
     totalPendingCommission: number
     totalCompaniesCount: number
   }
+  isOwner?: boolean
+  userPermissions?: ProfilePermissions
 }
 
 export default function ProjectCompaniesClient({
@@ -53,8 +57,15 @@ export default function ProjectCompaniesClient({
   initialItems,
   availableCompanies,
   initialSummary,
+  isOwner: propIsOwner,
+  userPermissions: propUserPermissions,
 }: ProjectCompaniesClientProps) {
   const router = useRouter()
+  const permissionsContext = usePermissions()
+  const isOwner = propIsOwner ?? permissionsContext.isOwner
+  const userPermissions = propUserPermissions ?? permissionsContext.permissions
+  const canManage = hasPermission(isOwner, userPermissions, 'companies_manage')
+  const canViewSensitive = hasPermission(isOwner, userPermissions, 'financial_view_sensitive')
   const [items, setItems] = useState<ProjectCompanyItem[]>(initialItems)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<ProjectCompanyItem | null>(null)
@@ -67,6 +78,10 @@ export default function ProjectCompaniesClient({
     }).format(val)
   }
 
+  const displayMoney = (val: number) => {
+    return canViewSensitive ? formatCurrency(val) : '••••••'
+  }
+
   // Summary calculations
   const totalContract = items.reduce((acc, it) => acc + (it.contract_value || 0), 0)
   const totalExpected = items.reduce((acc, it) => acc + (it.expected_commission_amount || 0), 0)
@@ -74,16 +89,19 @@ export default function ProjectCompaniesClient({
   const totalPending = Math.max(0, totalExpected - totalReceived)
 
   const handleOpenAdd = () => {
+    if (!canManage) return
     setEditingItem(null)
     setIsModalOpen(true)
   }
 
   const handleOpenEdit = (item: ProjectCompanyItem) => {
+    if (!canManage) return
     setEditingItem(item)
     setIsModalOpen(true)
   }
 
   const handleRemove = async (linkId: string, companyName: string) => {
+    if (!canManage) return
     if (!window.confirm(`Tem certeza que deseja desvincular "${companyName}" deste projeto?`)) {
       return
     }
@@ -99,6 +117,7 @@ export default function ProjectCompaniesClient({
   }
 
   const handleMarkAsPaid = async (linkId: string) => {
+    if (!canManage) return
     setLoadingActionId(linkId)
     const res = await quickUpdateCommissionStatusAction(linkId, 'pago_total')
     setLoadingActionId(null)
@@ -155,12 +174,14 @@ export default function ProjectCompaniesClient({
             <DollarSign className="w-4 h-4 text-emerald-600" /> Financeiro do Projeto
           </Link>
 
-          <button
-            onClick={handleOpenAdd}
-            className="inline-flex items-center gap-2 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-all shadow-xs shadow-indigo-500/20 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> Adicionar Fornecedor
-          </button>
+          {canManage && (
+            <button
+              onClick={handleOpenAdd}
+              className="inline-flex items-center gap-2 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-all shadow-xs shadow-indigo-500/20 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> Adicionar Fornecedor
+            </button>
+          )}
         </div>
       </div>
 
@@ -185,7 +206,7 @@ export default function ProjectCompaniesClient({
           <div>
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Volume Contratado</span>
             <span className="text-xl font-black text-slate-800 mt-1 block">
-              {formatCurrency(totalContract)}
+              {displayMoney(totalContract)}
             </span>
             <span className="text-xs font-medium text-slate-400 mt-1 block">
               total de orçamentos e serviços
@@ -200,7 +221,7 @@ export default function ProjectCompaniesClient({
           <div>
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Comissões Recebidas (RT)</span>
             <span className="text-xl font-black text-emerald-600 mt-1 block">
-              {formatCurrency(totalReceived)}
+              {displayMoney(totalReceived)}
             </span>
             <span className="text-xs font-medium text-emerald-700/80 mt-1 block flex items-center gap-1">
               <CheckCircle2 className="w-3.5 h-3.5" /> Já pago pelos parceiros
@@ -215,7 +236,7 @@ export default function ProjectCompaniesClient({
           <div>
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Comissões a Receber</span>
             <span className="text-xl font-black text-amber-600 mt-1 block">
-              {formatCurrency(totalPending)}
+              {displayMoney(totalPending)}
             </span>
             <span className="text-xs font-medium text-amber-700/80 mt-1 block flex items-center gap-1">
               <Clock className="w-3.5 h-3.5" /> Previsão de recebimento
@@ -235,12 +256,14 @@ export default function ProjectCompaniesClient({
             Serviços e Fornecedores Atuantes na Obra
           </h3>
 
-          <button
-            onClick={handleOpenAdd}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-semibold rounded-xl transition-all cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> Adicionar Serviço
-          </button>
+          {canManage && (
+            <button
+              onClick={handleOpenAdd}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-semibold rounded-xl transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> Adicionar Serviço
+            </button>
+          )}
         </div>
 
         {items.length === 0 ? (
@@ -254,12 +277,14 @@ export default function ProjectCompaniesClient({
             <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
               Adicione marcenarias, marmorarias, lojas de iluminação ou prestadores de serviços para controlar os valores e as comissões de RT geradas por esta obra.
             </p>
-            <button
-              onClick={handleOpenAdd}
-              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs shadow-indigo-500/20"
-            >
-              <Plus className="w-4 h-4" /> Adicionar Primeiro Fornecedor
-            </button>
+            {canManage && (
+              <button
+                onClick={handleOpenAdd}
+                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs shadow-indigo-500/20"
+              >
+                <Plus className="w-4 h-4" /> Adicionar Primeiro Fornecedor
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
@@ -354,7 +379,7 @@ export default function ProjectCompaniesClient({
                         Valor Contratado
                       </span>
                       <span className="font-bold text-slate-900 text-sm block mt-1">
-                        {formatCurrency(item.contract_value)}
+                        {displayMoney(item.contract_value)}
                       </span>
                     </div>
 
@@ -364,8 +389,8 @@ export default function ProjectCompaniesClient({
                       </span>
                       <span className="font-bold text-indigo-600 text-sm block mt-1">
                         {item.commission_type === 'percent'
-                          ? `${item.commission_rate}%`
-                          : formatCurrency(item.commission_rate)}
+                          ? (canViewSensitive ? `${item.commission_rate}%` : '••••••')
+                          : displayMoney(item.commission_rate)}
                       </span>
                     </div>
 
@@ -374,7 +399,7 @@ export default function ProjectCompaniesClient({
                         Comissão Prevista
                       </span>
                       <span className="font-bold text-slate-900 text-sm block mt-1">
-                        {formatCurrency(item.expected_commission_amount)}
+                        {displayMoney(item.expected_commission_amount)}
                       </span>
                     </div>
 
@@ -383,7 +408,7 @@ export default function ProjectCompaniesClient({
                         Valor Já Recebido
                       </span>
                       <span className="font-bold text-emerald-600 text-sm block mt-1">
-                        {formatCurrency(item.received_commission_amount)}
+                        {displayMoney(item.received_commission_amount)}
                       </span>
                     </div>
                   </div>
@@ -412,7 +437,7 @@ export default function ProjectCompaniesClient({
                         </a>
                       )}
 
-                      {!isPaid && (
+                      {!isPaid && canManage && (
                         <button
                           onClick={() => handleMarkAsPaid(item.id)}
                           disabled={loadingActionId === item.id}
@@ -422,22 +447,26 @@ export default function ProjectCompaniesClient({
                         </button>
                       )}
 
-                      <button
-                        onClick={() => handleOpenEdit(item)}
-                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                        title="Editar Valores / Escopo"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
+                      {canManage && (
+                        <button
+                          onClick={() => handleOpenEdit(item)}
+                          className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                          title="Editar Valores / Escopo"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      )}
 
-                      <button
-                        onClick={() => handleRemove(item.id, item.company_name)}
-                        disabled={loadingActionId === item.id}
-                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                        title="Desvincular do Projeto"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {canManage && (
+                        <button
+                          onClick={() => handleRemove(item.id, item.company_name)}
+                          disabled={loadingActionId === item.id}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                          title="Desvincular do Projeto"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
 
                       <Link
                         href={`/app/empresas/${item.company_id}`}

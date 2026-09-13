@@ -1,4 +1,7 @@
-import { requireAuth } from '@/lib/server/guard'
+import { getActiveOrganization } from '@/lib/server/active-org'
+import { redirect } from 'next/navigation'
+import { hasPermission } from '@/lib/server/guard'
+import AccessDenied from '@/components/ui/AccessDenied'
 import { getClientsAction } from '@/lib/actions/clients'
 import ClientsManagerClient from '@/components/clients/ClientsManagerClient'
 
@@ -8,32 +11,24 @@ export const metadata = {
 }
 
 export default async function ClientesPage() {
-  const { supabase, user } = await requireAuth()
+  const { activeOrg, isOwner, userPermissions } = await getActiveOrganization()
 
-  // Busca a organização do usuário
-  let { data: member } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .limit(1)
-    .maybeSingle()
-
-  let orgId = member?.organization_id || ''
-
-  if (!orgId) {
-    const { data: org } = await supabase
-      .from('organizations')
-      .select('id')
-      .eq('owner_id', user.id)
-      .limit(1)
-      .maybeSingle()
-
-    if (org?.id) {
-      orgId = org.id
-    }
+  if (!activeOrg) {
+    redirect('/onboarding')
   }
 
-  const res = await getClientsAction(orgId)
+  // Proteção de rota
+  if (!hasPermission(isOwner, userPermissions, 'module_clients')) {
+    return (
+      <AccessDenied
+        moduleName="Clientes e Portal"
+        userProfileName={activeOrg.profile_name}
+        userProfileColor={activeOrg.profile_color}
+      />
+    )
+  }
+
+  const res = await getClientsAction(activeOrg.id)
   const initialClients = res.clients || []
 
   return (
@@ -53,7 +48,9 @@ export default async function ClientesPage() {
       {/* Interactive Clients Manager */}
       <ClientsManagerClient
         initialClients={initialClients}
-        organizationId={orgId}
+        organizationId={activeOrg.id}
+        isOwner={isOwner}
+        userPermissions={userPermissions}
       />
     </div>
   )

@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { requireAuth, requireOrgAccess } from '@/lib/server/guard'
+import { requireAuth, requireOrgAccess, requirePermission } from '@/lib/server/guard'
 import { sanitizeText } from '@/lib/server/sanitize'
 import {
   WorkflowStage,
@@ -93,7 +93,7 @@ export async function saveWorkflowStagesAction(
       return { success: false, error: 'Organização não encontrada.' }
     }
 
-    await requireOrgAccess(orgId)
+    await requirePermission(orgId, 'settings_stages')
 
     const cleanedStages: WorkflowStage[] = stages.map((s, idx) => ({
       id: sanitizeText(s.id).trim() || `stage_${idx + 1}`,

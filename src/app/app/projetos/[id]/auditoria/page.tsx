@@ -1,4 +1,6 @@
-import { requireProjectAccess } from '@/lib/server/guard'
+import { requireProjectAccess, hasPermission } from '@/lib/server/guard'
+import { getActiveOrganization } from '@/lib/server/active-org'
+import AccessDenied from '@/components/ui/AccessDenied'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
@@ -23,6 +25,19 @@ export default async function ProjectAuditPage({
 
   if (!project) {
     notFound()
+  }
+
+  const { activeOrg, isOwner, userPermissions } = await getActiveOrganization()
+
+  // Proteção de rota
+  if (!hasPermission(isOwner, userPermissions, 'module_projects')) {
+    return (
+      <AccessDenied
+        moduleName="Projetos e Tarefas"
+        userProfileName={activeOrg?.profile_name}
+        userProfileColor={activeOrg?.profile_color}
+      />
+    )
   }
 
   // Busca o histórico de auditoria

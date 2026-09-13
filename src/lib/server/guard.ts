@@ -44,48 +44,108 @@ export async function requireAuth(): Promise<{ supabase: Awaited<ReturnType<type
 }
 
 
+import { PermissionKey, ProfilePermissions, FULL_PERMISSIONS } from '@/types/profiles'
+
 /**
- * 2. Prevenção de IDOR: Valida se o usuário autenticado é membro ativo ou proprietário da organização.
+ * 2. Prevenção de IDOR: Valida se o usuário autenticado é membro ativo ou proprietário da organização
+ * e carrega seu perfil de acesso e permissões granulares.
  */
 export async function requireOrgAccess(organizationId: string) {
   const { supabase, user } = await requireAuth()
 
-  // 1. Verifica se o usuário é membro registrado da organização
-  const { data: memberData } = await supabase
-    .from('organization_members')
-    .select('*')
-    .eq('organization_id', organizationId)
-    .eq('user_id', user.id)
-    .maybeSingle()
-
-  const member = memberData as MemberRow | null
-  if (member) {
-    return { supabase, user, memberRole: member.role }
-  }
-
-  // 2. Se não estiver em organization_members, verifica se é o proprietário (owner_id) da organização
+  // 1. Verifica se a organização existe e se o usuário é o proprietário raiz
   const { data: orgData } = await supabase
     .from('organizations')
     .select('id, owner_id')
     .eq('id', organizationId)
-    .eq('owner_id', user.id)
     .maybeSingle()
 
-  if (orgData) {
+  const isOwner = orgData?.owner_id === user.id
+
+  // 2. Busca dados de membro e perfil
+  const { data: memberData } = await supabase
+    .from('organization_members')
+    .select('*, access_profiles(*)')
+    .eq('organization_id', organizationId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (memberData) {
+    const profile = (memberData as any).access_profiles
+    const permissions: ProfilePermissions = isOwner || profile?.is_owner_profile
+      ? FULL_PERMISSIONS
+      : ((profile?.permissions as ProfilePermissions) || {})
+
+    return {
+      supabase,
+      user,
+      memberRole: memberData.role,
+      profileId: memberData.profile_id,
+      profileName: profile?.name || (isOwner ? 'Proprietário' : 'Membro'),
+      isOwner,
+      permissions,
+    }
+  }
+
+  if (isOwner) {
+    // Busca o perfil de proprietário do escritório
+    const { data: ownerProf } = await supabase
+      .from('access_profiles')
+      .select('id')
+      .eq('organization_id', organizationId)
+      .eq('is_owner_profile', true)
+      .maybeSingle()
+
     // Auto-associa como owner na tabela de membros para manter consistência
     await supabase.from('organization_members').upsert(
       {
         organization_id: organizationId,
         user_id: user.id,
         role: 'owner',
+        profile_id: ownerProf?.id || null,
       },
       { onConflict: 'organization_id,user_id' }
     )
 
-    return { supabase, user, memberRole: 'owner' as const }
+    return {
+      supabase,
+      user,
+      memberRole: 'owner' as const,
+      profileId: ownerProf?.id || null,
+      profileName: 'Proprietário',
+      isOwner: true,
+      permissions: FULL_PERMISSIONS,
+    }
   }
 
   throw new Error('Acesso negado: Você não possui permissão para acessar esta organização (IDOR Blocked).')
+}
+
+export { hasPermission } from '@/types/profiles'
+
+/**
+ * 2.1. Valida se o usuário autenticado possui uma permissão específica no escritório.
+ */
+export async function requirePermission(
+  organizationId: string,
+  permissionKey: PermissionKey | PermissionKey[]
+) {
+  const orgAccess = await requireOrgAccess(organizationId)
+
+  if (orgAccess.isOwner) {
+    return orgAccess
+  }
+
+  const allowed = Array.isArray(permissionKey)
+    ? permissionKey.some((key) => orgAccess.permissions[key] === true)
+    : orgAccess.permissions[permissionKey] === true
+
+  if (!allowed) {
+    const keysStr = Array.isArray(permissionKey) ? permissionKey.join(' ou ') : permissionKey
+    throw new Error(`Acesso negado: Seu perfil não possui permissão para a funcionalidade "${keysStr}".`)
+  }
+
+  return orgAccess
 }
 
 /**
@@ -106,20 +166,15 @@ export async function requireProjectAccess(projectId: string) {
     throw new Error('Acesso negado: Projeto não encontrado (IDOR Blocked).')
   }
 
-  // Se o usuário foi o criador do projeto diretamente
-  if (project.created_by === user.id) {
-    let memberRole: any = 'owner'
-    try {
-      const orgAccess = await requireOrgAccess(project.organization_id)
-      memberRole = orgAccess.memberRole
-    } catch {
-      // Garante permissão para o criador
-    }
-    return { supabase, user, project, memberRole }
-  }
-
   // Valida que o usuário é membro ou proprietário da organização proprietária do projeto
-  const { memberRole } = await requireOrgAccess(project.organization_id)
+  const orgAccess = await requireOrgAccess(project.organization_id)
 
-  return { supabase, user, project, memberRole }
+  return {
+    supabase,
+    user,
+    project,
+    memberRole: orgAccess.memberRole,
+    isOwner: orgAccess.isOwner,
+    permissions: orgAccess.permissions,
+  }
 }

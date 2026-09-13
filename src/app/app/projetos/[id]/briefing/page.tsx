@@ -1,4 +1,6 @@
-import { requireProjectAccess } from '@/lib/server/guard'
+import { requireProjectAccess, hasPermission } from '@/lib/server/guard'
+import { getActiveOrganization } from '@/lib/server/active-org'
+import AccessDenied from '@/components/ui/AccessDenied'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
@@ -23,6 +25,21 @@ export default async function ProjectBriefingPage({
   if (!project) {
     notFound()
   }
+
+  const { activeOrg, isOwner, userPermissions } = await getActiveOrganization()
+
+  // Proteção de rota
+  if (!hasPermission(isOwner, userPermissions, 'module_projects')) {
+    return (
+      <AccessDenied
+        moduleName="Projetos e Tarefas"
+        userProfileName={activeOrg?.profile_name}
+        userProfileColor={activeOrg?.profile_color}
+      />
+    )
+  }
+
+  const canEdit = hasPermission(isOwner, userPermissions, 'projects_edit')
 
   // Busca o briefing existente
   const { data: briefing } = await supabase
@@ -75,9 +92,10 @@ export default async function ProjectBriefingPage({
             <textarea
               name="stylePreferences"
               rows={3}
+              disabled={!canEdit}
               defaultValue={briefing?.style_preferences || ''}
               placeholder="Ex: Cliente busca arquitetura contemporânea com uso de concreto aparente, madeira cumaru e esquadrias pretas minimalistas..."
-              className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 disabled:opacity-75 disabled:bg-slate-100/80"
             />
           </div>
 
@@ -92,9 +110,10 @@ export default async function ProjectBriefingPage({
             <textarea
               name="siteConditions"
               rows={3}
+              disabled={!canEdit}
               defaultValue={briefing?.site_conditions || ''}
               placeholder="Ex: Terreno com declive suave de 2,5m. Fachada principal voltada para o Leste (sol da manhã). Vista panorâmica para a mata nos fundos..."
-              className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 disabled:opacity-75 disabled:bg-slate-100/80"
             />
           </div>
 
@@ -109,9 +128,10 @@ export default async function ProjectBriefingPage({
             <textarea
               name="budgetNotes"
               rows={3}
+              disabled={!canEdit}
               defaultValue={briefing?.budget_notes || ''}
               placeholder="Ex: Teto orçamentário de R$ 900.000 para a obra civil. Prioridade em isolamento acústico na suíte master e energia solar fotovoltaica..."
-              className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 disabled:opacity-75 disabled:bg-slate-100/80"
             />
           </div>
 
@@ -126,9 +146,10 @@ export default async function ProjectBriefingPage({
             <textarea
               name="notes"
               rows={4}
+              disabled={!canEdit}
               defaultValue={briefing?.notes || ''}
               placeholder="Ex: Reunião de 10/08: Cliente aprovou layout preliminar com integração total da cozinha à área gourmet..."
-              className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 disabled:opacity-75 disabled:bg-slate-100/80"
             />
           </div>
 
@@ -140,12 +161,18 @@ export default async function ProjectBriefingPage({
               Voltar ao Hub
             </Link>
 
-            <button
-              type="submit"
-              className="py-2.5 px-6 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-500/25 transition-all flex items-center gap-1.5"
-            >
-              <Save className="w-4 h-4" /> Salvar Ficha de Briefing
-            </button>
+            {canEdit ? (
+              <button
+                type="submit"
+                className="py-2.5 px-6 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-500/25 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Save className="w-4 h-4" /> Salvar Ficha de Briefing
+              </button>
+            ) : (
+              <span className="text-xs font-semibold px-3 py-2 bg-slate-100 text-slate-500 rounded-xl">
+                Modo somente leitura
+              </span>
+            )}
           </div>
         </form>
       </div>

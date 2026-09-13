@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { requireAuth, requireOrgAccess, requireProjectAccess } from '@/lib/server/guard'
+import { requireAuth, requireOrgAccess, requireProjectAccess, requirePermission } from '@/lib/server/guard'
 import { sanitizeText } from '@/lib/server/sanitize'
 import { Database, Json } from '@/types/database.types'
 
@@ -153,9 +153,9 @@ export async function createProjectAction(formData: FormData): Promise<{ success
     }
   }
 
-  // Prevenção IDOR: valida que o usuário é membro da organização
+  // Prevenção IDOR e validação de permissão granular
   try {
-    await requireOrgAccess(organizationId)
+    await requirePermission(organizationId, 'projects_create')
   } catch (err: unknown) {
     // Se for o dono mas faltou o membership, associa como owner
     const { data: ownerOrg } = await supabase
@@ -176,7 +176,8 @@ export async function createProjectAction(formData: FormData): Promise<{ success
         .select('id')
         .maybeSingle()
     } else {
-      return { success: false, error: 'Você não tem permissão nesta organização.' }
+      const msg = err instanceof Error ? err.message : 'Você não tem permissão para criar projetos nesta organização.'
+      return { success: false, error: msg }
     }
   }
 
@@ -241,7 +242,8 @@ export async function createProjectAction(formData: FormData): Promise<{ success
 }
 
 export async function updateProjectAction(projectId: string, formData: FormData) {
-  const { supabase } = await requireProjectAccess(projectId)
+  const { supabase, project } = await requireProjectAccess(projectId)
+  await requirePermission(project.organization_id, 'projects_edit')
 
   const title = sanitizeText(formData.get('title') as string)
   const clientName = sanitizeText(formData.get('clientName') as string)
@@ -330,7 +332,8 @@ export async function updateProjectAction(projectId: string, formData: FormData)
 }
 
 export async function deleteProjectAction(projectId: string) {
-  const { supabase } = await requireProjectAccess(projectId)
+  const { supabase, project } = await requireProjectAccess(projectId)
+  await requirePermission(project.organization_id, 'projects_delete')
 
   const { error } = await supabase.from('projects').delete().eq('id', projectId)
   if (error) {
@@ -344,7 +347,8 @@ export async function deleteProjectAction(projectId: string) {
 
 
 export async function updateBriefingAction(projectId: string, formData: FormData) {
-  const { supabase } = await requireProjectAccess(projectId)
+  const { supabase, project } = await requireProjectAccess(projectId)
+  await requirePermission(project.organization_id, 'projects_edit')
 
   const stylePreferences = sanitizeText(formData.get('stylePreferences') as string)
   const budgetNotes = sanitizeText(formData.get('budgetNotes') as string)

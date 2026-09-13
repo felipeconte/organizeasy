@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
-import { requireAuth } from '@/lib/server/guard'
+import { requireOrgAccess, hasPermission } from '@/lib/server/guard'
+import AccessDenied from '@/components/ui/AccessDenied'
 import { getClientByIdAction } from '@/lib/actions/clients'
 import ClientDetailClient from '@/components/clients/ClientDetailClient'
 import { BreadcrumbSetter } from '@/contexts/BreadcrumbContext'
@@ -14,12 +15,21 @@ export default async function ClientDetailPage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  const { user } = await requireAuth()
   const { id } = await params
 
   const res = await getClientByIdAction(id)
   if (!res.success || !res.client) {
     notFound()
+  }
+
+  const { isOwner, permissions } = await requireOrgAccess(res.client.organization_id)
+
+  if (!hasPermission(isOwner, permissions, 'module_clients')) {
+    return (
+      <AccessDenied
+        moduleName="Clientes e Portal"
+      />
+    )
   }
 
   return (
@@ -35,6 +45,8 @@ export default async function ClientDetailPage({
         client={res.client}
         projects={res.projects || []}
         organizationId={res.client.organization_id}
+        isOwner={isOwner}
+        userPermissions={permissions}
       />
     </>
   )

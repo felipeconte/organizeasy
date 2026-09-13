@@ -1,58 +1,44 @@
-import { requireAuth } from '@/lib/server/guard'
+import { getActiveOrganization } from '@/lib/server/active-org'
+import { redirect } from 'next/navigation'
+import { hasPermission } from '@/lib/server/guard'
+import AccessDenied from '@/components/ui/AccessDenied'
 import ProjectsManagerClient, { ProjectItem } from '@/components/projects/ProjectsManagerClient'
 
 export default async function ProjectsListPage() {
-  const { supabase, user } = await requireAuth()
+  const { supabase, user, activeOrg, isOwner, userPermissions } = await getActiveOrganization()
 
-  // 1. Busca todas as organizações onde o usuário é membro
-  const { data: memberRows } = await supabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
+  if (!activeOrg) {
+    redirect('/onboarding')
+  }
 
-  const memberOrgIds = (memberRows || []).map((m) => m.organization_id).filter(Boolean)
+  // Proteção de rota
+  if (!hasPermission(isOwner, userPermissions, 'module_projects')) {
+    return (
+      <AccessDenied
+        moduleName="Projetos e Tarefas"
+        userProfileName={activeOrg.profile_name}
+        userProfileColor={activeOrg.profile_color}
+      />
+    )
+  }
 
-  // 2. Busca todas as organizações onde o usuário é proprietário
-  const { data: ownerRows } = await supabase
-    .from('organizations')
-    .select('id')
-    .eq('owner_id', user.id)
-
-  const ownerOrgIds = (ownerRows || []).map((o) => o.id).filter(Boolean)
-
-  const allOrgIds = Array.from(new Set([...memberOrgIds, ...ownerOrgIds]))
-
-  // 3. Busca todos os projetos vinculados às organizações do usuário ou criados por ele
-  let projectsQuery = supabase
+  // 1. Busca todos os projetos vinculados à organização ativa
+  const { data: projs } = await supabase
     .from('projects')
     .select('*')
+    .eq('organization_id', activeOrg.id)
     .order('created_at', { ascending: false })
 
-  if (allOrgIds.length > 0) {
-    projectsQuery = projectsQuery.or(
-      `organization_id.in.(${allOrgIds.join(',')}),created_by.eq.${user.id}`
-    )
-  } else {
-    projectsQuery = projectsQuery.eq('created_by', user.id)
-  }
-
-  const { data: projs } = await projectsQuery
-
-  // 4. Busca todos os clientes cadastrados das organizações
-  let clientsQuery = supabase
+  // 2. Busca todos os clientes cadastrados da organização ativa
+  const { data: clientsData } = await supabase
     .from('clients')
     .select('*')
-    .not('name', 'ilike', '%Julian%')
+    .eq('organization_id', activeOrg.id)
     .order('name', { ascending: true })
 
-  if (allOrgIds.length > 0) {
-    clientsQuery = clientsQuery.in('organization_id', allOrgIds)
-  }
-
-  const { data: clientsData } = await clientsQuery
   const clients = (clientsData || []) as any[]
 
-  // 5. Busca vínculos da tabela project_clients
+  // 3. Busca vínculos da tabela project_clients
   const { data: pcData } = await supabase
     .from('project_clients')
     .select('project_id, client_id')
@@ -73,7 +59,9 @@ export default async function ProjectsListPage() {
     <ProjectsManagerClient
       initialProjects={projects}
       initialClients={clients}
-      organizationId={allOrgIds[0]}
+      organizationId={activeOrg.id}
+      isOwner={isOwner}
+      userPermissions={userPermissions}
     />
   )
 }

@@ -1,5 +1,6 @@
-import { requireAuth } from '@/lib/server/guard'
+import { requireOrgAccess, hasPermission } from '@/lib/server/guard'
 import { notFound } from 'next/navigation'
+import AccessDenied from '@/components/ui/AccessDenied'
 import { getCompanyByIdAction } from '@/lib/actions/companies'
 import CompanyDetailClient from '@/components/companies/CompanyDetailClient'
 import { BreadcrumbSetter } from '@/contexts/BreadcrumbContext'
@@ -15,12 +16,21 @@ export default async function CompanyDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const { supabase, user } = await requireAuth()
 
   const res = await getCompanyByIdAction(id)
 
   if (!res.success || !res.company) {
     notFound()
+  }
+
+  const { supabase, isOwner, permissions } = await requireOrgAccess(res.company.organization_id)
+
+  if (!hasPermission(isOwner, permissions, 'module_companies')) {
+    return (
+      <AccessDenied
+        moduleName="Empresas e Prestadores de Serviços"
+      />
+    )
   }
 
   // Busca lista de projetos da organização para o modal de vincular a novos projetos
@@ -44,6 +54,8 @@ export default async function CompanyDetailPage({
         initialProjects={res.projects || []}
         availableProjects={projects || []}
         organizationId={res.company.organization_id}
+        isOwner={isOwner}
+        userPermissions={permissions}
       />
     </>
   )

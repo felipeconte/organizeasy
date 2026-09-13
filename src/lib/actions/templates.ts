@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { requireAuth } from '@/lib/server/guard'
+import { requireAuth, requirePermission } from '@/lib/server/guard'
 import { sanitizeText } from '@/lib/server/sanitize'
 
 async function resolveUserOrgId(supabase: any, userId: string): Promise<string> {
@@ -48,6 +48,12 @@ export async function createTemplateAction(
 
   const orgId = await resolveUserOrgId(supabase, user.id)
   if (!orgId) return { error: 'Organização não encontrada' }
+
+  try {
+    await requirePermission(orgId, 'settings_stages')
+  } catch (err: any) {
+    return { error: err?.message || 'Acesso negado: Permissão insuficiente para gerenciar templates.' }
+  }
 
   const { data: newTpl, error: tplError } = await supabase
     .from('stage_templates')
@@ -100,6 +106,11 @@ export async function updateTemplateAction(
   if (!cleanName) return { error: 'O nome do template é obrigatório' }
 
   const orgId = await resolveUserOrgId(supabase, user.id)
+  try {
+    await requirePermission(orgId, 'settings_stages')
+  } catch (err: any) {
+    return { error: err?.message || 'Acesso negado: Permissão insuficiente.' }
+  }
 
   const { error } = await supabase
     .from('stage_templates')
@@ -121,6 +132,11 @@ export async function updateTemplateAction(
 export async function setDefaultTemplateAction(templateId: string) {
   const { supabase, user } = await requireAuth()
   const orgId = await resolveUserOrgId(supabase, user.id)
+  try {
+    await requirePermission(orgId, 'settings_stages')
+  } catch (err: any) {
+    return { error: err?.message || 'Acesso negado: Permissão insuficiente.' }
+  }
 
   // 1. Remove default de todos
   await supabase
@@ -146,6 +162,11 @@ export async function setDefaultTemplateAction(templateId: string) {
 export async function deleteTemplateAction(templateId: string) {
   const { supabase, user } = await requireAuth()
   const orgId = await resolveUserOrgId(supabase, user.id)
+  try {
+    await requirePermission(orgId, 'settings_stages')
+  } catch (err: any) {
+    return { error: err?.message || 'Acesso negado: Permissão insuficiente.' }
+  }
 
   const { data: tpl } = await supabase
     .from('stage_templates')
@@ -181,7 +202,14 @@ export async function addTemplateItemAction(
     is_client_approval_required?: boolean
   }
 ) {
-  const { supabase } = await requireAuth()
+  const { supabase, user } = await requireAuth()
+  const orgId = await resolveUserOrgId(supabase, user.id)
+  try {
+    await requirePermission(orgId, 'settings_stages')
+  } catch (err: any) {
+    return { error: err?.message || 'Acesso negado: Permissão insuficiente.' }
+  }
+
   const cleanName = sanitizeText(itemData.name)
   if (!cleanName) return { error: 'O nome da tarefa é obrigatório' }
 
@@ -231,7 +259,13 @@ export async function updateTemplateItemAction(
     is_client_approval_required?: boolean
   }
 ) {
-  const { supabase } = await requireAuth()
+  const { supabase, user } = await requireAuth()
+  const orgId = await resolveUserOrgId(supabase, user.id)
+  try {
+    await requirePermission(orgId, 'settings_stages')
+  } catch (err: any) {
+    return { error: err?.message || 'Acesso negado: Permissão insuficiente.' }
+  }
 
   const updatePayload: Record<string, any> = {}
   if (itemData.name !== undefined) updatePayload.name = sanitizeText(itemData.name)
@@ -258,7 +292,13 @@ export async function updateTemplateItemAction(
 }
 
 export async function deleteTemplateItemAction(itemId: string) {
-  const { supabase } = await requireAuth()
+  const { supabase, user } = await requireAuth()
+  const orgId = await resolveUserOrgId(supabase, user.id)
+  try {
+    await requirePermission(orgId, 'settings_stages')
+  } catch (err: any) {
+    return { error: err?.message || 'Acesso negado: Permissão insuficiente.' }
+  }
 
   const { error } = await supabase
     .from('stage_template_items')
@@ -277,7 +317,13 @@ export async function reorderTemplateItemsAction(
   templateId: string,
   orderedItemIds: string[]
 ) {
-  const { supabase } = await requireAuth()
+  const { supabase, user } = await requireAuth()
+  const orgId = await resolveUserOrgId(supabase, user.id)
+  try {
+    await requirePermission(orgId, 'settings_stages')
+  } catch (err: any) {
+    return { error: err?.message || 'Acesso negado: Permissão insuficiente.' }
+  }
 
   const updates = orderedItemIds.map((id, index) =>
     supabase
@@ -292,3 +338,4 @@ export async function reorderTemplateItemsAction(
   revalidatePath('/app/configuracoes/etapas')
   return { success: true }
 }
+

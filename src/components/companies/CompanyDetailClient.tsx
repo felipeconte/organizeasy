@@ -52,6 +52,9 @@ import {
 import CompanyModal from './CompanyModal'
 import LinkProjectModal from './LinkProjectModal'
 
+import { ProfilePermissions, hasPermission } from '@/types/profiles'
+import { usePermissions } from '@/contexts/PermissionsContext'
+
 interface SimpleProject {
   id: string
   code: string
@@ -64,6 +67,8 @@ interface CompanyDetailClientProps {
   initialProjects: CompanyProjectLink[]
   availableProjects: SimpleProject[]
   organizationId: string
+  isOwner?: boolean
+  userPermissions?: ProfilePermissions
 }
 
 export default function CompanyDetailClient({
@@ -71,8 +76,16 @@ export default function CompanyDetailClient({
   initialProjects,
   availableProjects,
   organizationId,
+  isOwner: propIsOwner,
+  userPermissions: propUserPermissions,
 }: CompanyDetailClientProps) {
   const router = useRouter()
+  const permissionsContext = usePermissions()
+  const isOwner = propIsOwner ?? permissionsContext.isOwner
+  const userPermissions = propUserPermissions ?? permissionsContext.permissions
+  const canManage = hasPermission(isOwner, userPermissions, 'companies_manage')
+  const canViewSensitive = hasPermission(isOwner, userPermissions, 'financial_view_sensitive')
+
   const [company, setCompany] = useState<CompanyData>(initialCompany)
   const [projects, setProjects] = useState<CompanyProjectLink[]>(initialProjects)
 
@@ -90,6 +103,10 @@ export default function CompanyDetailClient({
       style: 'currency',
       currency: 'BRL',
     }).format(val)
+  }
+
+  const displayMoney = (val: number) => {
+    return canViewSensitive ? formatCurrency(val) : '••••••'
   }
 
   const handleSavedCompany = (saved: CompanyData) => {
@@ -207,27 +224,33 @@ export default function CompanyDetailClient({
             </a>
           )}
 
-          <button
-            onClick={() => setIsEditModalOpen(true)}
-            className="inline-flex items-center gap-2 py-2.5 px-4 rounded-xl bg-white border border-slate-200 text-slate-700 hover:text-indigo-600 hover:bg-slate-50 text-sm font-semibold transition-all shadow-xs cursor-pointer"
-          >
-            <Edit2 className="w-4 h-4" /> Editar Cadastro
-          </button>
+          {canManage && (
+            <button
+              onClick={() => setIsEditModalOpen(true)}
+              className="inline-flex items-center gap-2 py-2.5 px-4 rounded-xl bg-white border border-slate-200 text-slate-700 hover:text-indigo-600 hover:bg-slate-50 text-sm font-semibold transition-all shadow-xs cursor-pointer"
+            >
+              <Edit2 className="w-4 h-4" /> Editar Cadastro
+            </button>
+          )}
 
-          <button
-            onClick={handleOpenNewLink}
-            className="inline-flex items-center gap-2 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-all shadow-xs shadow-indigo-500/20 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> Alocar em Projeto
-          </button>
+          {canManage && (
+            <button
+              onClick={handleOpenNewLink}
+              className="inline-flex items-center gap-2 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-all shadow-xs shadow-indigo-500/20 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> Alocar em Projeto
+            </button>
+          )}
 
-          <button
-            onClick={handleDeleteCompany}
-            className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
-            title="Excluir Empresa"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {canManage && (
+            <button
+              onClick={handleDeleteCompany}
+              className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+              title="Excluir Empresa"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -590,12 +613,14 @@ export default function CompanyDetailClient({
                 </p>
               </div>
 
-              <button
-                onClick={handleOpenNewLink}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-xs shadow-indigo-500/20 cursor-pointer self-start sm:self-auto"
-              >
-                <Plus className="w-4 h-4" /> Alocar em Outro Projeto
-              </button>
+              {canManage && (
+                <button
+                  onClick={handleOpenNewLink}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-xs shadow-indigo-500/20 cursor-pointer self-start sm:self-auto"
+                >
+                  <Plus className="w-4 h-4" /> Alocar em Outro Projeto
+                </button>
+              )}
             </div>
 
             {/* Projects List */}
@@ -689,7 +714,7 @@ export default function CompanyDetailClient({
                             Valor do Contrato
                           </span>
                           <span className="font-bold text-slate-800 text-sm block mt-1">
-                            {formatCurrency(link.contract_value)}
+                            {displayMoney(link.contract_value)}
                           </span>
                         </div>
 
@@ -699,8 +724,8 @@ export default function CompanyDetailClient({
                           </span>
                           <span className="font-bold text-indigo-600 text-sm block mt-1">
                             {link.commission_type === 'percent'
-                              ? `${link.commission_rate}%`
-                              : formatCurrency(link.commission_rate)}
+                              ? (canViewSensitive ? `${link.commission_rate}%` : '••••••')
+                              : displayMoney(link.commission_rate)}
                           </span>
                         </div>
 
@@ -709,7 +734,7 @@ export default function CompanyDetailClient({
                             Comissão Prevista
                           </span>
                           <span className="font-bold text-slate-800 text-sm block mt-1">
-                            {formatCurrency(link.expected_commission_amount)}
+                            {displayMoney(link.expected_commission_amount)}
                           </span>
                         </div>
 
@@ -718,7 +743,7 @@ export default function CompanyDetailClient({
                             Valor Já Recebido
                           </span>
                           <span className="font-bold text-emerald-600 text-sm block mt-1">
-                            {formatCurrency(link.received_commission_amount)}
+                            {displayMoney(link.received_commission_amount)}
                           </span>
                         </div>
                       </div>
@@ -732,7 +757,7 @@ export default function CompanyDetailClient({
                         </div>
 
                         <div className="flex items-center gap-2">
-                          {!isPaid && (
+                          {!isPaid && canManage && (
                             <button
                               onClick={() => handleMarkAsPaid(link.id)}
                               disabled={loadingActionId === link.id}
@@ -742,22 +767,26 @@ export default function CompanyDetailClient({
                             </button>
                           )}
 
-                          <button
-                            onClick={() => handleOpenEditLink(link)}
-                            className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                            title="Editar Valores / Escopo"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
+                          {canManage && (
+                            <button
+                              onClick={() => handleOpenEditLink(link)}
+                              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                              title="Editar Valores / Escopo"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                          )}
 
-                          <button
-                            onClick={() => handleRemoveLink(link.id, link.project_title)}
-                            disabled={loadingActionId === link.id}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                            title="Desvincular do Projeto"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {canManage && (
+                            <button
+                              onClick={() => handleRemoveLink(link.id, link.project_title)}
+                              disabled={loadingActionId === link.id}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              title="Desvincular do Projeto"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
 
                           <Link
                             href={`/app/projetos/${link.project_id}`}

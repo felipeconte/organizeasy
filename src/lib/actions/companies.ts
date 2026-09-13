@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { requireAuth, requireOrgAccess } from '@/lib/server/guard'
+import { requireAuth, requireOrgAccess, requirePermission } from '@/lib/server/guard'
 import { sanitizeText } from '@/lib/server/sanitize'
 import {
   cleanDigits,
@@ -335,7 +335,7 @@ export async function createCompanyAction(input: CompanyInput): Promise<{
       return { success: false, error: 'Organização não identificada.' }
     }
 
-    await requireOrgAccess(orgId)
+    await requirePermission(orgId, 'companies_manage')
 
     const name = sanitizeText(input.name)
     if (!name || name.trim().length < 2) {
@@ -452,7 +452,7 @@ export async function updateCompanyAction(
       return { success: false, error: 'Empresa não encontrada.' }
     }
 
-    await requireOrgAccess(existing.organization_id)
+    await requirePermission(existing.organization_id, 'companies_manage')
 
     const updatePayload: Record<string, any> = {}
 
@@ -578,7 +578,7 @@ export async function deleteCompanyAction(companyId: string): Promise<{
       return { success: false, error: 'Empresa não encontrada.' }
     }
 
-    await requireOrgAccess(company.organization_id)
+    await requirePermission(company.organization_id, 'companies_manage')
 
     const { error: delErr } = await supabase
       .from('companies')
