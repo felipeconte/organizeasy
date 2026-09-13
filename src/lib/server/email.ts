@@ -848,5 +848,250 @@ export async function sendReauthenticationEmail(
   return { success: true }
 }
 
+export interface ClientPortalAccessEmailParams {
+  clientName: string
+  clientEmail: string
+  portalToken: string
+  accessCode: string
+  officeName: string
+  officeLogo?: string | null
+  officePhone?: string | null
+  officeEmail?: string | null
+}
 
+/**
+ * Envia e-mail ao cliente com o Magic Link e o Código de Acesso ao Portal do seu escritório
+ */
+export async function sendClientPortalAccessDetailsEmail(
+  params: ClientPortalAccessEmailParams
+): Promise<{ success: boolean; error?: string }> {
+  const {
+    clientName,
+    clientEmail,
+    portalToken,
+    accessCode,
+    officeName,
+    officePhone,
+    officeEmail,
+  } = params
 
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  const portalUrl = `${baseUrl}/portal/${portalToken}`
+  const emailSubject = `Seu Acesso ao Portal do Cliente - ${officeName}`
+
+  const emailHtml = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>${emailSubject}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 24px; line-height: 1.6; }
+    .card { background-color: #ffffff; border-radius: 24px; max-width: 580px; margin: 0 auto; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .header { background-color: #0f172a; padding: 32px 32px 28px; text-align: center; color: #ffffff; }
+    .header h1 { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+    .header p { margin: 6px 0 0; font-size: 13px; color: #94a3b8; font-weight: 500; }
+    .body { padding: 32px; }
+    .greeting { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
+    .btn { display: inline-block; background-color: #2563eb; color: #ffffff !important; text-decoration: none; padding: 14px 28px; border-radius: 14px; font-weight: 700; font-size: 14px; text-align: center; margin: 20px 0; }
+    .code-container { background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 16px; padding: 20px; text-align: center; margin: 24px 0; }
+    .code-label { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 0.08em; margin-bottom: 8px; }
+    .access-code { font-family: 'SF Mono', Consolas, Menlo, Monaco, monospace; font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: 6px; }
+    .footer { padding: 24px 32px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center; font-size: 12px; color: #64748b; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <h1>${officeName}</h1>
+      <p>Portal do Cliente • Acompanhamento de Projetos</p>
+    </div>
+    <div class="body">
+      <div class="greeting">Olá, ${clientName}!</div>
+      <p style="font-size: 14px; color: #475569; margin: 0 0 16px;">
+        O escritório <strong>${officeName}</strong> disponibilizou o seu portal exclusivo para acompanhar todas as etapas, entregas e validações dos seus projetos de arquitetura em tempo real.
+      </p>
+
+      <div style="text-align: center;">
+        <a href="${portalUrl}" class="btn" target="_blank">Acessar Meu Portal</a>
+      </div>
+
+      <div class="code-container">
+        <div class="code-label">Seu Código de Acesso</div>
+        <div class="access-code">${accessCode}</div>
+        <p style="margin: 8px 0 0; font-size: 12px; color: #64748b;">
+          Informe este código caso seja solicitado para proteger a visualização dos seus projetos.
+        </p>
+      </div>
+
+      <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 16px 0 0;">
+        Link direto: <a href="${portalUrl}" style="color: #2563eb; word-break: break-all;">${portalUrl}</a>
+      </p>
+    </div>
+    <div class="footer">
+      <p style="margin: 0;">Mensagem enviada por <strong>${officeName}</strong> através da plataforma Orgarq Architecture OS.</p>
+      ${officePhone ? `<p style="margin: 4px 0 0;">Telefone / WhatsApp: ${officePhone}</p>` : ''}
+      ${officeEmail ? `<p style="margin: 4px 0 0;">E-mail: ${officeEmail}</p>` : ''}
+    </div>
+  </div>
+</body>
+</html>
+  `
+
+  console.log('===================================================================')
+  console.log(`📧 [EMAIL PORTAL CLIENTE] Enviando acesso para: ${clientEmail}`)
+  console.log(`👤 Cliente: ${clientName} | Escritório: ${officeName}`)
+  console.log(`🔑 Código de Acesso: ${accessCode}`)
+  console.log(`🔗 Link do Portal: ${portalUrl}`)
+  console.log('===================================================================')
+
+  const resendApiKey = process.env.RESEND_API_KEY
+  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Orgarq <onboarding@resend.dev>'
+
+  if (resendApiKey) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: resendFrom,
+          to: [clientEmail],
+          subject: emailSubject,
+          html: emailHtml,
+        }),
+      })
+
+      if (!res.ok) {
+        const errText = await res.text()
+        console.warn('Falha no envio via Resend API (portal cliente):', errText)
+      }
+    } catch (apiErr) {
+      console.warn('Erro ao chamar provedor de e-mail:', apiErr)
+    }
+  }
+
+  return { success: true }
+}
+
+export interface StageApprovalOtpEmailParams {
+  clientName: string
+  clientEmail: string
+  projectTitle: string
+  projectCode: string
+  stageName: string
+  otpCode: string
+  actionType: 'approved' | 'changes_requested'
+  officeName: string
+}
+
+/**
+ * Envia o código de confirmação numérico (OTP de 6 dígitos) para o cliente confirmar a aprovação
+ */
+export async function sendStageApprovalOtpEmail(
+  params: StageApprovalOtpEmailParams
+): Promise<{ success: boolean; error?: string }> {
+  const {
+    clientName,
+    clientEmail,
+    projectTitle,
+    projectCode,
+    stageName,
+    otpCode,
+    actionType,
+    officeName,
+  } = params
+
+  const isApproved = actionType === 'approved'
+  const actionLabel = isApproved ? 'Confirmação de Aprovação' : 'Solicitação de Ajustes'
+  const emailSubject = `${actionLabel} - Projeto ${projectCode} (${stageName})`
+
+  const emailHtml = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>${emailSubject}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 24px; line-height: 1.6; }
+    .card { background-color: #ffffff; border-radius: 24px; max-width: 580px; margin: 0 auto; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .header { background-color: ${isApproved ? '#065f46' : '#92400e'}; padding: 28px 32px; text-align: center; color: #ffffff; }
+    .header h1 { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+    .header p { margin: 6px 0 0; font-size: 13px; color: rgba(255,255,255,0.85); font-weight: 500; }
+    .body { padding: 32px; }
+    .greeting { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
+    .code-container { background: #f0fdf4; border: 2px dashed ${isApproved ? '#10b981' : '#f59e0b'}; border-radius: 18px; padding: 22px; text-align: center; margin: 24px 0; }
+    .code-label { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 0.08em; margin-bottom: 8px; }
+    .otp-code { font-family: 'SF Mono', Consolas, Menlo, Monaco, monospace; font-size: 36px; font-weight: 800; color: #0f172a; letter-spacing: 8px; }
+    .footer { padding: 20px 32px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center; font-size: 12px; color: #64748b; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <h1>${actionLabel}</h1>
+      <p>Projeto ${projectCode} • ${officeName}</p>
+    </div>
+    <div class="body">
+      <div class="greeting">Olá, ${clientName}!</div>
+      <p style="font-size: 14px; color: #475569; margin: 0 0 16px;">
+        Recebemos sua solicitação para ${isApproved ? 'aprovar' : 'solicitar ajustes na'} etapa <strong>${stageName}</strong> do projeto <strong>${projectTitle}</strong>.
+      </p>
+
+      <div class="code-container">
+        <div class="code-label">Código de Confirmação</div>
+        <div class="otp-code">${otpCode}</div>
+        <p style="margin: 8px 0 0; font-size: 12px; color: #64748b;">
+          Válido por 15 minutos. Preencha este código na tela para concluir sua validação.
+        </p>
+      </div>
+
+      <div style="background-color: #fffbeb; border: 1px solid #fef3c7; border-radius: 12px; padding: 12px 16px; font-size: 12px; color: #92400e;">
+        <strong>Segurança:</strong> Se você não reconhece esta ação ou não estava navegando no portal de acompanhamento, favor desconsiderar este e-mail.
+      </div>
+    </div>
+    <div class="footer">
+      <p style="margin: 0;">Mensagem enviada por <strong>${officeName}</strong> através da plataforma Orgarq Architecture OS.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `
+
+  console.log('===================================================================')
+  console.log(`📧 [EMAIL OTP APROVAÇÃO] Enviando para: ${clientEmail}`)
+  console.log(`👤 Cliente: ${clientName} | Etapa: ${stageName} | Código: ${otpCode}`)
+  console.log('===================================================================')
+
+  const resendApiKey = process.env.RESEND_API_KEY
+  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Orgarq <onboarding@resend.dev>'
+
+  if (resendApiKey) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: resendFrom,
+          to: [clientEmail],
+          subject: emailSubject,
+          html: emailHtml,
+        }),
+      })
+
+      if (!res.ok) {
+        const errText = await res.text()
+        console.warn('Falha no envio via Resend API (OTP aprovação):', errText)
+      }
+    } catch (apiErr) {
+      console.warn('Erro ao chamar provedor de e-mail:', apiErr)
+    }
+  }
+
+  return { success: true }
+}

@@ -7,12 +7,23 @@ import { sanitizeText } from '@/lib/server/sanitize'
 import {
   normalizeWorkflowStages,
   getApprovedStage,
-  getRevisionStage
+  getRevisionStage,
 } from '@/lib/workflow-stages'
-import { getClientPortalSession } from '@/lib/actions/client-portal-auth'
+import { generateApprovalOtpCode } from '@/lib/server/client-auth-crypto'
+import { sendStageApprovalOtpEmail } from '@/lib/server/email'
+import { unlockClientPortalSessionAction } from '@/lib/actions/client-portal-auth'
+
+function maskEmail(email?: string | null): string {
+  if (!email || !email.includes('@')) return ''
+  const [local, domain] = email.split('@')
+  if (local.length <= 2) {
+    return `${local[0]}***@${domain}`
+  }
+  return `${local[0]}***${local[local.length - 1]}@${domain}`
+}
 
 /**
- * Gera ou recupera o Magic Link / Token do Portal do Cliente.
+ * Gera ou recupera o Magic Link / Token do Portal do Cliente para o projeto específico.
  */
 export async function getOrCreatePortalTokenAction(projectId: string) {
   const { supabase } = await requireProjectAccess(projectId)
@@ -46,39 +57,13 @@ export async function getOrCreatePortalTokenAction(projectId: string) {
 }
 
 /**
- * Consulta dados públicos do portal (tenta RPC e faz fallback automático direto pelo banco).
+ * Consulta dados do projeto para o portal a partir do token de acesso direto.
+ * Não exige código de segurança — já vem autenticado!
  */
 export async function getPortalDataAction(token: string) {
   const supabase = await createClient()
 
-  // 1. Tenta via RPC se existir e estiver atualizada
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: rpcData, error: rpcError } = await (supabase.rpc as any)('get_portal_project', {
-      client_token: token,
-    })
-
-    if (!rpcError && rpcData && typeof rpcData === 'object' && !('error' in rpcData) && rpcData.project) {
-      const filteredRpcStages = (rpcData.stages || [])
-        .filter((s: any) => s.is_client_approval_required !== false)
-        .map((s: any) => ({
-          ...s,
-          attachments: (Array.isArray(s.attachments) ? s.attachments : []).filter(
-            (att: any) => att.is_visible_to_client !== false
-          ),
-        }))
-      return {
-        data: {
-          ...rpcData,
-          stages: filteredRpcStages,
-        },
-      }
-    }
-  } catch {
-    // Continua para o fallback direto
-  }
-
-  // 2. Fallback direto (seguro e imune a RPCs com colunas antigas)
+  // 1. Valida token
   const { data: tokenRecord } = await supabase
     .from('client_access_tokens')
     .select('project_id, is_revoked, expires_at')
@@ -113,18 +98,25 @@ export async function getPortalDataAction(token: string) {
     .eq('id', project.organization_id)
     .single()
 
-  // 1. Busca todos os clientes vinculados ao projeto
+  // 2. Busca todos os clientes vinculados ao projeto
   const { data: pcRows } = await supabase
     .from('project_clients')
-    .select('client_id, clients(id, name, email, phone, person_type)')
+    .select('client_id, clients(id, name, email, phone, person_type, portal_token)')
     .eq('project_id', project.id)
 
-  let linkedClients: { id: string; name: string; email: string | null; phone: string | null; person_type: string }[] = []
+  let linkedClients: {
+    id: string
+    name: string
+    email: string | null
+    phone: string | null
+    person_type: string
+    portal_token?: string | null
+  }[] = []
 
   if (pcRows && pcRows.length > 0) {
     linkedClients = pcRows
       .map((r: any) => r.clients)
-      .filter((c: any): c is { id: string; name: string; email: string | null; phone: string | null; person_type: string } => Boolean(c))
+      .filter(Boolean)
   }
 
   // Fallback para projetos legados
@@ -132,7 +124,7 @@ export async function getPortalDataAction(token: string) {
     if (project.client_id) {
       const { data: singleClient } = await supabase
         .from('clients')
-        .select('id, name, email, phone, person_type')
+        .select('id, name, email, phone, person_type, portal_token')
         .eq('id', project.client_id)
         .maybeSingle()
       if (singleClient) linkedClients.push(singleClient)
@@ -143,7 +135,16 @@ export async function getPortalDataAction(token: string) {
         email: null,
         phone: null,
         person_type: 'PF',
+        portal_token: null,
       })
+    }
+  }
+
+  // Como o cliente acessou via link mágico direto de projeto, desbloqueamos a sessão do portal dele
+  // para que, caso ele clique em "Ver Todos os Meus Projetos", navegue para a página principal sem pedir código!
+  for (const c of linkedClients) {
+    if (c.portal_token) {
+      await unlockClientPortalSessionAction(c.portal_token)
     }
   }
 
@@ -154,7 +155,7 @@ export async function getPortalDataAction(token: string) {
     .eq('is_client_approval_required', true)
     .order('stage_order', { ascending: true })
 
-  // 2. Busca histórico de aprovações da tabela stage_approvals
+  // 3. Busca histórico de aprovações da tabela stage_approvals
   const { data: approvalsData } = await supabase
     .from('stage_approvals')
     .select('id, stage_id, client_id, approver_name, approver_email, action, created_at, feedback_message')
@@ -226,13 +227,134 @@ export async function getPortalDataAction(token: string) {
         email: null,
       },
       stages: enrichedStages,
-      workflowStages: workflowStages,
+      workflowStages,
     },
   }
 }
 
 /**
- * Registra aprovação ou solicitação de ajustes do cliente com suporte a aprovação colegiada.
+ * Dispara código de confirmação (OTP de 6 dígitos) para o e-mail do cliente selecionado
+ */
+export async function sendStageApprovalOtpAction(
+  token: string,
+  stageId: string,
+  clientId: string,
+  actionType: 'approved' | 'changes_requested'
+): Promise<{
+  success: boolean
+  maskedEmail?: string
+  error?: string
+}> {
+  try {
+    const supabase = await createClient()
+
+    // 1. Valida token
+    const { data: tokenRecord } = await supabase
+      .from('client_access_tokens')
+      .select('project_id')
+      .eq('token', token)
+      .eq('is_revoked', false)
+      .maybeSingle()
+
+    if (!tokenRecord?.project_id) {
+      return { success: false, error: 'Link do portal inválido ou expirado.' }
+    }
+
+    const projectId = tokenRecord.project_id
+
+    // 2. Busca informações do projeto e da organização
+    const { data: project } = await supabase
+      .from('projects')
+      .select('id, code, title, organization_id, organizations(name)')
+      .eq('id', projectId)
+      .single()
+
+    if (!project) {
+      return { success: false, error: 'Projeto não encontrado.' }
+    }
+
+    // 3. Busca informações da etapa
+    const { data: stage } = await supabase
+      .from('project_stages')
+      .select('id, name')
+      .eq('id', stageId)
+      .eq('project_id', projectId)
+      .single()
+
+    if (!stage) {
+      return { success: false, error: 'Etapa não encontrada.' }
+    }
+
+    // 4. Busca informações do cliente selecionado
+    const { data: client } = await supabase
+      .from('clients')
+      .select('id, name, email')
+      .eq('id', clientId)
+      .single()
+
+    if (!client || !client.email) {
+      return {
+        success: false,
+        error: 'O cliente selecionado não possui um e-mail cadastrado para receber o código de confirmação.',
+      }
+    }
+
+    // 5. Gera código de 6 dígitos
+    const otpCode = generateApprovalOtpCode()
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString() // 15 minutos
+
+    // Invalida OTPs anteriores ainda pendentes desta etapa/cliente
+    await supabase
+      .from('stage_approval_otps')
+      .update({ used_at: new Date().toISOString() })
+      .eq('stage_id', stageId)
+      .eq('client_id', clientId)
+      .is('used_at', null)
+
+    // Insere novo OTP
+    const { error: insertErr } = await supabase
+      .from('stage_approval_otps')
+      .insert({
+        project_id: projectId,
+        stage_id: stageId,
+        client_id: clientId,
+        email: client.email,
+        code: otpCode,
+        action_type: actionType,
+        expires_at: expiresAt,
+      })
+
+    if (insertErr) {
+      console.error('Erro ao salvar OTP de aprovação:', insertErr)
+      return { success: false, error: 'Falha ao registrar código de confirmação.' }
+    }
+
+    const officeName = (project.organizations as any)?.name || 'Escritório de Arquitetura'
+
+    // Envia o e-mail com o código
+    await sendStageApprovalOtpEmail({
+      clientName: client.name,
+      clientEmail: client.email,
+      projectTitle: project.title,
+      projectCode: project.code,
+      stageName: stage.name,
+      otpCode,
+      actionType,
+      officeName,
+    })
+
+    return {
+      success: true,
+      maskedEmail: maskEmail(client.email),
+    }
+  } catch (err: any) {
+    console.error('sendStageApprovalOtpAction error:', err)
+    return { success: false, error: err?.message || 'Erro ao enviar código de confirmação.' }
+  }
+}
+
+/**
+ * Valida o código OTP de confirmação e registra aprovação ou solicitação de ajustes do cliente.
  */
 export async function submitClientApprovalAction(
   token: string,
@@ -240,13 +362,16 @@ export async function submitClientApprovalAction(
   actionType: 'approved' | 'changes_requested',
   formData: FormData
 ) {
-  const approverName = sanitizeText(formData.get('approverName') as string)
-  const approverEmail = sanitizeText(formData.get('approverEmail') as string)
+  const clientId = formData.get('clientId') as string
+  const otpCode = sanitizeText(formData.get('otpCode') as string)
   const feedback = sanitizeText(formData.get('feedback') as string)
-  const clientId = (formData.get('clientId') as string) || null
 
-  if (!approverName) {
-    return { error: 'Por favor, informe seu nome para confirmar a ação.' }
+  if (!clientId) {
+    return { error: 'Por favor, selecione quem está confirmando esta ação.' }
+  }
+
+  if (!otpCode || otpCode.trim().length !== 6) {
+    return { error: 'Por favor, informe o código de confirmação de 6 dígitos recebido por e-mail.' }
   }
 
   const supabase = await createClient()
@@ -265,80 +390,56 @@ export async function submitClientApprovalAction(
 
   const projectId = tokenRecord.project_id
 
-  // 2. Busca projeto e lista de clientes vinculados
+  // 2. Valida se o código OTP informado existe, está válido e não expirou
+  const { data: validOtp, error: otpErr } = await supabase
+    .from('stage_approval_otps')
+    .select('id, email, code, expires_at, used_at')
+    .eq('stage_id', stageId)
+    .eq('client_id', clientId)
+    .eq('code', otpCode.trim())
+    .is('used_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (otpErr || !validOtp) {
+    return {
+      error: 'Código de confirmação inválido ou expirado. Verifique os números digitados ou solicite um novo código.',
+    }
+  }
+
+  // 3. Marca o OTP como utilizado
+  await supabase
+    .from('stage_approval_otps')
+    .update({ used_at: new Date().toISOString() })
+    .eq('id', validOtp.id)
+
+  // 4. Busca dados do projeto e cliente
   const { data: project } = await supabase
     .from('projects')
     .select('id, client_id, client_name, organization_id, organizations(workflow_stages)')
     .eq('id', projectId)
     .single()
 
+  const { data: client } = await supabase
+    .from('clients')
+    .select('id, name, email')
+    .eq('id', clientId)
+    .single()
+
+  const approverName = client?.name || 'Cliente'
+  const approverEmail = client?.email || validOtp.email
+
+  // 5. Busca total de clientes vinculados
   const { data: pcRows } = await supabase
     .from('project_clients')
-    .select('client_id, clients(id, name, email)')
+    .select('client_id')
     .eq('project_id', projectId)
 
-  let linkedClients: { id: string; name: string }[] = []
-  if (pcRows && pcRows.length > 0) {
-    linkedClients = pcRows.map((r: any) => r.clients).filter(Boolean)
-  }
+  const totalLinkedClients = Math.max((pcRows || []).length, 1)
 
-  const totalLinkedClients = Math.max(linkedClients.length, 1)
-
-  // 3. Tenta resolver o client_id caso não tenha sido enviado
-  let resolvedClientId = clientId
-  if (!resolvedClientId && linkedClients.length > 0) {
-    const matched = linkedClients.find(
-      (c) => c.name.toLowerCase() === approverName.toLowerCase()
-    )
-    if (matched) {
-      resolvedClientId = matched.id
-    }
-  }
-
-  // 3.1. Validação de Convergência Cadastral (Impede ação se houver divergência ou solicitação pendente)
-  const portalSession = await getClientPortalSession()
-  if (portalSession && project?.organization_id) {
-    const { data: portalAccount } = await supabase
-      .from('client_portal_accounts')
-      .select('name, email, phone, address, city, state, zip_code')
-      .eq('cpf', portalSession.cpf)
-      .maybeSingle()
-
-    const { data: officeClient } = await supabase
-      .from('clients')
-      .select('name, email, phone, address, city, state, zip_code')
-      .eq('document_number', portalSession.cpf)
-      .eq('organization_id', project.organization_id)
-      .maybeSingle()
-
-    const { data: pendingReq } = await supabase
-      .from('client_update_requests')
-      .select('id')
-      .eq('organization_id', project.organization_id)
-      .eq('cpf', portalSession.cpf)
-      .eq('status', 'pending')
-      .maybeSingle()
-
-    let hasDivergence = false
-    if (portalAccount && officeClient) {
-      if (portalAccount.name.trim().toLowerCase() !== (officeClient.name || '').trim().toLowerCase()) hasDivergence = true
-      if ((portalAccount.email || '').trim().toLowerCase() !== (officeClient.email || '').trim().toLowerCase()) hasDivergence = true
-      if ((portalAccount.phone || '').replace(/\D/g, '') !== (officeClient.phone || '').replace(/\D/g, '')) hasDivergence = true
-      if ((portalAccount.address || '').trim().toLowerCase() !== (officeClient.address || '').trim().toLowerCase()) hasDivergence = true
-      if ((portalAccount.city || '').trim().toLowerCase() !== (officeClient.city || '').trim().toLowerCase()) hasDivergence = true
-      if ((portalAccount.state || '').trim().toUpperCase() !== (officeClient.state || '').trim().toUpperCase()) hasDivergence = true
-      if ((portalAccount.zip_code || '').replace(/\D/g, '') !== (officeClient.zip_code || '').replace(/\D/g, '')) hasDivergence = true
-    }
-
-    if (hasDivergence || pendingReq) {
-      return {
-        error: 'Existem divergências cadastrais com o escritório. Por favor, regularize seus dados antes de aprovar ou solicitar ajustes nesta etapa.',
-      }
-    }
-  }
-
-  // 4. Workflow stages para status de aprovação
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // 6. Workflow stages para status de aprovação
   const rawWorkflowStages = (project?.organizations as any)?.workflow_stages
   const normalizedStages = normalizeWorkflowStages(rawWorkflowStages)
   const approvedStage = getApprovedStage(normalizedStages)
@@ -348,18 +449,18 @@ export async function submitClientApprovalAction(
     ? (approvedStage?.id || 'concluido')
     : (revisionStage?.id || 'em_producao')
 
-  // 5. Registra auditoria na tabela stage_approvals
+  // 7. Registra na tabela stage_approvals
   await supabase.from('stage_approvals').insert({
     project_id: projectId,
     stage_id: stageId,
-    client_id: resolvedClientId || null,
+    client_id: clientId,
     action: actionType,
     approver_name: approverName,
-    approver_email: approverEmail || null,
+    approver_email: approverEmail,
     feedback_message: feedback || null,
   })
 
-  // 6. Busca histórico de aprovações para calcular quantas aprovações únicas já foram registradas
+  // 8. Conta aprovações únicas já registradas
   const { data: stageApprovals } = await supabase
     .from('stage_approvals')
     .select('id, client_id, approver_name, action')
@@ -373,7 +474,7 @@ export async function submitClientApprovalAction(
   const approvedCount = uniqueApprovers.size
   const isFullyApproved = approvedCount >= totalLinkedClients
 
-  // 7. Busca comentários atuais da tarefa para registrar o histórico de validação
+  // 9. Comentários de validação
   const { data: currentStage } = await supabase
     .from('project_stages')
     .select('comments')
@@ -381,37 +482,35 @@ export async function submitClientApprovalAction(
     .eq('project_id', projectId)
     .single()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const currentComments: any[] = Array.isArray(currentStage?.comments) ? currentStage.comments : []
 
   let commentText = ''
   if (actionType === 'approved') {
     if (isFullyApproved) {
       commentText = totalLinkedClients > 1
-        ? `🎉 [Validação Concluída] Aprovado por ${approverName} (${approvedCount} de ${totalLinkedClients} clientes aprovaram - Todas as aprovações concluídas!).${feedback ? `\nObservação: "${feedback}"` : ''}`
-        : `✅ [Validação do Cliente] Aprovado por ${approverName}.${feedback ? `\nObservação: "${feedback}"` : ''}`
+        ? `🎉 [Validação Concluída via E-mail] Aprovado por ${approverName} (${approvedCount} de ${totalLinkedClients} clientes aprovaram - Todas as aprovações concluídas!).${feedback ? `\nObservação: "${feedback}"` : ''}`
+        : `✅ [Validação do Cliente via E-mail] Aprovado por ${approverName}.${feedback ? `\nObservação: "${feedback}"` : ''}`
     } else {
-      commentText = `✅ [Validação Parcial] Aprovado por ${approverName} (${approvedCount} de ${totalLinkedClients} aprovações necessárias). Aguardando aprovação dos demais clientes.${feedback ? `\nObservação: "${feedback}"` : ''}`
+      commentText = `✅ [Validação Parcial via E-mail] Aprovado por ${approverName} (${approvedCount} de ${totalLinkedClients} aprovações necessárias). Aguardando aprovação dos demais clientes.${feedback ? `\nObservação: "${feedback}"` : ''}`
     }
   } else {
-    commentText = `⚠️ [Validação do Cliente] Solicitação de Ajustes por ${approverName}:\n"${feedback || 'Ajustes solicitados conforme alinhamento.'}"`
+    commentText = `⚠️ [Validação do Cliente via E-mail] Solicitação de Ajustes por ${approverName}:\n"${feedback || 'Ajustes solicitados conforme alinhamento.'}"`
   }
 
   const validationComment = {
     id: `cmt-portal-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     user_id: 'portal-client',
     user_name: `${approverName} (Cliente)`,
-    user_email: approverEmail || null,
+    user_email: approverEmail,
     text: commentText,
     created_at: new Date().toISOString(),
   }
 
   const updatedComments = [...currentComments, validationComment]
 
-  // 8. Atualiza status da etapa no banco
+  // 10. Atualiza status da etapa
   if (actionType === 'approved') {
     if (isFullyApproved) {
-      // Todos aprovaram: conclui a etapa
       await (supabase
         .from('project_stages') as any)
         .update({
@@ -423,7 +522,6 @@ export async function submitClientApprovalAction(
         .eq('id', stageId)
         .eq('project_id', projectId)
     } else {
-      // Aprovação parcial: mantém em aprovação
       await (supabase
         .from('project_stages') as any)
         .update({
@@ -436,7 +534,6 @@ export async function submitClientApprovalAction(
         .eq('project_id', projectId)
     }
   } else {
-    // Solicitação de ajustes
     await (supabase
       .from('project_stages') as any)
       .update({

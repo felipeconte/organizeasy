@@ -12,10 +12,13 @@ import {
 import {
   generateSecureClientPassword,
   hashClientPassword,
+  generateClientAccessCode,
+  generateClientPortalToken,
 } from '@/lib/server/client-auth-crypto'
 import {
   sendClientPortalCredentialsEmail,
   sendClientNewProjectNotificationEmail,
+  sendClientPortalAccessDetailsEmail,
 } from '@/lib/server/email'
 
 export interface ClientData {
@@ -32,6 +35,8 @@ export interface ClientData {
   zip_code: string | null
   notes: string | null
   status: 'ativo' | 'inativo'
+  portal_token?: string | null
+  access_code?: string | null
   created_at: string
   updated_at: string
   projects_count?: number
@@ -262,6 +267,8 @@ export async function getClientByIdAction(clientId: string): Promise<{
       success: true,
       client: {
         ...client,
+        status: (client.status === 'inativo' ? 'inativo' : 'ativo') as 'ativo' | 'inativo',
+        person_type: (client.person_type === 'PJ' ? 'PJ' : 'PF') as 'PF' | 'PJ',
         projects_count: projectsWithProgress.length,
       },
       projects: projectsWithProgress,
@@ -332,6 +339,8 @@ export async function createClientAction(input: ClientInput): Promise<{
         zip_code: zipCode,
         notes: sanitizeText(input.notes) || null,
         status: input.status || 'ativo',
+        portal_token: generateClientPortalToken(),
+        access_code: generateClientAccessCode(),
       })
       .select('*')
       .single()
@@ -339,61 +348,6 @@ export async function createClientAction(input: ClientInput): Promise<{
     if (insertError) {
       console.error('Erro ao inserir cliente:', insertError)
       return { success: false, error: insertError.message }
-    }
-
-    // 2. CRIAÇÃO AUTOMÁTICA DE CONTA DO PORTAL E ENVIO DE E-MAIL (SE HOUVER CPF)
-    if (documentNumber && documentNumber.length === 11) {
-      try {
-        const { data: existingAccount } = await supabase
-          .from('client_portal_accounts')
-          .select('id, cpf, email')
-          .eq('cpf', documentNumber)
-          .maybeSingle()
-
-        const { data: orgData } = await supabase
-          .from('organizations')
-          .select('name, phone, email')
-          .eq('id', orgId)
-          .single()
-
-        const officeName = orgData?.name || 'Escritório de Arquitetura'
-
-        if (!existingAccount) {
-          // Conta nova: gera senha aleatória e envia por e-mail (arquiteto NÃO tem acesso à senha)
-          const rawPassword = generateSecureClientPassword()
-          const passwordHash = hashClientPassword(rawPassword)
-
-          await supabase.from('client_portal_accounts').insert({
-            cpf: documentNumber,
-            name,
-            email,
-            password_hash: passwordHash,
-          })
-
-          if (email) {
-            await sendClientPortalCredentialsEmail({
-              clientName: name,
-              clientEmail: email,
-              clientCpf: documentNumber,
-              rawPassword,
-              officeName,
-              officePhone: orgData?.phone,
-              officeEmail: orgData?.email,
-            })
-          }
-        } else if (email) {
-          // Conta existente (ex: já é cliente de outro escritório no Orgarq): notifica sem trocar senha
-          await sendClientNewProjectNotificationEmail({
-            clientName: name,
-            clientEmail: email,
-            clientCpf: documentNumber,
-            officeName,
-            projectTitle: 'Acompanhamento de Projetos',
-          })
-        }
-      } catch (portalAuthErr) {
-        console.warn('Aviso: Não foi possível processar conta do portal:', portalAuthErr)
-      }
     }
 
     revalidatePath('/app/clientes')
@@ -570,7 +524,7 @@ export async function deleteClientAction(clientId: string): Promise<{
 }
 
 /**
- * 6. REENVIAR / REDEFINIR SENHA DO PORTAL DIRETAMENTE PARA O E-MAIL DO CLIENTE
+ * 6. REENVIAR / ENVIAR ACESSO AO PORTAL DO CLIENTE (MAGIC LINK E CÓDIGO)
  */
 export async function resendClientPortalAccessAction(clientId: string): Promise<{
   success: boolean
@@ -582,7 +536,7 @@ export async function resendClientPortalAccessAction(clientId: string): Promise<
 
     const { data: client, error: fetchErr } = await supabase
       .from('clients')
-      .select('id, name, email, document_number, organization_id')
+      .select('id, name, email, document_number, organization_id, portal_token, access_code')
       .eq('id', clientId)
       .single()
 
@@ -592,74 +546,99 @@ export async function resendClientPortalAccessAction(clientId: string): Promise<
 
     await requirePermission(client.organization_id, 'clients_portal')
 
-    const cpf = cleanDigits(client.document_number)
-    if (!cpf || cpf.length !== 11) {
-      return {
-        success: false,
-        error: 'O cliente precisa ter um CPF válido cadastrado para acessar o portal.',
-      }
-    }
-
     if (!client.email) {
       return {
         success: false,
-        error: 'O cliente precisa ter um e-mail cadastrado para receber a senha de acesso.',
+        error: 'O cliente precisa ter um e-mail cadastrado para receber o link e o código de acesso.',
       }
+    }
+
+    let portalToken = client.portal_token
+    let accessCode = client.access_code
+
+    if (!portalToken || !accessCode) {
+      portalToken = portalToken || generateClientPortalToken()
+      accessCode = accessCode || generateClientAccessCode()
+
+      await supabase
+        .from('clients')
+        .update({
+          portal_token: portalToken,
+          access_code: accessCode,
+        })
+        .eq('id', clientId)
     }
 
     const { data: orgData } = await supabase
       .from('organizations')
-      .select('name, phone, email')
+      .select('name, phone, email, logo_url')
       .eq('id', client.organization_id)
       .single()
 
     const officeName = orgData?.name || 'Escritório de Arquitetura'
-    const rawPassword = generateSecureClientPassword()
-    const passwordHash = hashClientPassword(rawPassword)
 
-    // Atualiza ou insere a conta com nova senha
-    const { data: existing } = await supabase
-      .from('client_portal_accounts')
-      .select('id')
-      .eq('cpf', cpf)
-      .maybeSingle()
-
-    if (existing) {
-      await supabase
-        .from('client_portal_accounts')
-        .update({
-          password_hash: passwordHash,
-          email: client.email,
-          name: client.name,
-        })
-        .eq('cpf', cpf)
-    } else {
-      await supabase.from('client_portal_accounts').insert({
-        cpf,
-        name: client.name,
-        email: client.email,
-        password_hash: passwordHash,
-      })
-    }
-
-    // Envia o e-mail diretamente ao cliente
-    await sendClientPortalCredentialsEmail({
+    // Envia o e-mail diretamente ao cliente com o magic link e código de acesso
+    await sendClientPortalAccessDetailsEmail({
       clientName: client.name,
       clientEmail: client.email,
-      clientCpf: cpf,
-      rawPassword,
+      portalToken,
+      accessCode,
       officeName,
+      officeLogo: orgData?.logo_url,
       officePhone: orgData?.phone,
       officeEmail: orgData?.email,
     })
 
     return {
       success: true,
-      message: `Uma nova senha de acesso foi gerada e enviada diretamente para o e-mail do cliente (${client.email}).`,
+      message: `Link do Portal e Código de Acesso enviados com sucesso para o e-mail (${client.email}).`,
     }
   } catch (err: any) {
     console.error('resendClientPortalAccessAction error:', err)
-    return { success: false, error: err?.message || 'Erro ao reenviar acesso do cliente.' }
+    return { success: false, error: err?.message || 'Erro ao enviar acesso do cliente.' }
   }
 }
+
+/**
+ * 7. GERAR NOVO CÓDIGO DE ACESSO PARA O CLIENTE
+ */
+export async function regenerateClientAccessCodeAction(clientId: string): Promise<{
+  success: boolean
+  accessCode?: string
+  error?: string
+}> {
+  try {
+    const { supabase } = await requireAuth()
+
+    const { data: client, error: fetchErr } = await supabase
+      .from('clients')
+      .select('id, organization_id')
+      .eq('id', clientId)
+      .single()
+
+    if (fetchErr || !client) {
+      return { success: false, error: 'Cliente não encontrado.' }
+    }
+
+    await requirePermission(client.organization_id, 'clients_portal')
+
+    const newCode = generateClientAccessCode()
+
+    const { error: updateErr } = await supabase
+      .from('clients')
+      .update({ access_code: newCode })
+      .eq('id', clientId)
+
+    if (updateErr) {
+      return { success: false, error: 'Erro ao gerar novo código de acesso.' }
+    }
+
+    revalidatePath(`/app/clientes/${clientId}`)
+    return { success: true, accessCode: newCode }
+  } catch (err: any) {
+    console.error('regenerateClientAccessCodeAction error:', err)
+    return { success: false, error: err?.message || 'Erro ao gerar código de acesso.' }
+  }
+}
+
 

@@ -1,7 +1,5 @@
-'use server'
+import { redirect } from 'next/navigation'
 
-import ClientLoginForm from './ClientLoginForm'
-
-export default async function ClientPortalLoginPage() {
-  return <ClientLoginForm />
+export default function ClientPortalLoginPage() {
+  redirect('/portal')
 }

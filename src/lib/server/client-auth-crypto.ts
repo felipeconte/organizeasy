@@ -117,3 +117,100 @@ export function verifyClientPortalSession(token: string): ClientPortalSessionDat
     return null
   }
 }
+
+/**
+ * Gera código de acesso alfanumérico aleatório de 6 caracteres em caixa alta (ex: "K7X9B2").
+ * Exclui caracteres ambíguos (0/O e 1/I) para evitar confusão visual do cliente.
+ */
+export function generateClientAccessCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let result = ''
+  for (let i = 0; i < 6; i++) {
+    result += chars[crypto.randomInt(0, chars.length)]
+  }
+  return result
+}
+
+/**
+ * Gera um token único de portal seguro para URL
+ */
+export function generateClientPortalToken(): string {
+  return `cp_${crypto.randomBytes(16).toString('hex')}`
+}
+
+/**
+ * Gera um código OTP numérico de 6 dígitos para confirmação de aprovação por e-mail (ex: "481920")
+ */
+export function generateApprovalOtpCode(): string {
+  return crypto.randomInt(100000, 1000000).toString()
+}
+
+export interface ClientPortalAccessCookieData {
+  portalToken: string
+  clientId: string
+  organizationId: string
+  exp: number
+}
+
+/**
+ * Assina e cria um cookie seguro autorizando o acesso ao portal geral de um cliente
+ */
+export function signClientPortalAccessCookie(data: {
+  portalToken: string
+  clientId: string
+  organizationId: string
+}): string {
+  const payload: ClientPortalAccessCookieData = {
+    portalToken: data.portalToken,
+    clientId: data.clientId,
+    organizationId: data.organizationId,
+    exp: Date.now() + 1000 * 60 * 60 * 24 * 30, // 30 dias
+  }
+
+  const payloadBase64 = Buffer.from(JSON.stringify(payload)).toString('base64url')
+  const signature = crypto
+    .createHmac('sha256', SECRET_KEY)
+    .update(payloadBase64)
+    .digest('base64url')
+
+  return `${payloadBase64}.${signature}`
+}
+
+/**
+ * Valida o cookie de acesso do portal e confirma se corresponde ao portalToken esperado
+ */
+export function verifyClientPortalAccessCookie(
+  token: string,
+  expectedPortalToken: string
+): ClientPortalAccessCookieData | null {
+  if (!token || !token.includes('.')) return null
+  const [payloadBase64, signature] = token.split('.')
+  if (!payloadBase64 || !signature) return null
+
+  const expectedSignature = crypto
+    .createHmac('sha256', SECRET_KEY)
+    .update(payloadBase64)
+    .digest('base64url')
+
+  if (signature !== expectedSignature) {
+    return null
+  }
+
+  try {
+    const json = Buffer.from(payloadBase64, 'base64url').toString('utf-8')
+    const payload = JSON.parse(json) as ClientPortalAccessCookieData
+
+    if (!payload.exp || Date.now() > payload.exp) {
+      return null
+    }
+
+    if (payload.portalToken !== expectedPortalToken) {
+      return null
+    }
+
+    return payload
+  } catch {
+    return null
+  }
+}
+

@@ -23,9 +23,18 @@ import {
   Loader2,
   ShieldCheck,
   ChevronRight,
+  Copy,
+  Check,
+  ExternalLink,
+  RefreshCw,
 } from 'lucide-react'
 import BackButton from '@/components/ui/BackButton'
-import { ClientData, ClientProjectItem, resendClientPortalAccessAction } from '@/lib/actions/clients'
+import {
+  ClientData,
+  ClientProjectItem,
+  resendClientPortalAccessAction,
+  regenerateClientAccessCodeAction,
+} from '@/lib/actions/clients'
 import { maskCPFOrCNPJ, maskPhone, maskCEP } from '@/lib/formatters-and-validators'
 import { formatDateBR } from '@/lib/date-utils'
 import { useConfirm, useAlert } from '@/components/ui/ConfirmDialog'
@@ -60,31 +69,77 @@ export default function ClientDetailClient({
   const [client, setClient] = useState<ClientData>(initialClient)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [resendingAccess, setResendingAccess] = useState(false)
+  const [regeneratingCode, setRegeneratingCode] = useState(false)
+  const [accessCode, setAccessCode] = useState(client.access_code || '')
+  const [copiedLink, setCopiedLink] = useState(false)
+  const [copiedCode, setCopiedCode] = useState(false)
+
+  const portalToken = client.portal_token || ''
+  const portalUrl = typeof window !== 'undefined' && portalToken
+    ? `${window.location.origin}/portal/${portalToken}`
+    : `/portal/${portalToken}`
+
+  const handleCopyLink = () => {
+    if (!portalToken) return
+    navigator.clipboard.writeText(portalUrl)
+    setCopiedLink(true)
+    setTimeout(() => setCopiedLink(false), 2000)
+  }
+
+  const handleCopyCode = () => {
+    if (!accessCode) return
+    navigator.clipboard.writeText(accessCode)
+    setCopiedCode(true)
+    setTimeout(() => setCopiedCode(false), 2000)
+  }
+
+  const handleRegenerateCode = async () => {
+    const confirmed = await confirm({
+      title: 'Gerar Novo Código de Acesso',
+      message: 'Deseja gerar um novo código de acesso aleatório para este cliente?',
+      description: 'O código anterior deixará de funcionar imediatamente para novos acessos ao portal.',
+      confirmText: 'Gerar Novo Código',
+      cancelText: 'Cancelar',
+      variant: 'warning',
+    })
+
+    if (!confirmed) return
+
+    setRegeneratingCode(true)
+    const res = await regenerateClientAccessCodeAction(client.id)
+    setRegeneratingCode(false)
+
+    if (res.success && res.accessCode) {
+      setAccessCode(res.accessCode)
+      await showAlert({
+        title: 'Código Atualizado',
+        message: `Novo código gerado com sucesso: ${res.accessCode}`,
+        variant: 'success',
+      })
+    } else {
+      await showAlert({
+        title: 'Erro ao gerar código',
+        message: res.error || 'Não foi possível gerar novo código.',
+        variant: 'error',
+      })
+    }
+  }
 
   const handleResendAccess = async () => {
-    if (!client.document_number) {
-      await showAlert({
-        title: 'CPF Necessário',
-        message: 'O cliente precisa ter um CPF cadastrado para ter acesso ao portal.',
-        variant: 'warning',
-      })
-      return
-    }
-
     if (!client.email) {
       await showAlert({
         title: 'E-mail Necessário',
-        message: 'O cliente precisa ter um e-mail cadastrado para receber as credenciais.',
+        message: 'O cliente precisa ter um e-mail cadastrado para receber o link e o código de acesso.',
         variant: 'warning',
       })
       return
     }
 
     const confirmed = await confirm({
-      title: 'Reenviar Acesso ao Portal',
-      message: `Deseja gerar uma nova senha e enviar diretamente para o e-mail do cliente (${client.email})?`,
-      description: 'Por segurança e privacidade, a senha é gerada no servidor e enviada exclusivamente para o cliente.',
-      confirmText: 'Gerar e Enviar Senha',
+      title: 'Enviar Acesso ao Portal',
+      message: `Deseja enviar o Magic Link e o Código de Acesso para o e-mail do cliente (${client.email})?`,
+      description: 'O cliente receberá um e-mail com as instruções para acessar os projetos deste escritório com total segurança.',
+      confirmText: 'Enviar Acesso por E-mail',
       cancelText: 'Cancelar',
       variant: 'primary',
     })
@@ -98,13 +153,13 @@ export default function ClientDetailClient({
     if (res.success) {
       await showAlert({
         title: 'Acesso Enviado',
-        message: res.message || 'Credenciais enviadas com sucesso para o e-mail do cliente.',
+        message: res.message || 'Link e código enviados com sucesso para o e-mail do cliente.',
         variant: 'success',
       })
     } else {
       await showAlert({
         title: 'Erro ao Enviar Acesso',
-        message: res.error || 'Não foi possível gerar e enviar o acesso do cliente.',
+        message: res.error || 'Não foi possível enviar o acesso do cliente.',
         variant: 'error',
       })
     }
@@ -254,28 +309,6 @@ export default function ClientDetailClient({
             ) : (
               <p className="text-slate-400 italic text-sm">E-mail não cadastrado</p>
             )}
-
-            {/* Acesso ao Portal do Cliente */}
-            {canPortal && (
-              <div className="pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={handleResendAccess}
-                  disabled={resendingAccess}
-                  className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200/80 hover:border-blue-300 text-sm font-semibold transition-all cursor-pointer disabled:opacity-50"
-                >
-                  {resendingAccess ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" /> Enviando Acesso...
-                    </>
-                  ) : (
-                    <>
-                      <KeyRound className="w-4 h-4 text-blue-600" /> Reenviar Acesso ao Portal
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
           </div>
         </div>
 
@@ -317,6 +350,118 @@ export default function ClientDetailClient({
           </div>
         </div>
       </div>
+
+      {/* 2.1 PORTAL DO CLIENTE (ACESSO EXCLUSIVO DESTE ESCRITÓRIO) */}
+      {canPortal && (
+        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-6 sm:p-7 rounded-3xl border border-slate-800 shadow-lg space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0 shadow-inner">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-white">Portal do Cliente</h3>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    Magic Link Ativo
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Acesso exclusivo aos projetos deste cliente com seu escritório, sem necessidade de login.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleResendAccess}
+              disabled={resendingAccess || !client.email}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md shadow-blue-600/30 cursor-pointer shrink-0"
+            >
+              {resendingAccess ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Enviando...
+                </>
+              ) : (
+                <>
+                  <Send className="w-3.5 h-3.5" /> Enviar Link e Código por E-mail
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Link do Portal */}
+            <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2.5">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                Magic Link do Portal
+              </span>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 bg-slate-900 px-3 py-2 rounded-xl border border-slate-800 text-xs font-mono text-slate-300 truncate">
+                  {portalUrl}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyLink}
+                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                  title="Copiar link"
+                >
+                  {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedLink ? 'Copiado!' : 'Copiar'}</span>
+                </button>
+                {portalToken && (
+                  <a
+                    href={`/portal/${portalToken}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all shrink-0"
+                    title="Abrir portal em nova guia"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-400">
+                O cliente acessa todos os seus projetos vinculados a este escritório através deste link.
+              </p>
+            </div>
+
+            {/* Código de Acesso */}
+            <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2.5">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                Código de Acesso do Cliente
+              </span>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 bg-slate-900 px-4 py-2 rounded-xl border border-slate-800 font-mono text-lg font-bold tracking-widest text-amber-400 text-center">
+                  {accessCode || '------'}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyCode}
+                  disabled={!accessCode}
+                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50"
+                  title="Copiar código"
+                >
+                  {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedCode ? 'Copiado!' : 'Copiar'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRegenerateCode}
+                  disabled={regeneratingCode}
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all shrink-0 cursor-pointer disabled:opacity-50"
+                  title="Gerar novo código aleatório"
+                >
+                  <RefreshCw className={`w-4 h-4 ${regeneratingCode ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Código aleatório para proteger o portal geral contra acessos indevidos por terceiros.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 3. PROJETOS VINCULADOS */}
       <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
