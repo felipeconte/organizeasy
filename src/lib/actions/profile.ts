@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/server/guard'
 import { sanitizeText } from '@/lib/server/sanitize'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendPasswordResetEmail, sendEmailChangeConfirmationEmail } from '@/lib/server/email'
+import { getAppBaseUrl } from '@/lib/app-url'
 
 function translateAuthError(msg: string): string {
   if (!msg) return 'Ocorreu um erro ao processar a solicitação.'
@@ -84,7 +85,7 @@ export async function updateUserProfileAction(formData: FormData): Promise<{
       if (serviceRoleKey && resendApiKey) {
         try {
           const adminClient = createAdminClient()
-          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+          const baseUrl = getAppBaseUrl()
           const { data: linkData } = await adminClient.auth.admin.generateLink({
             type: 'email_change_new',
             email: user.email,
@@ -211,7 +212,7 @@ export async function sendPasswordResetEmailAction(): Promise<{ success: boolean
     return { success: false, error: 'E-mail do usuário não encontrado.' }
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const baseUrl = getAppBaseUrl()
   const redirectTo = `${baseUrl}/recuperar-senha`
 
   // 1. Tenta gerar o link seguro oficial via Admin e enviar com template Organizeasy via Resend

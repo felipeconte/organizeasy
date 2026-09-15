@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { sanitizeText } from '@/lib/server/sanitize'
 import { sendPasswordResetEmail, sendSignupConfirmationEmail, sendMagicLinkEmail } from '@/lib/server/email'
+import { getAppBaseUrl } from '@/lib/app-url'
 
 
 export async function loginAction(formData: FormData) {
@@ -92,7 +93,7 @@ export async function registerAction(formData: FormData) {
   if (serviceRoleKey && resendApiKey && !authData.session) {
     try {
       const adminClient = createAdminClient()
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      const baseUrl = getAppBaseUrl()
       const { data: linkData } = await adminClient.auth.admin.generateLink({
         type: 'signup',
         email,
@@ -130,7 +131,7 @@ export async function resetPasswordAction(formData: FormData) {
     return { error: 'Por favor, informe seu e-mail.' }
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const baseUrl = getAppBaseUrl()
   const redirectTo = `${baseUrl}/recuperar-senha`
 
   // 1. Tenta gerar link oficial com admin e enviar direto via Resend
@@ -188,7 +189,7 @@ export async function sendMagicLinkAction(formData: FormData): Promise<{ success
   const email = sanitizeText(formData.get('email') as string)?.toLowerCase().trim()
   if (!email) return { error: 'E-mail é obrigatório.' }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const baseUrl = getAppBaseUrl()
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   const resendApiKey = process.env.RESEND_API_KEY
 

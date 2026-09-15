@@ -1,10 +1,11 @@
-const DEFAULT_APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.organizeasy.com.br'
+import { maskCPF } from '@/lib/formatters-and-validators'
+import { getAppBaseUrl } from '@/lib/app-url'
+
+const DEFAULT_APP_URL = getAppBaseUrl()
 
 /**
  * Serviço de Envio de E-mails para o Portal do Cliente
  */
-
-import { maskCPF } from '@/lib/formatters-and-validators'
 
 export interface ClientCredentialsEmailParams {
   clientName: string
@@ -40,7 +41,7 @@ export async function sendClientPortalCredentialsEmail(
     officeEmail,
   } = params
 
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  const baseUrl = getAppBaseUrl()
   const formattedCpf = maskCPF(clientCpf)
   const portalLoginUrl = `${baseUrl}/portal/login?cpf=${encodeURIComponent(formattedCpf)}`
 
@@ -157,7 +158,7 @@ export async function sendClientNewProjectNotificationEmail(
 ): Promise<{ success: boolean; error?: string }> {
   const { clientName, clientEmail, clientCpf, officeName, projectTitle } = params
 
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  const baseUrl = getAppBaseUrl()
   const portalLoginUrl = `${baseUrl}/portal/login`
   const formattedCpf = maskCPF(clientCpf)
 
@@ -877,7 +878,7 @@ export async function sendClientPortalAccessDetailsEmail(
     officeEmail,
   } = params
 
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  const baseUrl = getAppBaseUrl()
   const portalUrl = `${baseUrl}/portal/${portalToken}`
   const emailSubject = `Seu Acesso ao Portal do Cliente - ${officeName}`
 
