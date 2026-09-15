@@ -20,7 +20,7 @@ export function getFallbackBreadcrumbs(pathname: string): BreadcrumbItem[] {
   // 1. Visão Geral / Início
   if (pathname === '/app') {
     return [
-      { label: 'Escritório', href: '/app' },
+      { label: 'Escritório' },
       { label: 'Visão Geral' },
     ]
   }
@@ -29,7 +29,6 @@ export function getFallbackBreadcrumbs(pathname: string): BreadcrumbItem[] {
   if (pathname.startsWith('/app/configuracoes')) {
     const configRoot: BreadcrumbItem = {
       label: 'Configurações',
-      href: '/app/configuracoes/escritorio',
     }
 
     if (pathname === '/app/configuracoes/etapas-fluxo') {
@@ -41,6 +40,9 @@ export function getFallbackBreadcrumbs(pathname: string): BreadcrumbItem[] {
     if (pathname === '/app/configuracoes/escritorio') {
       return [configRoot, { label: 'Dados do Escritório' }]
     }
+    if (pathname === '/app/configuracoes/perfis') {
+      return [configRoot, { label: 'Perfis de Acesso' }]
+    }
     if (pathname === '/app/configuracoes/perfil') {
       return [configRoot, { label: 'Meu Perfil' }]
     }
@@ -49,7 +51,7 @@ export function getFallbackBreadcrumbs(pathname: string): BreadcrumbItem[] {
 
   // 3. Clientes
   if (pathname.startsWith('/app/clientes')) {
-    const root: BreadcrumbItem = { label: 'Escritório', href: '/app' }
+    const root: BreadcrumbItem = { label: 'Escritório' }
     if (pathname === '/app/clientes') {
       return [root, { label: 'Clientes' }]
     }
@@ -62,7 +64,7 @@ export function getFallbackBreadcrumbs(pathname: string): BreadcrumbItem[] {
 
   // 4. Projetos
   if (pathname.startsWith('/app/projetos')) {
-    const root: BreadcrumbItem = { label: 'Escritório', href: '/app' }
+    const root: BreadcrumbItem = { label: 'Escritório' }
     if (pathname === '/app/projetos') {
       return [root, { label: 'Projetos' }]
     }
@@ -101,7 +103,7 @@ export function getFallbackBreadcrumbs(pathname: string): BreadcrumbItem[] {
 
   // 5. Empresas e Serviços
   if (pathname.startsWith('/app/empresas')) {
-    const root: BreadcrumbItem = { label: 'Escritório', href: '/app' }
+    const root: BreadcrumbItem = { label: 'Escritório' }
     if (pathname === '/app/empresas') {
       return [root, { label: 'Empresas e Serviços' }]
     }
@@ -115,14 +117,14 @@ export function getFallbackBreadcrumbs(pathname: string): BreadcrumbItem[] {
   // 6. Financeiro
   if (pathname.startsWith('/app/financeiro')) {
     return [
-      { label: 'Escritório', href: '/app' },
+      { label: 'Escritório' },
       { label: 'Financeiro' },
     ]
   }
 
   // Fallback genérico para qualquer outra rota sob /app
   const segments = pathname.replace('/app', '').split('/').filter(Boolean)
-  const items: BreadcrumbItem[] = [{ label: 'Escritório', href: '/app' }]
+  const items: BreadcrumbItem[] = [{ label: 'Escritório' }]
   let currentPath = '/app'
   segments.forEach((seg, idx) => {
     currentPath += `/${seg}`

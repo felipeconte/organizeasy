@@ -174,7 +174,7 @@ export default async function ProjectDetailPage({
     <div className="space-y-6 antialiased">
       <BreadcrumbSetter
         items={[
-          { label: 'Escritório', href: '/app' },
+          { label: 'Escritório' },
           { label: 'Projetos', href: '/app/projetos' },
           { label: project.title },
         ]}

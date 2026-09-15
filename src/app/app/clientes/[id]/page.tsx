@@ -36,7 +36,7 @@ export default async function ClientDetailPage({
     <>
       <BreadcrumbSetter
         items={[
-          { label: 'Escritório', href: '/app' },
+          { label: 'Escritório' },
           { label: 'Clientes', href: '/app/clientes' },
           { label: res.client.name },
         ]}

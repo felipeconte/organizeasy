@@ -4,6 +4,8 @@ import React from 'react'
 import Link from 'next/link'
 import { useBreadcrumb } from '@/contexts/BreadcrumbContext'
 
+const NON_CLICKABLE_LABELS = new Set(['Escritório', 'Configurações'])
+
 export function Breadcrumbs() {
   const { breadcrumbs } = useBreadcrumb()
 
@@ -18,6 +20,7 @@ export function Breadcrumbs() {
     >
       {breadcrumbs.map((item, index) => {
         const isLast = index === breadcrumbs.length - 1
+        const isVisualMarker = !isLast && (NON_CLICKABLE_LABELS.has(item.label) || !item.href)
 
         return (
           <React.Fragment key={`${item.label}-${index}`}>
@@ -29,17 +32,24 @@ export function Breadcrumbs() {
                 /
               </span>
             )}
-            {isLast || !item.href ? (
+            {isLast ? (
               <span
                 className="text-slate-900 font-bold truncate max-w-[200px] sm:max-w-[320px] md:max-w-[460px]"
                 title={item.label}
-                aria-current={isLast ? 'page' : undefined}
+                aria-current="page"
+              >
+                {item.label}
+              </span>
+            ) : isVisualMarker ? (
+              <span
+                className="text-slate-400 font-medium select-none truncate max-w-[160px] sm:max-w-[220px]"
+                title={item.label}
               >
                 {item.label}
               </span>
             ) : (
               <Link
-                href={item.href}
+                href={item.href!}
                 className="text-slate-500 hover:text-blue-600 transition-colors duration-150 truncate max-w-[160px] sm:max-w-[220px]"
                 title={item.label}
               >

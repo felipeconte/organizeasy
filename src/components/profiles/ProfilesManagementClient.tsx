@@ -274,17 +274,12 @@ export default function ProfilesManagementClient({
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-8">
+    <div className="max-w-7xl mx-auto space-y-8">
       {/* Topo / Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 pb-6">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-            <span>Configurações</span>
-            <span>/</span>
-            <span className="text-blue-600">Perfis de Acesso</span>
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Perfis de Acesso
+          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
+            <Shield className="w-6 h-6 text-blue-600" /> Perfis de Acesso
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             Personalize os cargos do seu escritório e defina exatamente quais funcionalidades cada perfil pode acessar.

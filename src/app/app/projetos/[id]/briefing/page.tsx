@@ -57,7 +57,7 @@ export default async function ProjectBriefingPage({
     <div className="max-w-4xl mx-auto space-y-6 antialiased">
       <BreadcrumbSetter
         items={[
-          { label: 'Escritório', href: '/app' },
+          { label: 'Escritório' },
           { label: 'Projetos', href: '/app/projetos' },
           { label: project.title, href: `/app/projetos/${id}` },
           { label: 'Briefing' },

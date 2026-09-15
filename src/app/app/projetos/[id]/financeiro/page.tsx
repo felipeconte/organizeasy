@@ -64,7 +64,7 @@ export default async function ProjectFinanceiroPage({
     <>
       <BreadcrumbSetter
         items={[
-          { label: 'Escritório', href: '/app' },
+          { label: 'Escritório' },
           { label: 'Projetos', href: '/app/projetos' },
           { label: project.title, href: `/app/projetos/${id}` },
           { label: 'Financeiro' },

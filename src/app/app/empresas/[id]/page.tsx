@@ -44,7 +44,7 @@ export default async function CompanyDetailPage({
     <>
       <BreadcrumbSetter
         items={[
-          { label: 'Escritório', href: '/app' },
+          { label: 'Escritório' },
           { label: 'Empresas e Serviços', href: '/app/empresas' },
           { label: res.company.trade_name || res.company.name || 'Empresa Parceira' },
         ]}
