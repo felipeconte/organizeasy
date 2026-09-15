@@ -28,10 +28,12 @@ import {
   Copy,
   Send,
   RefreshCw,
+  Camera,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import {
   updateOrganizationAction,
+  updateOrganizationLogoAction,
   addOrganizationMemberAction,
   updateMemberRoleAction,
   updateMemberProfileAction,
@@ -525,10 +527,29 @@ export default function OfficeSettingsClient({
       {cropperRawImage && (
         <ImageCropperModal
           imageSrc={cropperRawImage}
-          onCropComplete={(croppedUrl) => {
-            setFormData({ ...formData, logo_url: croppedUrl })
+          title="Ajustar Logomarca do Escritório"
+          description="Arraste e use o zoom para centralizar o ícone perfeitamente."
+          confirmText="Aplicar Logomarca"
+          onCropComplete={async (croppedUrl) => {
             setCropperRawImage(null)
-            showToast('Logomarca ajustada com sucesso!')
+            if (isEditing) {
+              setFormData((prev) => ({ ...prev, logo_url: croppedUrl }))
+              showToast('Logomarca selecionada! Clique em "Salvar Alterações" para confirmar.')
+            } else {
+              // Salva imediatamente no banco de dados quando alterado na visualização
+              setOrg((prev) => ({ ...prev, logo_url: croppedUrl }))
+              setFormData((prev) => ({ ...prev, logo_url: croppedUrl }))
+              const res = await updateOrganizationLogoAction(org.id, croppedUrl)
+              if (res.success) {
+                showToast('Logomarca do escritório atualizada com sucesso!')
+              } else {
+                await showAlert({
+                  title: 'Erro ao salvar logomarca',
+                  message: res.error || 'Não foi possível atualizar a logomarca do escritório.',
+                  variant: 'error',
+                })
+              }
+            }
           }}
           onCancel={() => setCropperRawImage(null)}
         />
@@ -757,11 +778,23 @@ export default function OfficeSettingsClient({
           <div className="space-y-6">
             {/* Top Logo & Title Badge */}
             <div className="flex items-center gap-4 pb-4 border-b border-slate-100">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center overflow-hidden border-2 border-white shadow-md shrink-0">
-                {org.logo_url ? (
-                  <img src={org.logo_url} alt={org.name} className="w-full h-full object-cover" />
-                ) : (
-                  <Building2 className="w-8 h-8" />
+              <div className="relative group shrink-0">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center overflow-hidden border-2 border-white shadow-md">
+                  {org.logo_url ? (
+                    <img src={org.logo_url} alt={org.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <Building2 className="w-8 h-8" />
+                  )}
+                </div>
+                {canEditOffice && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute inset-0 bg-slate-900/50 rounded-2xl flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-md"
+                    title="Alterar logomarca"
+                  >
+                    <Camera className="w-5 h-5" />
+                  </button>
                 )}
               </div>
               <div>

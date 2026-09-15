@@ -37,7 +37,8 @@ export async function updateOrganizationAction(
   const cnpj = sanitizeText(formData.get('cnpj') as string)
   const phone = sanitizeText(formData.get('phone') as string)
   const email = sanitizeText(formData.get('email') as string)
-  const logo_url = sanitizeText(formData.get('logo_url') as string)
+  const rawLogo = formData.get('logo_url') as string
+  const logo_url = rawLogo?.startsWith('data:image/') || rawLogo?.startsWith('http') ? rawLogo.trim() : sanitizeText(rawLogo)
 
   if (!name) {
     return { success: false, error: 'O nome do escritório é obrigatório.' }
@@ -102,7 +103,31 @@ export async function updateOrganizationAction(
   }
 
   revalidatePath('/app/configuracoes/escritorio')
-  revalidatePath('/app')
+  revalidatePath('/app', 'layout')
+  return { success: true }
+}
+
+/**
+ * Atualiza exclusivamente a logomarca do escritório com persistência imediata
+ */
+export async function updateOrganizationLogoAction(
+  orgId: string,
+  logoUrl: string
+): Promise<{ success: boolean; error?: string }> {
+  const { supabase } = await requireAuth()
+  await requirePermission(orgId, 'settings_office')
+
+  const { error } = await supabase
+    .from('organizations')
+    .update({ logo_url: logoUrl || null, updated_at: new Date().toISOString() })
+    .eq('id', orgId)
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/app/configuracoes/escritorio')
+  revalidatePath('/app', 'layout')
   return { success: true }
 }
 

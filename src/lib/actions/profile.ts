@@ -136,6 +136,7 @@ export async function updateUserProfileAction(formData: FormData): Promise<{
 
   if (dbError) {
     console.error('Error updating user_profiles table:', dbError)
+    return { success: false, error: 'Erro ao salvar perfil no banco de dados: ' + dbError.message }
   }
 
   // 3. Atualiza metadados leves no Supabase Auth
@@ -154,6 +155,35 @@ export async function updateUserProfileAction(formData: FormData): Promise<{
     emailChangePending,
     newEmail: email || user.email,
   }
+}
+
+/**
+ * Atualiza exclusivamente a foto de perfil do usuário com persistência imediata
+ */
+export async function updateUserAvatarAction(
+  avatarUrl: string
+): Promise<{ success: boolean; error?: string }> {
+  const { supabase, user } = await requireAuth()
+
+  const { error: dbError } = await supabase
+    .from('user_profiles')
+    .upsert(
+      {
+        user_id: user.id,
+        avatar_url: avatarUrl || null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id' }
+    )
+
+  if (dbError) {
+    console.error('Error updating avatar in user_profiles:', dbError)
+    return { success: false, error: dbError.message }
+  }
+
+  revalidatePath('/app/configuracoes/perfil')
+  revalidatePath('/app', 'layout')
+  return { success: true }
 }
 
 /**

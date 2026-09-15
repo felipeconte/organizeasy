@@ -18,10 +18,12 @@ import {
   Briefcase,
   FileCheck,
   Send,
-  X
+  X,
+  Camera,
 } from 'lucide-react'
 import {
   updateUserProfileAction,
+  updateUserAvatarAction,
   updateUserPasswordAction,
   sendPasswordResetEmailAction
 } from '@/lib/actions/profile'
@@ -297,10 +299,29 @@ export default function UserProfileSettingsClient({
       {cropperRawImage && (
         <ImageCropperModal
           imageSrc={cropperRawImage}
-          onCropComplete={(croppedUrl) => {
-            setFormData({ ...formData, avatarUrl: croppedUrl })
+          title="Ajustar Foto de Perfil"
+          description="Arraste e use o zoom para centralizar sua foto perfeitamente."
+          confirmText="Aplicar Foto de Perfil"
+          onCropComplete={async (croppedUrl) => {
             setCropperRawImage(null)
-            showToast('Foto de perfil ajustada com sucesso!')
+            if (isEditing) {
+              setFormData((prev) => ({ ...prev, avatarUrl: croppedUrl }))
+              showToast('Foto selecionada! Clique em "Salvar Alterações" para confirmar.')
+            } else {
+              // Salva imediatamente no banco de dados quando alterado na visualização
+              setProfile((prev) => ({ ...prev, avatarUrl: croppedUrl }))
+              setFormData((prev) => ({ ...prev, avatarUrl: croppedUrl }))
+              const res = await updateUserAvatarAction(croppedUrl)
+              if (res.success) {
+                showToast('Foto de perfil salva com sucesso!')
+              } else {
+                await showAlert({
+                  title: 'Erro ao salvar foto',
+                  message: res.error || 'Não foi possível atualizar a foto de perfil.',
+                  variant: 'error',
+                })
+              }
+            }
           }}
           onCancel={() => setCropperRawImage(null)}
         />
@@ -519,12 +540,22 @@ export default function UserProfileSettingsClient({
           <div className="space-y-6">
             {/* Header with Avatar and Basic Info */}
             <div className="flex items-center gap-4 pb-4 border-b border-slate-100">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-extrabold text-lg shadow-sm border-2 border-white overflow-hidden shrink-0">
-                {profile.avatarUrl ? (
-                  <img src={profile.avatarUrl} alt={profile.fullName} className="w-full h-full object-cover" />
-                ) : (
-                  <span>{getInitials(profile.fullName || profile.email)}</span>
-                )}
+              <div className="relative group shrink-0">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-extrabold text-lg shadow-sm border-2 border-white overflow-hidden">
+                  {profile.avatarUrl ? (
+                    <img src={profile.avatarUrl} alt={profile.fullName} className="w-full h-full object-cover" />
+                  ) : (
+                    <span>{getInitials(profile.fullName || profile.email)}</span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute inset-0 bg-slate-900/50 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-md"
+                  title="Alterar foto de perfil"
+                >
+                  <Camera className="w-5 h-5" />
+                </button>
               </div>
               <div>
                 <h3 className="text-xl font-bold text-slate-900">{profile.fullName}</h3>
