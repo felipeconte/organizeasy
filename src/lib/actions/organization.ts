@@ -78,7 +78,6 @@ export async function updateOrganizationAction(
     name,
     slug,
     professional_council_id: professional_council_id || null,
-    cau_caubr: professional_council_id || null,
     cnpj: cnpj ? maskCPFOrCNPJ(cnpj) : null,
     phone: phone || null,
     email: email || null,
@@ -90,9 +89,10 @@ export async function updateOrganizationAction(
     .update(updatePayload as any)
     .eq('id', orgId)
 
-  // Fallback se a coluna professional_council_id ainda não existir no schema remoto
+  // Fallback se a coluna professional_council_id ainda não existir no schema remoto (bancos legados com cau_caubr)
   if (error && (error.message?.includes('professional_council_id') || error.code === '42703')) {
     delete updatePayload.professional_council_id
+    updatePayload.cau_caubr = professional_council_id || null
     const retry = await supabase.from('organizations').update(updatePayload as any).eq('id', orgId)
     error = retry.error
   }

@@ -155,6 +155,7 @@ export async function getClientPortalOfficeDataAction(portalToken: string): Prom
     phone: string | null
     email: string | null
     cau_caubr: string | null
+    professional_council_id?: string | null
   }
   clientName?: string
   data?: ClientPortalOfficeData
@@ -174,11 +175,20 @@ export async function getClientPortalOfficeDataAction(portalToken: string): Prom
   }
 
   // 2. Busca informações do escritório
-  const { data: orgData } = await (supabase
+  let { data: orgData, error: orgErr } = await (supabase
     .from('organizations') as any)
-    .select('id, name, logo_url, phone, email, cau_caubr')
+    .select('id, name, logo_url, phone, email, professional_council_id')
     .eq('id', client.organization_id)
-    .single()
+    .maybeSingle()
+
+  if (orgErr && (orgErr.message?.includes('professional_council_id') || orgErr.code === '42703')) {
+    const fallback = await (supabase
+      .from('organizations') as any)
+      .select('id, name, logo_url, phone, email, cau_caubr')
+      .eq('id', client.organization_id)
+      .maybeSingle()
+    orgData = fallback.data
+  }
 
   const office = {
     id: client.organization_id,
@@ -186,8 +196,8 @@ export async function getClientPortalOfficeDataAction(portalToken: string): Prom
     logo_url: orgData?.logo_url || null,
     phone: orgData?.phone || null,
     email: orgData?.email || null,
-    cau_caubr: orgData?.professional_council_id || orgData?.cau_caubr || null,
-    professional_council_id: orgData?.professional_council_id || orgData?.cau_caubr || null,
+    cau_caubr: orgData?.professional_council_id || (orgData as any)?.cau_caubr || null,
+    professional_council_id: orgData?.professional_council_id || (orgData as any)?.cau_caubr || null,
   }
 
   // 3. Verifica se a sessão está desbloqueada pelo cookie

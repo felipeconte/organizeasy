@@ -92,11 +92,20 @@ export async function getPortalDataAction(token: string) {
     return { error: 'Projeto não encontrado.' }
   }
 
-  const { data: org } = await (supabase
+  let { data: org, error: orgErr } = await (supabase
     .from('organizations') as any)
-    .select('name, logo_url, cau_caubr, phone, email, workflow_stages')
+    .select('name, logo_url, professional_council_id, phone, email, workflow_stages')
     .eq('id', project.organization_id)
-    .single()
+    .maybeSingle()
+
+  if (orgErr && (orgErr.message?.includes('professional_council_id') || orgErr.code === '42703')) {
+    const fallbackOrg = await (supabase
+      .from('organizations') as any)
+      .select('name, logo_url, cau_caubr, phone, email, workflow_stages')
+      .eq('id', project.organization_id)
+      .maybeSingle()
+    org = fallbackOrg.data
+  }
 
   // 2. Busca todos os clientes vinculados ao projeto
   const { data: pcRows } = await supabase
@@ -219,7 +228,11 @@ export async function getPortalDataAction(token: string) {
         status: project.status,
       },
       clients: linkedClients,
-      organization: org || {
+      organization: org ? {
+        ...org,
+        professional_council_id: (org as any).professional_council_id || (org as any).cau_caubr || null,
+        cau_caubr: (org as any).professional_council_id || (org as any).cau_caubr || null,
+      } : {
         name: 'Meu Escritório',
         logo_url: null,
         cau_caubr: null,

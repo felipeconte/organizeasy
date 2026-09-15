@@ -119,7 +119,6 @@ export async function updateUserProfileAction(formData: FormData): Promise<{
     phone: phone || null,
     job_role: jobRole || null,
     professional_council_id: professional_council_id || null,
-    cau: professional_council_id || null,
     bio: bio || null,
     updated_at: new Date().toISOString(),
   }
@@ -130,6 +129,7 @@ export async function updateUserProfileAction(formData: FormData): Promise<{
 
   if (dbError && (dbError.message?.includes('professional_council_id') || dbError.code === '42703')) {
     delete profilePayload.professional_council_id
+    profilePayload.cau = professional_council_id || null
     const retry = await supabase.from('user_profiles').upsert(profilePayload as any, { onConflict: 'user_id' })
     dbError = retry.error
   }
