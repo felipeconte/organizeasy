@@ -30,7 +30,7 @@ export async function loginAction(formData: FormData) {
 
 export async function registerAction(formData: FormData) {
   const name = sanitizeText(formData.get('name') as string)
-  const email = sanitizeText(formData.get('email') as string)
+  const email = sanitizeText(formData.get('email') as string)?.toLowerCase().trim()
   const password = formData.get('password') as string
   const officeName = formData.get('officeName') ? sanitizeText(formData.get('officeName') as string) : ''
 
@@ -42,27 +42,109 @@ export async function registerAction(formData: FormData) {
     return { error: 'A senha deve ter no mínimo 6 caracteres.' }
   }
 
-  const supabase = await createClient()
-
-  // 1. Cria usuário no Supabase Auth
-  const { data: authData, error: authError } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name: name,
-      },
-    },
-  })
-
-  if (authError || !authData.user) {
-    return { error: authError?.message || 'Falha ao registrar usuário.' }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(email)) {
+    return { error: 'Por favor, informe um endereço de e-mail válido.' }
   }
 
-  const userId = authData.user.id
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const resendApiKey = process.env.RESEND_API_KEY
+  const supabase = await createClient()
 
-  // 2. Se o usuário já informou nome do escritório diretamente, cria a Organização
-  if (officeName) {
+  let userId: string | null = null
+
+  // 1. Estratégia Principal: Admin Client (Cria usuário sem depender do GoTrue SMTP e com e-mail confirmado)
+  if (serviceRoleKey) {
+    try {
+      const adminClient = createAdminClient()
+      const { data: adminUser, error: adminErr } = await adminClient.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: name,
+          display_name: name,
+        },
+      })
+
+      if (adminErr) {
+        const msg = adminErr.message || ''
+        const lower = msg.toLowerCase()
+        if (
+          lower.includes('already registered') ||
+          lower.includes('unique constraint') ||
+          lower.includes('already exists') ||
+          lower.includes('user already exists')
+        ) {
+          return { error: 'Este e-mail já está cadastrado. Faça login para continuar ou use a recuperação de senha.' }
+        }
+        return { error: msg || 'Falha ao registrar usuário.' }
+      }
+
+      if (adminUser?.user) {
+        userId = adminUser.user.id
+
+        // Garante perfil inicial em user_profiles
+        try {
+          await adminClient.from('user_profiles').upsert(
+            {
+              user_id: userId,
+              full_name: name,
+              display_name: name,
+            },
+            { onConflict: 'user_id' }
+          )
+        } catch (profErr) {
+          console.warn('Aviso: falha ao criar user_profiles inicial:', profErr)
+        }
+
+        // Realiza o login imediato no servidor para criar os cookies de sessão
+        const { error: signInErr } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
+
+        if (signInErr) {
+          console.warn('Aviso: login automático após criação via admin falhou:', signInErr)
+        }
+      }
+    } catch (adminException: any) {
+      console.error('Erro na criação via adminClient (tentando fallback):', adminException)
+    }
+  }
+
+  // 2. Fallback caso adminClient não esteja configurado ou não tenha concluído
+  if (!userId) {
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name,
+        },
+      },
+    })
+
+    if (authError || !authData.user) {
+      const errorMsg = authError?.message || ''
+      const lower = errorMsg.toLowerCase()
+      if (lower.includes('confirmation email') || lower.includes('error sending')) {
+        return {
+          error:
+            'Não foi possível enviar o e-mail de confirmação pelo servidor. Por favor, tente novamente em instantes ou contate o suporte.',
+        }
+      }
+      if (lower.includes('already registered') || lower.includes('user already exists')) {
+        return { error: 'Este e-mail já está cadastrado. Faça login ou recupere sua senha.' }
+      }
+      return { error: errorMsg || 'Falha ao registrar usuário.' }
+    }
+
+    userId = authData.user.id
+  }
+
+  // 3. Se o usuário já informou nome do escritório diretamente, cria a Organização
+  if (officeName && userId) {
     const slug =
       officeName
         .toLowerCase()
@@ -73,7 +155,8 @@ export async function registerAction(formData: FormData) {
       '-' +
       Math.floor(1000 + Math.random() * 9000)
 
-    const { error: orgError } = await supabase
+    const dbClient = serviceRoleKey ? createAdminClient() : supabase
+    const { error: orgError } = await dbClient
       .from('organizations')
       .insert({
         name: officeName,
@@ -87,31 +170,37 @@ export async function registerAction(formData: FormData) {
     }
   }
 
-  // 3. Se confirmação de e-mail estiver ativa (sem sessão imediata), envia e-mail com layout Organizeasy via Resend
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const resendApiKey = process.env.RESEND_API_KEY
-  if (serviceRoleKey && resendApiKey && !authData.session) {
+  // 4. Envia e-mail de confirmação / boas-vindas com layout oficial Organizeasy via Resend
+  if (resendApiKey) {
     try {
-      const adminClient = createAdminClient()
       const baseUrl = await getRequestBaseUrl()
-      const { data: linkData } = await adminClient.auth.admin.generateLink({
-        type: 'signup',
-        email,
-        password,
-        options: {
-          data: { full_name: name },
-          redirectTo: `${baseUrl}/onboarding`,
-        },
-      })
-      if (linkData?.properties?.action_link) {
-        await sendSignupConfirmationEmail({
-          userEmail: email,
-          userName: name,
-          confirmationLink: linkData.properties.action_link,
-        })
+      let confirmationLink = `${baseUrl}/onboarding`
+
+      if (serviceRoleKey) {
+        try {
+          const adminClient = createAdminClient()
+          const { data: linkData } = await adminClient.auth.admin.generateLink({
+            type: 'magiclink',
+            email,
+            options: {
+              redirectTo: `${baseUrl}/onboarding`,
+            },
+          })
+          if (linkData?.properties?.action_link) {
+            confirmationLink = linkData.properties.action_link
+          }
+        } catch {
+          // Mantém baseUrl/onboarding como fallback
+        }
       }
-    } catch (linkErr) {
-      console.warn('Erro ao gerar/enviar confirmação de cadastro via Resend:', linkErr)
+
+      await sendSignupConfirmationEmail({
+        userEmail: email,
+        userName: name,
+        confirmationLink,
+      })
+    } catch (mailErr) {
+      console.warn('Aviso: falha ao enviar e-mail de confirmação via Resend:', mailErr)
     }
   }
 

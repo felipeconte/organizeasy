@@ -2,6 +2,21 @@ import { maskCPF } from '@/lib/formatters-and-validators'
 import { getAppBaseUrl, getEmailAssetBaseUrl } from '@/lib/app-url'
 
 const DEFAULT_APP_URL = getEmailAssetBaseUrl()
+export const DEFAULT_SENDER_EMAIL = 'Organizeasy <noreply@mail.organizeasy.com.br>'
+
+/**
+ * Retorna o remetente oficial blindado.
+ * Se a variável de ambiente contiver o remetente de testes 'onboarding@resend.dev' ou estiver vazia,
+ * faz o fallback automático para o domínio oficial verificado.
+ */
+export function getSenderEmail(): string {
+  const envFrom = process.env.RESEND_FROM_EMAIL?.trim()
+  if (!envFrom || envFrom.includes('onboarding@resend.dev')) {
+    return DEFAULT_SENDER_EMAIL
+  }
+  return envFrom
+}
+
 
 /**
  * Serviço de Envio de E-mails para o Portal do Cliente
@@ -120,7 +135,7 @@ export async function sendClientPortalCredentialsEmail(
 
   // Se houver chave RESEND_API_KEY ou serviço SMTP configurado no ambiente:
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Organizeasy <onboarding@resend.dev>'
+  const resendFrom = getSenderEmail()
 
   if (resendApiKey) {
     try {
@@ -172,7 +187,7 @@ export async function sendClientNewProjectNotificationEmail(
   console.log('===================================================================')
 
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Organizeasy <onboarding@resend.dev>'
+  const resendFrom = getSenderEmail()
 
   if (resendApiKey) {
     try {
@@ -216,7 +231,7 @@ export async function sendPasswordResetEmail(
 ): Promise<{ success: boolean; error?: string }> {
   const { userEmail, userName, resetLink } = params
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Organizeasy <onboarding@resend.dev>'
+  const resendFrom = getSenderEmail()
   const greeting = userName ? `Olá, <strong>${userName}</strong>` : 'Olá'
   const emailSubject = 'Redefina sua senha de acesso no Organizeasy'
 
@@ -322,7 +337,7 @@ export async function sendSignupConfirmationEmail(
 ): Promise<{ success: boolean; error?: string }> {
   const { userEmail, userName, confirmationLink } = params
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Organizeasy <onboarding@resend.dev>'
+  const resendFrom = getSenderEmail()
   const greeting = userName ? `Olá, <strong>${userName}</strong>` : 'Olá'
   const emailSubject = 'Confirme seu e-mail para ativar sua conta no Organizeasy'
 
@@ -429,7 +444,7 @@ export async function sendEmailChangeConfirmationEmail(
 ): Promise<{ success: boolean; error?: string }> {
   const { userEmail, newEmail, userName, confirmationLink } = params
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Organizeasy <onboarding@resend.dev>'
+  const resendFrom = getSenderEmail()
   const greeting = userName ? `Olá, <strong>${userName}</strong>` : 'Olá'
   const emailSubject = 'Confirme a alteração do seu e-mail no Organizeasy'
 
@@ -544,7 +559,7 @@ export async function sendUserInvitationEmail(
 ): Promise<{ success: boolean; error?: string }> {
   const { userEmail, inviterName, officeName, inviteLink } = params
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Organizeasy <onboarding@resend.dev>'
+  const resendFrom = getSenderEmail()
   const emailSubject = `Convite para participar do escritório ${officeName} no Organizeasy`
 
   const emailHtml = `
@@ -649,7 +664,7 @@ export async function sendMagicLinkEmail(
 ): Promise<{ success: boolean; error?: string }> {
   const { userEmail, userName, magicLink, otpCode } = params
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Organizeasy <onboarding@resend.dev>'
+  const resendFrom = getSenderEmail()
   const greeting = userName ? `Olá, <strong>${userName}</strong>` : 'Olá'
   const emailSubject = 'Seu link de acesso ao Organizeasy'
 
@@ -767,7 +782,7 @@ export async function sendReauthenticationEmail(
 ): Promise<{ success: boolean; error?: string }> {
   const { userEmail, userName, otpCode } = params
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Organizeasy <onboarding@resend.dev>'
+  const resendFrom = getSenderEmail()
   const greeting = userName ? `Olá, <strong>${userName}</strong>` : 'Olá'
   const emailSubject = 'Seu código de verificação de segurança — Organizeasy'
 
@@ -949,7 +964,7 @@ export async function sendClientPortalAccessDetailsEmail(
   console.log('===================================================================')
 
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Organizeasy <onboarding@resend.dev>'
+  const resendFrom = getSenderEmail()
 
   if (resendApiKey) {
     try {
@@ -1069,7 +1084,7 @@ export async function sendStageApprovalOtpEmail(
   console.log('===================================================================')
 
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Organizeasy <onboarding@resend.dev>'
+  const resendFrom = getSenderEmail()
 
   if (resendApiKey) {
     try {
