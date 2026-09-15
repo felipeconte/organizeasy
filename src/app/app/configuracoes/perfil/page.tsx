@@ -16,11 +16,12 @@ export default async function UserProfilePage() {
   const profileData: UserProfileData = {
     id: user.id,
     email: user.email || '',
-    fullName: dbProfile?.full_name || dbProfile?.display_name || meta.full_name || meta.display_name || user.email?.split('@')[0] || 'Arquiteto',
+    fullName: dbProfile?.full_name || dbProfile?.display_name || meta.full_name || meta.display_name || user.email?.split('@')[0] || 'Usuário',
     avatarUrl: dbProfile?.avatar_url || meta.avatar_url || null,
     phone: dbProfile?.phone || meta.phone || null,
     jobRole: dbProfile?.job_role || meta.job_role || null,
-    cau: dbProfile?.cau || meta.cau || null,
+    professional_council_id: (dbProfile as any)?.professional_council_id || dbProfile?.cau || meta.professional_council_id || meta.cau || null,
+    cau: dbProfile?.cau || (dbProfile as any)?.professional_council_id || meta.cau || null,
     bio: dbProfile?.bio || meta.bio || null,
   }
 

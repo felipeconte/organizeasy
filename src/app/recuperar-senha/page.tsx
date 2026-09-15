@@ -91,11 +91,12 @@ export default function RecoverPasswordPage() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center py-12 sm:px-6 lg:px-8 antialiased">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-3">
-        <Link href="/" className="inline-flex items-center gap-2.5">
-          <div className="h-11 w-11 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
-            <Building2 className="w-6 h-6" />
-          </div>
-          <span className="text-2xl font-bold text-slate-900 tracking-tight">Orgarq</span>
+        <Link href="/" className="inline-flex items-center justify-center">
+          <img
+            src="/logos/logo-organize.webp"
+            alt="Organizeasy"
+            className="h-10 w-auto object-contain"
+          />
         </Link>
         <h2 className="text-xl font-bold text-slate-800 tracking-tight">
           {isRecoveryMode ? 'Definir Nova Senha' : 'Recuperação de Senha'}
@@ -202,7 +203,7 @@ export default function RecoverPasswordPage() {
                     type="email"
                     name="email"
                     required
-                    placeholder="arquiteto@estudio.com.br"
+                    placeholder="contato@escritorio.com.br"
                     className="block w-full pl-10 pr-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
                   />
                 </div>

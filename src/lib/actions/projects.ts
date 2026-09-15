@@ -137,7 +137,7 @@ export async function createProjectAction(formData: FormData): Promise<{ success
         const { data: newOrg, error: orgCreateError } = await supabase
           .from('organizations')
           .insert({
-            name: 'Meu Escritório de Arquitetura',
+            name: 'Meu Escritório',
             slug,
             owner_id: user.id,
             email: user.email || null,

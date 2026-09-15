@@ -1,4 +1,5 @@
-export const ACTIVE_ORG_COOKIE = 'orgarq_active_org_id'
+export const ACTIVE_ORG_COOKIE = 'organizeasy_active_org_id'
+export const LEGACY_ACTIVE_ORG_COOKIE = 'orgarq_active_org_id'
 
 export interface UserOrganizationItem {
   id: string

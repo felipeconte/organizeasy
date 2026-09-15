@@ -1,13 +1,14 @@
-# Orgarq
+# Organizeasy
 
-O **Orgarq** é uma plataforma SaaS B2B moderna, limpa e responsiva, desenvolvida sob medida para escritórios e profissionais de arquitetura. O sistema une a gestão interna de fluxos técnicos à comunicação descomplicada e aprovação ágil por parte do cliente final.
+O **Organizeasy** é uma plataforma SaaS B2B moderna, limpa e responsiva, desenvolvida para organização e gestão inteligente de qualquer tipo de escritório (consultorias, advocacia, contabilidade, engenharia, agências, arquitetura e prestadores de serviços). O sistema une a gestão operacional de projetos e tarefas, controle financeiro integrado e comunicação transparente com aprovação ágil por parte do cliente final.
 
 ## 🚀 Funcionalidades Principais
 
-- **Gestão de Projetos & Briefing**: Ficha de briefing integrada, levantamento de necessidades e metas físicas/financeiras.
-- **Fluxo de Trabalho em 10 Fases**: Templates customizáveis de etapas com controle de progresso ponderado.
+- **Gestão de Projetos & Briefing**: Ficha de briefing integrada, escopo, requisitos e metas financeiras/cronogramas.
+- **Fluxo de Trabalho por Etapas**: Templates customizáveis de etapas com controle de progresso e prazos.
 - **Multivisualização Dinâmica (Lista, Kanban & Gantt)**: Visualize cronogramas e entregas no estilo que preferir.
 - **Portal do Cliente (Zero Friction)**: Acesso seguro via Magic Link ou Token único, sem necessidade de senha, para acompanhar o status e aprovar ou solicitar ajustes nas etapas com auditoria imutável (IP, timestamp, e-mail e user-agent gravados).
+- **Gestão Financeira & Parceiros**: Fluxo de caixa, controle de receitas/despesas, empresas e prestadores parceiros vinculados.
 
 ## 🛠️ Stack Tecnológica
 

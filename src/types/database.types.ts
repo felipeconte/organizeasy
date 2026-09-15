@@ -652,7 +652,8 @@ export type Database = {
       }
       organizations: {
         Row: {
-          cau_caubr: string | null
+          cau_caubr?: string | null
+          professional_council_id: string | null
           cnpj: string | null
           created_at: string
           email: string | null
@@ -667,6 +668,7 @@ export type Database = {
         }
         Insert: {
           cau_caubr?: string | null
+          professional_council_id?: string | null
           cnpj?: string | null
           created_at?: string
           email?: string | null
@@ -681,6 +683,7 @@ export type Database = {
         }
         Update: {
           cau_caubr?: string | null
+          professional_council_id?: string | null
           cnpj?: string | null
           created_at?: string
           email?: string | null
@@ -1454,7 +1457,8 @@ export type Database = {
         Row: {
           avatar_url: string | null
           bio: string | null
-          cau: string | null
+          cau?: string | null
+          professional_council_id: string | null
           created_at: string | null
           display_name: string | null
           full_name: string | null
@@ -1467,6 +1471,7 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           cau?: string | null
+          professional_council_id?: string | null
           created_at?: string | null
           display_name?: string | null
           full_name?: string | null
@@ -1479,6 +1484,7 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           cau?: string | null
+          professional_council_id?: string | null
           created_at?: string | null
           display_name?: string | null
           full_name?: string | null

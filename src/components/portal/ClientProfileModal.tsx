@@ -254,7 +254,7 @@ export default function ClientProfileModal({
               <div className="p-3 rounded-xl bg-blue-50/50 border border-blue-100 text-xs text-blue-800 flex items-start gap-2">
                 <HelpCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                 <span>
-                  Estes são seus dados do Portal Orgarq. Ao salvar, você poderá escolher se deseja notificar os escritórios para atualizar seus registros lá também.
+                  Estes são seus dados do Portal Organizeasy. Ao salvar, você poderá escolher se deseja notificar os escritórios para atualizar seus registros lá também.
                 </span>
               </div>
 
@@ -365,7 +365,7 @@ export default function ClientProfileModal({
             /* TAB: ESCRITÓRIOS VINCULADOS */
             <div className="space-y-4">
               <p className="text-xs text-slate-500">
-                Abaixo estão os escritórios de arquitetura que possuem seu cadastro na plataforma. Se houver informações divergentes, você pode solicitar a correção diretamente para o escritório.
+                Abaixo estão os escritórios que possuem seu cadastro na plataforma. Se houver informações divergentes, você pode solicitar a correção diretamente para o escritório.
               </p>
 
               {offices.length === 0 ? (
@@ -507,7 +507,7 @@ export default function ClientProfileModal({
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              Você deseja enviar uma solicitação de atualização cadastral com estes novos dados para os escritórios de arquitetura vinculados ao seu cadastro?
+              Você deseja enviar uma solicitação de atualização cadastral com estes novos dados para os escritórios vinculados ao seu cadastro?
             </p>
 
             <div className="space-y-2 pt-2">

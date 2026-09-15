@@ -56,7 +56,8 @@ export interface PortalData {
   organization: {
     name: string
     logo_url: string | null
-    cau_caubr: string | null
+    cau_caubr?: string | null
+    professional_council_id?: string | null
     phone: string | null
     email: string | null
   }
@@ -212,7 +213,7 @@ export default function PortalClient({
         ? (res.isFullyApproved
             ? `Etapa "${selectedStage.name}" aprovada com sucesso! Todas as validações foram concluídas.`
             : `Sua aprovação para "${selectedStage.name}" foi registrada com sucesso! Aguardando aprovação dos demais clientes.`)
-        : `Solicitação de ajustes para "${selectedStage.name}" enviada para o escritório de arquitetura!`
+        : `Solicitação de ajustes para "${selectedStage.name}" enviada para o escritório!`
 
       setFeedbackSuccess(actionDesc)
 
@@ -257,14 +258,18 @@ export default function PortalClient({
                 className="h-10 w-10 rounded-xl object-contain border border-slate-200 bg-white p-1"
               />
             ) : (
-              <div className="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold shadow-xs">
-                <Building2 className="w-5 h-5" />
+              <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center border border-slate-200 p-1 shadow-xs">
+                <img
+                  src="/logos/logo-organizeasy-quadrado.webp"
+                  alt={organization.name}
+                  className="w-full h-full object-contain"
+                />
               </div>
             )}
             <div>
               <span className="text-sm font-bold text-slate-900 block">{organization.name}</span>
               <span className="text-xs text-slate-500">
-                {organization.cau_caubr ? `CAU: ${organization.cau_caubr}` : 'Portal de Acompanhamento & Aprovações'}
+                {(organization.professional_council_id || organization.cau_caubr) ? `Registro: ${organization.professional_council_id || organization.cau_caubr}` : 'Portal de Acompanhamento e Aprovações'}
               </span>
             </div>
           </div>
@@ -484,7 +489,7 @@ export default function PortalClient({
                           </div>
 
                           <p className="text-xs text-slate-600 leading-relaxed">
-                            Esta etapa foi finalizada pela equipe de arquitetura e está pronta para sua validação.
+                            Esta etapa foi finalizada pela equipe do escritório e está pronta para sua validação.
                             {st.approvalProgress && st.approvalProgress.totalRequired > 1 && (
                               <span className="block mt-1 text-amber-800 font-medium">
                                 Para concluir a etapa, todos os clientes vinculados ao projeto deverão aprovar com o código de confirmação recebido por e-mail.
@@ -762,7 +767,7 @@ export default function PortalClient({
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200/80 py-6 px-6 mt-8">
         <div className="max-w-4xl mx-auto text-center text-xs text-slate-400">
-          Orgarq Architecture OS • Conexão Segura & Validação com Código de Confirmação
+          Organizeasy • Conexão Segura & Validação com Código de Confirmação
         </div>
       </footer>
     </div>

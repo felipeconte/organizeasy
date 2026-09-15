@@ -6,7 +6,7 @@ import CompanyDetailClient from '@/components/companies/CompanyDetailClient'
 import { BreadcrumbSetter } from '@/contexts/BreadcrumbContext'
 
 export const metadata = {
-  title: 'Detalhes da Empresa | Orgarq',
+  title: 'Detalhes da Empresa | Organizeasy',
   description: 'Informações cadastrais, projetos atendidos e controle de comissões/RT da empresa parceira',
 }
 

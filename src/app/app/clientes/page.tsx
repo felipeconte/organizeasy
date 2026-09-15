@@ -6,8 +6,8 @@ import { getClientsAction } from '@/lib/actions/clients'
 import ClientsManagerClient from '@/components/clients/ClientsManagerClient'
 
 export const metadata = {
-  title: 'Clientes | Orgarq',
-  description: 'Gestão de clientes e vínculo de projetos arquitetônicos',
+  title: 'Clientes | Organizeasy',
+  description: 'Gestão de clientes e vínculo de projetos',
 }
 
 export default async function ClientesPage() {

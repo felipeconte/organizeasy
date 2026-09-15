@@ -1,4 +1,4 @@
-# ORGARQ — Especificação de Produto & Arquitetura (MVP)
+# ORGANIZEASY — Especificação de Produto & Arquitetura
 
 > **Documento Oficial de Visão de Produto, Módulos, Regras de Negócio e Design System**
 
@@ -6,7 +6,7 @@
 
 ## 1. Visão Geral do Produto
 
-O **Orgarq** é uma plataforma SaaS B2B desenvolvida especialmente para escritórios e profissionais de arquitetura, unindo a gestão interna da produção técnica com a comunicação e aprovação simplificada por parte do cliente final.
+O **Organizeasy** é uma plataforma SaaS B2B desenvolvida para a organização e gestão inteligente de qualquer tipo de escritório (consultoria, advocacia, contabilidade, engenharia, agências, arquitetura e prestação de serviços), unindo a gestão interna da produção técnica com a comunicação e aprovação simplificada por parte do cliente final.
 
 ---
 
@@ -14,8 +14,8 @@ O **Orgarq** é uma plataforma SaaS B2B desenvolvida especialmente para escritó
 
 | Perfil | Tipo de Acesso | Responsabilidades / Ações |
 | :--- | :--- | :--- |
-| **Arquiteto Titular (Admin)** | Supabase Auth (Email/Senha) | Gestão da organização, configuração dos templates de etapas, criação de projetos, envio de aprovações e reabertura de fases. |
-| **Colaborador (Arquiteto / Estagiário)** | Supabase Auth (Email/Senha) | Atualização do status de tarefas no Kanban, preenchimento de briefings e anexos. |
+| **Titular / Administrador** | Supabase Auth (Email/Senha) | Gestão da organização, configuração de templates de etapas, criação de projetos, controle financeiro, envio de aprovações e governança da equipe. |
+| **Colaborador (Equipe / Especialista)** | Supabase Auth (Email/Senha) | Atualização do status de tarefas no Kanban, preenchimento de briefings, notas e anexos. |
 | **Cliente do Projeto** | **Magic Link / Token Seguro** (Sem senha) | Visualização do status atual do seu projeto, histórico de entregas e aprovação/solicitação de ajustes com registro de auditoria. |
 
 ---

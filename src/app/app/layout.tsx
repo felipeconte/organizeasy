@@ -37,7 +37,7 @@ export default async function AppLayout({
     meta.full_name ||
     meta.display_name ||
     user.email?.split('@')[0] ||
-    'Arquiteto'
+    'Usuário'
   const userAvatarUrl = dbProfile?.avatar_url || meta.avatar_url || null
   const userRole = activeOrg.profile_name || (isOwner ? 'Proprietário' : 'Membro')
 

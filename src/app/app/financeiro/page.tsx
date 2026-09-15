@@ -14,8 +14,8 @@ import { getClientsAction } from '@/lib/actions/clients'
 import FinancialManagerClient from '@/components/financial/FinancialManagerClient'
 
 export const metadata = {
-  title: 'Financeiro & Fluxo de Caixa | Orgarq',
-  description: 'Controle financeiro completo do escritório de arquitetura, fluxo de caixa, despesas fixas e lucratividade por projeto.',
+  title: 'Financeiro e Fluxo de Caixa | Organizeasy',
+  description: 'Controle financeiro completo do escritório, fluxo de caixa, despesas fixas e lucratividade por projeto.',
 }
 
 export default async function FinanceiroPage() {

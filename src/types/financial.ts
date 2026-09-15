@@ -25,10 +25,10 @@ export interface FinancialCategoryOption {
 
 export const FINANCIAL_CATEGORIES: FinancialCategoryOption[] = [
   // Receitas (Income)
-  { id: 'honorarios_projeto', label: 'Honorários de Projeto', type: 'income', group: 'projeto', color: 'emerald' },
+  { id: 'honorarios_projeto', label: 'Honorários de Projeto / Serviços', type: 'income', group: 'projeto', color: 'emerald' },
   { id: 'fee_acompanhamento', label: 'Fee Mensal de Acompanhamento / Gestão', type: 'income', group: 'projeto', color: 'emerald' },
-  { id: 'comissao_rt', label: 'Comissão / Reserva Técnica (RT)', type: 'income', group: 'projeto', color: 'blue' },
-  { id: 'consultoria', label: 'Consultoria Arquitetônica', type: 'income', group: 'geral', color: 'teal' },
+  { id: 'comissao_rt', label: 'Comissões e Parcerias Comerciais', type: 'income', group: 'projeto', color: 'blue' },
+  { id: 'consultoria', label: 'Consultoria e Assessoria Especializada', type: 'income', group: 'geral', color: 'teal' },
   { id: 'consultoria_mensal', label: 'Consultoria / Assessoria Recorrente', type: 'income', group: 'geral', color: 'teal' },
   { id: 'sublocacao_espaco', label: 'Sublocação de Espaço / Coworking', type: 'income', group: 'geral', color: 'cyan' },
   { id: 'reembolso', label: 'Reembolso de Cliente / Parceiro', type: 'income', group: 'projeto', color: 'indigo' },
@@ -36,24 +36,24 @@ export const FINANCIAL_CATEGORIES: FinancialCategoryOption[] = [
   { id: 'outros_ganhos', label: 'Outras Receitas', type: 'income', group: 'geral', color: 'slate' },
 
   // Despesas de Projeto (Project Expenses)
-  { id: 'visitas_deslocamento', label: 'Visitas à Obra / Deslocamento', type: 'expense', group: 'projeto', color: 'amber' },
+  { id: 'visitas_deslocamento', label: 'Visitas Técnicas / Deslocamento', type: 'expense', group: 'projeto', color: 'amber' },
   { id: 'brindes_mimos', label: 'Brindes / Mimos de Cliente', type: 'expense', group: 'projeto', color: 'pink' },
   { id: 'locacao_espaco', label: 'Aluguel de Sala de Reunião / Coworking', type: 'expense', group: 'projeto', color: 'orange' },
-  { id: 'impressao_plotagem', label: 'Impressões / Plotagens / Cadernos', type: 'expense', group: 'projeto', color: 'purple' },
-  { id: 'maquete_render', label: 'Renderização 3D / Maquetes Terceirizadas', type: 'expense', group: 'projeto', color: 'rose' },
-  { id: 'taxas_art_rrt', label: 'Taxas RRT / ART / Alvarás', type: 'expense', group: 'projeto', color: 'red' },
-  { id: 'material_amostras', label: 'Amostras de Materiais / Catálogos', type: 'expense', group: 'projeto', color: 'amber' },
+  { id: 'impressao_plotagem', label: 'Impressões / Plotagens / Documentos', type: 'expense', group: 'projeto', color: 'purple' },
+  { id: 'maquete_render', label: 'Serviços Técnicos / Criação Terceirizada', type: 'expense', group: 'projeto', color: 'rose' },
+  { id: 'taxas_art_rrt', label: 'Taxas, Alvarás e Registros de Classe', type: 'expense', group: 'projeto', color: 'red' },
+  { id: 'material_amostras', label: 'Insumos, Materiais e Amostras', type: 'expense', group: 'projeto', color: 'amber' },
   { id: 'outras_despesas_projeto', label: 'Outros Custos Diretos do Projeto', type: 'expense', group: 'projeto', color: 'slate' },
 
   // Despesas Gerais do Escritório (Office Expenses)
-  { id: 'aluguel_condominio', label: 'Aluguel & Condomínio do Escritório', type: 'expense', group: 'escritorio', color: 'red' },
-  { id: 'energia_internet', label: 'Energia, Água & Internet', type: 'expense', group: 'escritorio', color: 'amber' },
-  { id: 'softwares_licencas', label: 'Softwares & Licenças (BIM/CAD/3D)', type: 'expense', group: 'escritorio', color: 'blue' },
-  { id: 'contabilidade_juridico', label: 'Contabilidade & Assessoria Jurídica', type: 'expense', group: 'escritorio', color: 'indigo' },
-  { id: 'salarios_equipe', label: 'Equipe, Estagiários & Pró-labore', type: 'expense', group: 'escritorio', color: 'violet' },
-  { id: 'marketing_anuncios', label: 'Marketing, Tráfego & Redes Sociais', type: 'expense', group: 'escritorio', color: 'pink' },
-  { id: 'impostos', label: 'Impostos & Taxas Governamentais (DAS)', type: 'expense', group: 'escritorio', color: 'rose' },
-  { id: 'material_escritorio', label: 'Material de Escritório & Café', type: 'expense', group: 'escritorio', color: 'slate' },
+  { id: 'aluguel_condominio', label: 'Aluguel e Condomínio do Escritório', type: 'expense', group: 'escritorio', color: 'red' },
+  { id: 'energia_internet', label: 'Energia, Água e Internet', type: 'expense', group: 'escritorio', color: 'amber' },
+  { id: 'softwares_licencas', label: 'Softwares, Assinaturas e Licenças', type: 'expense', group: 'escritorio', color: 'blue' },
+  { id: 'contabilidade_juridico', label: 'Contabilidade e Assessoria Jurídica', type: 'expense', group: 'escritorio', color: 'indigo' },
+  { id: 'salarios_equipe', label: 'Equipe, Estagiários e Pró-labore', type: 'expense', group: 'escritorio', color: 'violet' },
+  { id: 'marketing_anuncios', label: 'Marketing, Tráfego e Redes Sociais', type: 'expense', group: 'escritorio', color: 'pink' },
+  { id: 'impostos', label: 'Impostos e Taxas Governamentais (DAS)', type: 'expense', group: 'escritorio', color: 'rose' },
+  { id: 'material_escritorio', label: 'Material de Escritório e Café', type: 'expense', group: 'escritorio', color: 'slate' },
   { id: 'outros_custos_fixos', label: 'Outras Despesas do Escritório', type: 'expense', group: 'escritorio', color: 'slate' },
 ]
 

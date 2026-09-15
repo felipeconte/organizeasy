@@ -61,7 +61,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
   {
     id: 'projects',
     name: 'Projetos e Tarefas',
-    description: 'Acompanhamento do fluxo arquitetônico, Kanban e cronograma',
+    description: 'Acompanhamento de projetos, fluxo operacional, Kanban e cronograma',
     iconName: 'FolderGit2',
     permissions: [
       {

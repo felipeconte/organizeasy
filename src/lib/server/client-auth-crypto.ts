@@ -10,7 +10,7 @@ export interface ClientPortalSessionData {
 const SECRET_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  'orgarq-client-portal-secure-salt-key-2026'
+  'organizeasy-client-portal-secure-salt-key-2026'
 
 /**
  * Gera uma senha aleatória de exatamente 10 caracteres contendo:

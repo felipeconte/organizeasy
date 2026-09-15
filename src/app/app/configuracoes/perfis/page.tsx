@@ -6,7 +6,7 @@ import { getAccessProfilesAction } from '@/lib/actions/access-profiles'
 import ProfilesManagementClient from '@/components/profiles/ProfilesManagementClient'
 
 export const metadata = {
-  title: 'Perfis de Acesso & Permissões | Orgarq',
+  title: 'Perfis de Acesso e Permissões | Organizeasy',
   description: 'Gerencie os perfis de acesso e configure permissões granulares por funcionalidade para a sua equipe.',
 }
 

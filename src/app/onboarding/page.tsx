@@ -4,8 +4,8 @@ import { getPendingInvitesForUserAction } from '@/lib/actions/access-profiles'
 import OnboardingClient from '@/components/onboarding/OnboardingClient'
 
 export const metadata = {
-  title: 'Bem-vindo ao Orgarq | Onboarding',
-  description: 'Crie seu novo escritório ou participe de um escritório existente no Orgarq.',
+  title: 'Bem-vindo ao Organizeasy | Onboarding',
+  description: 'Crie seu novo escritório ou participe de um escritório existente no Organizeasy.',
 }
 
 export default async function OnboardingPage() {
@@ -43,7 +43,7 @@ export default async function OnboardingPage() {
       user={{
         id: user.id,
         email: user.email,
-        name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Arquiteto',
+        name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário',
       }}
       initialInvites={initialInvites}
     />

@@ -469,9 +469,9 @@ export default function ProjectHubClient({
   const handleSelectView = (view: 'lista' | 'kanban' | 'gantt') => {
     setActiveView(view)
     try {
-      localStorage.setItem(`orgarq_project_view_${projectId}`, view)
-      document.cookie = `orgarq_project_view_${projectId}=${view}; path=/; max-age=31536000; SameSite=Lax`
-      document.cookie = `orgarq_last_view=${view}; path=/; max-age=31536000; SameSite=Lax`
+      localStorage.setItem(`organizeasy_project_view_${projectId}`, view)
+      document.cookie = `organizeasy_project_view_${projectId}=${view}; path=/; max-age=31536000; SameSite=Lax`
+      document.cookie = `organizeasy_last_view=${view}; path=/; max-age=31536000; SameSite=Lax`
       const url = new URL(window.location.href)
       url.searchParams.set('view', view)
       window.history.replaceState(null, '', url.toString())
@@ -483,9 +483,9 @@ export default function ProjectHubClient({
   // Sincroniza cookies e escuta histórico de navegação (Back/Forward)
   useEffect(() => {
     try {
-      localStorage.setItem(`orgarq_project_view_${projectId}`, activeView)
-      document.cookie = `orgarq_project_view_${projectId}=${activeView}; path=/; max-age=31536000; SameSite=Lax`
-      document.cookie = `orgarq_last_view=${activeView}; path=/; max-age=31536000; SameSite=Lax`
+      localStorage.setItem(`organizeasy_project_view_${projectId}`, activeView)
+      document.cookie = `organizeasy_project_view_${projectId}=${activeView}; path=/; max-age=31536000; SameSite=Lax`
+      document.cookie = `organizeasy_last_view=${activeView}; path=/; max-age=31536000; SameSite=Lax`
       const searchParams = new URLSearchParams(window.location.search)
       if (!searchParams.has('view')) {
         const url = new URL(window.location.href)

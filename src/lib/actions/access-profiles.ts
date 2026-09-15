@@ -652,7 +652,7 @@ export async function getInviteDetailsAction(inviteId: string): Promise<{
         id: invite.id,
         email: invite.email,
         organization_id: invite.organization_id,
-        organization_name: org?.name || 'Escritório de Arquitetura',
+        organization_name: org?.name || 'Meu Escritório',
         organization_logo: org?.logo_url || null,
         profile_id: invite.profile_id,
         profile_name: prof?.name || 'Colaborador',
@@ -782,7 +782,7 @@ export async function registerAndAcceptInviteAction(input: {
       if (msg.includes('already registered') || msg.includes('unique constraint') || msg.includes('exists')) {
         return {
           success: false,
-          error: 'Este endereço de e-mail já possui uma conta no Orgarq. Por favor, faça login para aceitar o convite.',
+          error: 'Este endereço de e-mail já possui uma conta no Organizeasy. Por favor, faça login para aceitar o convite.',
           code: 'USER_EXISTS',
         }
       }

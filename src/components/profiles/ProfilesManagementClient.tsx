@@ -201,12 +201,12 @@ export default function ProfilesManagementClient({
         prev.map((p) =>
           p.id === selectedProfile.id
             ? {
-                ...p,
-                name: selectedProfile.is_owner_profile ? p.name : formName,
-                description: formDescription,
-                color: formColor,
-                permissions: selectedProfile.is_owner_profile ? FULL_PERMISSIONS : formPermissions,
-              }
+              ...p,
+              name: selectedProfile.is_owner_profile ? p.name : formName,
+              description: formDescription,
+              color: formColor,
+              permissions: selectedProfile.is_owner_profile ? FULL_PERMISSIONS : formPermissions,
+            }
             : p
         )
       )
@@ -284,7 +284,7 @@ export default function ProfilesManagementClient({
             <span className="text-blue-600">Perfis de Acesso</span>
           </div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Perfis de Acesso & Permissões
+            Perfis de Acesso
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             Personalize os cargos do seu escritório e defina exatamente quais funcionalidades cada perfil pode acessar.
@@ -310,11 +310,10 @@ export default function ProfilesManagementClient({
           return (
             <div
               key={profile.id}
-              className={`bg-white rounded-2xl border transition-all duration-200 flex flex-col justify-between overflow-hidden shadow-2xs hover:shadow-md ${
-                isOwnerProfile
-                  ? 'border-indigo-200 ring-1 ring-indigo-500/10'
-                  : 'border-slate-200/80 hover:border-slate-300'
-              }`}
+              className={`bg-white rounded-2xl border transition-all duration-200 flex flex-col justify-between overflow-hidden shadow-2xs hover:shadow-md ${isOwnerProfile
+                ? 'border-indigo-200 ring-1 ring-indigo-500/10'
+                : 'border-slate-200/80 hover:border-slate-300'
+                }`}
             >
               <div className="p-6">
                 {/* Header do Card */}
@@ -492,7 +491,7 @@ export default function ProfilesManagementClient({
                       disabled={selectedProfile?.is_owner_profile}
                       value={formName}
                       onChange={(e) => setFormName(e.target.value)}
-                      placeholder="Ex: Arquiteto Sênior, Financeiro, Coordenador"
+                      placeholder="Ex: Gestor de Projetos, Financeiro, Consultor"
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all disabled:bg-slate-100 disabled:text-slate-500"
                     />
                   </div>
@@ -507,9 +506,8 @@ export default function ProfilesManagementClient({
                           key={c.value}
                           type="button"
                           onClick={() => setFormColor(c.value)}
-                          className={`h-8 w-8 rounded-lg flex items-center justify-center transition-transform cursor-pointer ${
-                            formColor === c.value ? 'scale-110 ring-2 ring-offset-2 ring-slate-400' : 'hover:scale-105'
-                          }`}
+                          className={`h-8 w-8 rounded-lg flex items-center justify-center transition-transform cursor-pointer ${formColor === c.value ? 'scale-110 ring-2 ring-offset-2 ring-slate-400' : 'hover:scale-105'
+                            }`}
                           style={{ backgroundColor: c.value }}
                           title={c.label}
                         >
@@ -604,9 +602,8 @@ export default function ProfilesManagementClient({
                             return (
                               <label
                                 key={perm.key}
-                                className={`flex items-start justify-between gap-4 p-2.5 rounded-xl transition-colors cursor-pointer ${
-                                  isLocked ? 'cursor-default' : 'hover:bg-slate-50/80'
-                                }`}
+                                className={`flex items-start justify-between gap-4 p-2.5 rounded-xl transition-colors cursor-pointer ${isLocked ? 'cursor-default' : 'hover:bg-slate-50/80'
+                                  }`}
                               >
                                 <div className="space-y-0.5 min-w-0 pr-2">
                                   <div className="flex items-center gap-2">
@@ -635,16 +632,14 @@ export default function ProfilesManagementClient({
                                   />
                                   <div
                                     onClick={() => !isLocked && handleTogglePermission(perm.key)}
-                                    className={`w-11 h-6 rounded-full transition-colors ${
-                                      isChecked
-                                        ? 'bg-blue-600 peer-checked:bg-blue-600'
-                                        : 'bg-slate-200'
-                                    } ${isLocked ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
+                                    className={`w-11 h-6 rounded-full transition-colors ${isChecked
+                                      ? 'bg-blue-600 peer-checked:bg-blue-600'
+                                      : 'bg-slate-200'
+                                      } ${isLocked ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
                                   >
                                     <div
-                                      className={`h-5 w-5 rounded-full bg-white shadow-xs transition-transform transform mt-0.5 ${
-                                        isChecked ? 'translate-x-5.5' : 'translate-x-0.5'
-                                      }`}
+                                      className={`h-5 w-5 rounded-full bg-white shadow-xs transition-transform transform mt-0.5 ${isChecked ? 'translate-x-5.5' : 'translate-x-0.5'
+                                        }`}
                                     />
                                   </div>
                                 </div>

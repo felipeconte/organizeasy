@@ -211,10 +211,11 @@ export default function InviteAcceptanceClient({
       {/* Topo / Marca */}
       <header className="max-w-md w-full mx-auto flex items-center justify-between py-2">
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-xs shadow-blue-500/20">
-            <Building2 className="w-5 h-5" />
-          </div>
-          <span className="text-lg font-bold text-slate-900 tracking-tight">Orgarq</span>
+          <img
+            src="/logos/logo-organize.webp"
+            alt="Organizeasy"
+            className="h-8 w-auto object-contain"
+          />
         </Link>
 
         {currentUser && (
@@ -419,7 +420,7 @@ export default function InviteAcceptanceClient({
                         </button>
                       </div>
                       <span className="text-[11px] text-slate-400 mt-1 block">
-                        Você usará este e-mail e senha para acessar o Orgarq.
+                        Você usará este e-mail e senha para acessar o Organizeasy.
                       </span>
                     </div>
 
@@ -461,7 +462,7 @@ export default function InviteAcceptanceClient({
 
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        Sua Senha do Orgarq *
+                        Sua Senha do Organizeasy *
                       </label>
                       <div className="relative">
                         <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -511,7 +512,7 @@ export default function InviteAcceptanceClient({
 
       {/* Rodapé simples */}
       <footer className="text-center text-xs text-slate-400 py-2">
-        &copy; {new Date().getFullYear()} Orgarq Architecture OS. Todos os direitos reservados.
+        &copy; {new Date().getFullYear()} Organizeasy. Todos os direitos reservados.
       </footer>
     </div>
   )

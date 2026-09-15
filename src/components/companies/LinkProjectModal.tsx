@@ -231,7 +231,7 @@ export default function LinkProjectModal({
             {/* Project Selection */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                Selecione o Projeto de Arquitetura <span className="text-red-500">*</span>
+                Selecione o Projeto <span className="text-red-500">*</span>
               </label>
               <select
                 disabled={isEditing}

@@ -89,7 +89,7 @@ export default function OverviewDashboardClient({
   // Estado de visibilidade dos valores financeiros (com persistência em localStorage)
   const [showFinancials, setShowFinancials] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('orgarq_dashboard_show_financials')
+      const stored = localStorage.getItem('organizeasy_dashboard_show_financials') ?? localStorage.getItem('orgarq_dashboard_show_financials')
       return stored !== null ? stored === 'true' : true
     }
     return true
@@ -104,7 +104,7 @@ export default function OverviewDashboardClient({
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('orgarq_dashboard_show_financials', String(showFinancials))
+      localStorage.setItem('organizeasy_dashboard_show_financials', String(showFinancials))
     }
   }, [showFinancials])
 

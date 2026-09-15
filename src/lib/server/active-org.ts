@@ -2,10 +2,10 @@ import { cookies } from 'next/headers'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requireAuth } from '@/lib/server/guard'
 import { FULL_PERMISSIONS, ProfilePermissions } from '@/types/profiles'
-import { ACTIVE_ORG_COOKIE, UserOrganizationItem } from '@/types/organization'
+import { ACTIVE_ORG_COOKIE, LEGACY_ACTIVE_ORG_COOKIE, UserOrganizationItem } from '@/types/organization'
 
 export type { UserOrganizationItem }
-export { ACTIVE_ORG_COOKIE }
+export { ACTIVE_ORG_COOKIE, LEGACY_ACTIVE_ORG_COOKIE }
 
 /**
  * Busca todas as organizações às quais o usuário tem acesso (como proprietário ou membro)
@@ -92,7 +92,7 @@ export async function getUserOrganizations(
 }
 
 /**
- * Obtém a organização ativa para a sessão atual a partir do cookie orgarq_active_org_id
+ * Obtém a organização ativa para a sessão atual a partir do cookie organizeasy_active_org_id
  */
 export async function getActiveOrganization(): Promise<{
   supabase: Awaited<ReturnType<typeof createClient>>
@@ -121,7 +121,7 @@ export async function getActiveOrganization(): Promise<{
   }
 
   const cookieStore = await cookies()
-  const activeOrgCookie = cookieStore.get(ACTIVE_ORG_COOKIE)?.value
+  const activeOrgCookie = cookieStore.get(ACTIVE_ORG_COOKIE)?.value || cookieStore.get(LEGACY_ACTIVE_ORG_COOKIE)?.value
 
   let activeOrg = userOrganizations.find((o) => o.id === activeOrgCookie) || null
 

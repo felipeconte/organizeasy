@@ -41,11 +41,13 @@ export interface ClientPortalOfficeData {
     phone: string | null
     email: string | null
     cau_caubr: string | null
+    professional_council_id?: string | null
   }
   projects: ClientPortalProjectCard[]
 }
 
-const getCookieName = (portalToken: string) => `orgarq_cp_${portalToken}`
+const getCookieName = (portalToken: string) => `organizeasy_cp_${portalToken}`
+const getLegacyCookieName = (portalToken: string) => `orgarq_cp_${portalToken}`
 
 /**
  * 1. VALIDA O CÓDIGO DE ACESSO DO PORTAL DO CLIENTE E CRIA SESSÃO SEGURA
@@ -82,7 +84,7 @@ export async function verifyClientPortalAccessCodeAction(
   if (cleanCode !== expectedCode) {
     return {
       success: false,
-      error: 'Código de acesso incorreto. Verifique o código enviado pelo seu escritório de arquitetura.',
+      error: 'Código de acesso incorreto. Verifique o código enviado pelo seu escritório.',
     }
   }
 
@@ -180,16 +182,17 @@ export async function getClientPortalOfficeDataAction(portalToken: string): Prom
 
   const office = {
     id: client.organization_id,
-    name: orgData?.name || 'Escritório de Arquitetura',
+    name: orgData?.name || 'Escritório',
     logo_url: orgData?.logo_url || null,
     phone: orgData?.phone || null,
     email: orgData?.email || null,
-    cau_caubr: orgData?.cau_caubr || null,
+    cau_caubr: orgData?.professional_council_id || orgData?.cau_caubr || null,
+    professional_council_id: orgData?.professional_council_id || orgData?.cau_caubr || null,
   }
 
   // 3. Verifica se a sessão está desbloqueada pelo cookie
   const cookieStore = await cookies()
-  const cookieVal = cookieStore.get(getCookieName(portalToken))?.value
+  const cookieVal = cookieStore.get(getCookieName(portalToken))?.value || cookieStore.get(getLegacyCookieName(portalToken))?.value
   const session = cookieVal ? verifyClientPortalAccessCookie(cookieVal, portalToken) : null
 
   if (!session) {
@@ -307,6 +310,7 @@ export async function clientPortalLogoutAction(portalToken?: string): Promise<{ 
   if (portalToken) {
     const cookieStore = await cookies()
     cookieStore.delete(getCookieName(portalToken))
+    cookieStore.delete(getLegacyCookieName(portalToken))
   }
   return { success: true }
 }

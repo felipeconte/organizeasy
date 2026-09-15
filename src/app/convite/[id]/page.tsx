@@ -5,8 +5,8 @@ import Link from 'next/link'
 import { Building2, AlertCircle, ArrowLeft } from 'lucide-react'
 
 export const metadata = {
-  title: 'Convite para Escritório | Orgarq',
-  description: 'Aceite seu convite para ingressar na equipe de arquitetura no Orgarq.',
+  title: 'Convite para Escritório | Organizeasy',
+  description: 'Aceite seu convite para ingressar na equipe no Organizeasy.',
 }
 
 export default async function InvitePage({

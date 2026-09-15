@@ -1971,7 +1971,7 @@ export default function TaskDetailDrawer({
                           type="text"
                           value={newAttachmentName}
                           onChange={(e) => setNewAttachmentName(e.target.value)}
-                          placeholder="Ex: Prancha 01 - Planta Baixa Arquitetônica R02"
+                          placeholder="Ex: Entregável 01 - Relatório Técnico Revisão 02"
                           className="w-full text-sm border border-slate-200 rounded-xl p-2.5 bg-white outline-hidden focus:border-blue-500"
                         />
                       </div>

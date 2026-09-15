@@ -220,9 +220,10 @@ export async function getPortalDataAction(token: string) {
       },
       clients: linkedClients,
       organization: org || {
-        name: 'Escritório de Arquitetura',
+        name: 'Meu Escritório',
         logo_url: null,
         cau_caubr: null,
+        professional_council_id: null,
         phone: null,
         email: null,
       },
@@ -329,7 +330,7 @@ export async function sendStageApprovalOtpAction(
       return { success: false, error: 'Falha ao registrar código de confirmação.' }
     }
 
-    const officeName = (project.organizations as any)?.name || 'Escritório de Arquitetura'
+    const officeName = (project.organizations as any)?.name || 'Meu Escritório'
 
     // Envia o e-mail com o código
     await sendStageApprovalOtpEmail({

@@ -27,7 +27,7 @@ async function resolveUserOrgId(supabase: any, userId: string): Promise<string> 
   const { data: newOrg } = await supabase
     .from('organizations')
     .insert({
-      name: 'Meu Escritório de Arquitetura',
+      name: 'Meu Escritório',
       slug,
       owner_id: userId,
     })

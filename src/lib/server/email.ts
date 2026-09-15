@@ -1,3 +1,5 @@
+const DEFAULT_APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.organizeasy.com.br'
+
 /**
  * Serviço de Envio de E-mails para o Portal do Cliente
  */
@@ -70,8 +72,8 @@ export async function sendClientPortalCredentialsEmail(
 <body>
   <div class="card">
     <div class="header">
-      <div class="logo-badge">Orgarq</div>
-      <h1>Acompanhe seu Projeto de Arquitetura</h1>
+      <img src="${DEFAULT_APP_URL}/logos/logo-organize.png" alt="Organizeasy" style="height: 38px; max-width: 190px; margin-bottom: 12px; display: inline-block;" />
+      <h1>Acompanhe seu Projeto</h1>
       <p>Olá <strong>${clientName}</strong>, o escritório <strong>${officeName}</strong> preparou um portal exclusivo para você acompanhar todas as etapas, entregas e aprovações do seu projeto em tempo real.</p>
     </div>
 
@@ -98,7 +100,7 @@ export async function sendClientPortalCredentialsEmail(
     </p>
 
     <div class="footer">
-      <p>Mensagem enviada por <strong>${officeName}</strong> através da plataforma Orgarq Architecture OS.</p>
+      <p>Mensagem enviada por <strong>${officeName}</strong> através da plataforma Organizeasy.</p>
       ${officePhone ? `<p>Telefone / WhatsApp do escritório: ${officePhone}</p>` : ''}
       ${officeEmail ? `<p>E-mail: ${officeEmail}</p>` : ''}
     </div>
@@ -117,7 +119,7 @@ export async function sendClientPortalCredentialsEmail(
 
   // Se houver chave RESEND_API_KEY ou serviço SMTP configurado no ambiente:
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Orgarq <onboarding@resend.dev>'
+  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Organizeasy <onboarding@resend.dev>'
 
   if (resendApiKey) {
     try {
@@ -169,7 +171,7 @@ export async function sendClientNewProjectNotificationEmail(
   console.log('===================================================================')
 
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Orgarq <onboarding@resend.dev>'
+  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Organizeasy <onboarding@resend.dev>'
 
   if (resendApiKey) {
     try {
@@ -206,16 +208,16 @@ export interface PasswordResetEmailParams {
 }
 
 /**
- * Envia e-mail de redefinição de senha com layout oficial Orgarq via Resend
+ * Envia e-mail de redefinição de senha com layout oficial Organizeasy via Resend
  */
 export async function sendPasswordResetEmail(
   params: PasswordResetEmailParams
 ): Promise<{ success: boolean; error?: string }> {
   const { userEmail, userName, resetLink } = params
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Orgarq <onboarding@resend.dev>'
+  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Organizeasy <onboarding@resend.dev>'
   const greeting = userName ? `Olá, <strong>${userName}</strong>` : 'Olá'
-  const emailSubject = 'Redefina sua senha de acesso no Orgarq'
+  const emailSubject = 'Redefina sua senha de acesso no Organizeasy'
 
   const emailHtml = `
 <!DOCTYPE html>
@@ -240,11 +242,11 @@ export async function sendPasswordResetEmail(
 <body>
   <div class="card">
     <div class="header">
-      <div class="logo-badge">Orgarq</div>
+      <img src="${DEFAULT_APP_URL}/logos/logo-organize.png" alt="Organizeasy" style="height: 38px; max-width: 190px; margin-bottom: 12px; display: inline-block;" />
       <h1>Redefinição de senha</h1>
     </div>
     <p>${greeting},</p>
-    <p>Recebemos uma solicitação para redefinir a senha da sua conta de acesso ao <strong>Orgarq Architecture OS</strong>.</p>
+    <p>Recebemos uma solicitação para redefinir a senha da sua conta de acesso ao <strong>Organizeasy</strong>.</p>
     
     <div class="btn-container">
       <a href="${resetLink}" class="btn">Redefinir Minha Senha &rarr;</a>
@@ -261,7 +263,7 @@ export async function sendPasswordResetEmail(
     </div>
 
     <div class="footer">
-      <p><strong>Orgarq Architecture OS</strong> &bull; Gestão Inteligente de Projetos de Arquitetura</p>
+      <p><strong>Organizeasy</strong> &bull; Gestão Inteligente de Escritórios & Projetos</p>
     </div>
   </div>
 </body>
@@ -312,16 +314,16 @@ export interface SignupConfirmationEmailParams {
 }
 
 /**
- * Envia e-mail de confirmação de cadastro com layout oficial Orgarq via Resend
+ * Envia e-mail de confirmação de cadastro com layout oficial Organizeasy via Resend
  */
 export async function sendSignupConfirmationEmail(
   params: SignupConfirmationEmailParams
 ): Promise<{ success: boolean; error?: string }> {
   const { userEmail, userName, confirmationLink } = params
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Orgarq <onboarding@resend.dev>'
+  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Organizeasy <onboarding@resend.dev>'
   const greeting = userName ? `Olá, <strong>${userName}</strong>` : 'Olá'
-  const emailSubject = 'Confirme seu e-mail para ativar sua conta no Orgarq'
+  const emailSubject = 'Confirme seu e-mail para ativar sua conta no Organizeasy'
 
   const emailHtml = `
 <!DOCTYPE html>
@@ -345,11 +347,11 @@ export async function sendSignupConfirmationEmail(
 <body>
   <div class="card">
     <div class="header">
-      <div class="logo-badge">Orgarq</div>
+      <img src="${DEFAULT_APP_URL}/logos/logo-organize.png" alt="Organizeasy" style="height: 38px; max-width: 190px; margin-bottom: 12px; display: inline-block;" />
       <h1>Confirme seu endereço de e-mail</h1>
     </div>
     <p>${greeting},</p>
-    <p>Obrigado por criar sua conta no <strong>Orgarq Architecture OS</strong>. Para ativar o acesso ao seu painel e às etapas de projeto do seu escritório, confirme seu endereço de e-mail clicando no botão abaixo:</p>
+    <p>Obrigado por criar sua conta no <strong>Organizeasy</strong>. Para ativar o acesso ao seu painel e às etapas de projeto do seu escritório, confirme seu endereço de e-mail clicando no botão abaixo:</p>
     
     <div class="btn-container">
       <a href="${confirmationLink}" class="btn">Confirmar meu E-mail &rarr;</a>
@@ -367,7 +369,7 @@ export async function sendSignupConfirmationEmail(
     </div>
 
     <div class="footer">
-      <p><strong>Orgarq Architecture OS</strong> &bull; Gestão Inteligente de Projetos de Arquitetura</p>
+      <p><strong>Organizeasy</strong> &bull; Gestão Inteligente de Escritórios & Projetos</p>
     </div>
   </div>
 </body>
@@ -419,16 +421,16 @@ export interface EmailChangeConfirmationParams {
 }
 
 /**
- * Envia e-mail de confirmação de alteração de e-mail com layout oficial Orgarq via Resend
+ * Envia e-mail de confirmação de alteração de e-mail com layout oficial Organizeasy via Resend
  */
 export async function sendEmailChangeConfirmationEmail(
   params: EmailChangeConfirmationParams
 ): Promise<{ success: boolean; error?: string }> {
   const { userEmail, newEmail, userName, confirmationLink } = params
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Orgarq <onboarding@resend.dev>'
+  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Organizeasy <onboarding@resend.dev>'
   const greeting = userName ? `Olá, <strong>${userName}</strong>` : 'Olá'
-  const emailSubject = 'Confirme a alteração do seu e-mail no Orgarq'
+  const emailSubject = 'Confirme a alteração do seu e-mail no Organizeasy'
 
   const emailHtml = `
 <!DOCTYPE html>
@@ -454,11 +456,11 @@ export async function sendEmailChangeConfirmationEmail(
 <body>
   <div class="card">
     <div class="header">
-      <div class="logo-badge">Orgarq</div>
+      <img src="${DEFAULT_APP_URL}/logos/logo-organize.png" alt="Organizeasy" style="height: 38px; max-width: 190px; margin-bottom: 12px; display: inline-block;" />
       <h1>Alteração de endereço de e-mail</h1>
     </div>
     <p>${greeting},</p>
-    <p>Recebemos uma solicitação para alterar o endereço de e-mail de acesso da sua conta no <strong>Orgarq Architecture OS</strong>.</p>
+    <p>Recebemos uma solicitação para alterar o endereço de e-mail de acesso da sua conta no <strong>Organizeasy</strong>.</p>
     
     <div class="highlight-box">
       <span style="display: block; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Novo endereço solicitado:</span>
@@ -482,7 +484,7 @@ export async function sendEmailChangeConfirmationEmail(
     </div>
 
     <div class="footer">
-      <p><strong>Orgarq Architecture OS</strong> &bull; Gestão Inteligente de Projetos de Arquitetura</p>
+      <p><strong>Organizeasy</strong> &bull; Gestão Inteligente de Escritórios & Projetos</p>
     </div>
   </div>
 </body>
@@ -541,8 +543,8 @@ export async function sendUserInvitationEmail(
 ): Promise<{ success: boolean; error?: string }> {
   const { userEmail, inviterName, officeName, inviteLink } = params
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Orgarq <onboarding@resend.dev>'
-  const emailSubject = `Convite para participar do escritório ${officeName} no Orgarq`
+  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Organizeasy <onboarding@resend.dev>'
+  const emailSubject = `Convite para participar do escritório ${officeName} no Organizeasy`
 
   const emailHtml = `
 <!DOCTYPE html>
@@ -566,12 +568,12 @@ export async function sendUserInvitationEmail(
 <body>
   <div class="card">
     <div class="header">
-      <div class="logo-badge">Orgarq</div>
+      <img src="${DEFAULT_APP_URL}/logos/logo-organize.png" alt="Organizeasy" style="height: 38px; max-width: 190px; margin-bottom: 12px; display: inline-block;" />
       <h1>Você foi convidado para a equipe!</h1>
     </div>
     <p>Olá,</p>
     <p>
-      ${inviterName ? `<strong>${inviterName}</strong> convidou` : 'Você foi convidado(a)'} você para fazer parte da equipe do escritório <strong>${officeName}</strong> no <strong>Orgarq Architecture OS</strong>.
+      ${inviterName ? `<strong>${inviterName}</strong> convidou` : 'Você foi convidado(a)'} você para fazer parte da equipe do escritório <strong>${officeName}</strong> no <strong>Organizeasy</strong>.
     </p>
     <p>
       Clique no botão abaixo para aceitar o convite, configurar sua senha de acesso e começar a colaborar nos projetos:
@@ -587,7 +589,7 @@ export async function sendUserInvitationEmail(
     </div>
 
     <div class="footer">
-      <p><strong>Orgarq Architecture OS</strong> &bull; Gestão Inteligente de Projetos de Arquitetura</p>
+      <p><strong>Organizeasy</strong> &bull; Gestão Inteligente de Escritórios & Projetos</p>
     </div>
   </div>
 </body>
@@ -646,9 +648,9 @@ export async function sendMagicLinkEmail(
 ): Promise<{ success: boolean; error?: string }> {
   const { userEmail, userName, magicLink, otpCode } = params
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Orgarq <onboarding@resend.dev>'
+  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Organizeasy <onboarding@resend.dev>'
   const greeting = userName ? `Olá, <strong>${userName}</strong>` : 'Olá'
-  const emailSubject = 'Seu link de acesso ao Orgarq'
+  const emailSubject = 'Seu link de acesso ao Organizeasy'
 
   const emailHtml = `
 <!DOCTYPE html>
@@ -675,11 +677,11 @@ export async function sendMagicLinkEmail(
 <body>
   <div class="card">
     <div class="header">
-      <div class="logo-badge">Orgarq</div>
+      <img src="${DEFAULT_APP_URL}/logos/logo-organize.png" alt="Organizeasy" style="height: 38px; max-width: 190px; margin-bottom: 12px; display: inline-block;" />
       <h1>Acesso rápido sem senha</h1>
     </div>
     <p>${greeting},</p>
-    <p>Recebemos uma solicitação de login direto para sua conta no <strong>Orgarq Architecture OS</strong>.</p>
+    <p>Recebemos uma solicitação de login direto para sua conta no <strong>Organizeasy</strong>.</p>
     
     ${
       otpCode
@@ -693,7 +695,7 @@ export async function sendMagicLinkEmail(
     }
 
     <div class="btn-container">
-      <a href="${magicLink}" class="btn">Entrar no Orgarq com 1 Clique &rarr;</a>
+      <a href="${magicLink}" class="btn">Entrar no Organizeasy com 1 Clique &rarr;</a>
     </div>
 
     <p style="font-size: 13px; color: #64748b; margin-bottom: 8px;">Ou copie e cole o link direto no seu navegador:</p>
@@ -706,7 +708,7 @@ export async function sendMagicLinkEmail(
     </div>
 
     <div class="footer">
-      <p><strong>Orgarq Architecture OS</strong> &bull; Gestão Inteligente de Projetos de Arquitetura</p>
+      <p><strong>Organizeasy</strong> &bull; Gestão Inteligente de Escritórios & Projetos</p>
     </div>
   </div>
 </body>
@@ -764,9 +766,9 @@ export async function sendReauthenticationEmail(
 ): Promise<{ success: boolean; error?: string }> {
   const { userEmail, userName, otpCode } = params
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Orgarq <onboarding@resend.dev>'
+  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Organizeasy <onboarding@resend.dev>'
   const greeting = userName ? `Olá, <strong>${userName}</strong>` : 'Olá'
-  const emailSubject = 'Seu código de verificação de segurança — Orgarq'
+  const emailSubject = 'Seu código de verificação de segurança — Organizeasy'
 
   const emailHtml = `
 <!DOCTYPE html>
@@ -790,11 +792,11 @@ export async function sendReauthenticationEmail(
 <body>
   <div class="card">
     <div class="header">
-      <div class="logo-badge">Orgarq</div>
+      <img src="${DEFAULT_APP_URL}/logos/logo-organize.png" alt="Organizeasy" style="height: 38px; max-width: 190px; margin-bottom: 12px; display: inline-block;" />
       <h1>Verificação de Segurança</h1>
     </div>
     <p>${greeting},</p>
-    <p>Para confirmar uma operação de segurança sensível na sua conta do <strong>Orgarq Architecture OS</strong>, informe o código de verificação abaixo:</p>
+    <p>Para confirmar uma operação de segurança sensível na sua conta do <strong>Organizeasy</strong>, informe o código de verificação abaixo:</p>
     
     <div class="otp-box">
       <span class="otp-code">${otpCode}</span>
@@ -805,7 +807,7 @@ export async function sendReauthenticationEmail(
     </div>
 
     <div class="footer">
-      <p><strong>Orgarq Architecture OS</strong> &bull; Gestão Inteligente de Projetos de Arquitetura</p>
+      <p><strong>Organizeasy</strong> &bull; Gestão Inteligente de Escritórios & Projetos</p>
     </div>
   </div>
 </body>
@@ -909,7 +911,7 @@ export async function sendClientPortalAccessDetailsEmail(
     <div class="body">
       <div class="greeting">Olá, ${clientName}!</div>
       <p style="font-size: 14px; color: #475569; margin: 0 0 16px;">
-        O escritório <strong>${officeName}</strong> disponibilizou o seu portal exclusivo para acompanhar todas as etapas, entregas e validações dos seus projetos de arquitetura em tempo real.
+        O escritório <strong>${officeName}</strong> disponibilizou o seu portal exclusivo para acompanhar todas as etapas, entregas e validações dos seus projetos em tempo real.
       </p>
 
       <div style="text-align: center;">
@@ -929,7 +931,7 @@ export async function sendClientPortalAccessDetailsEmail(
       </p>
     </div>
     <div class="footer">
-      <p style="margin: 0;">Mensagem enviada por <strong>${officeName}</strong> através da plataforma Orgarq Architecture OS.</p>
+      <p style="margin: 0;">Mensagem enviada por <strong>${officeName}</strong> através da plataforma Organizeasy.</p>
       ${officePhone ? `<p style="margin: 4px 0 0;">Telefone / WhatsApp: ${officePhone}</p>` : ''}
       ${officeEmail ? `<p style="margin: 4px 0 0;">E-mail: ${officeEmail}</p>` : ''}
     </div>
@@ -946,7 +948,7 @@ export async function sendClientPortalAccessDetailsEmail(
   console.log('===================================================================')
 
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Orgarq <onboarding@resend.dev>'
+  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Organizeasy <onboarding@resend.dev>'
 
   if (resendApiKey) {
     try {
@@ -1053,7 +1055,7 @@ export async function sendStageApprovalOtpEmail(
       </div>
     </div>
     <div class="footer">
-      <p style="margin: 0;">Mensagem enviada por <strong>${officeName}</strong> através da plataforma Orgarq Architecture OS.</p>
+      <p style="margin: 0;">Mensagem enviada por <strong>${officeName}</strong> através da plataforma Organizeasy.</p>
     </div>
   </div>
 </body>
@@ -1066,7 +1068,7 @@ export async function sendStageApprovalOtpEmail(
   console.log('===================================================================')
 
   const resendApiKey = process.env.RESEND_API_KEY
-  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Orgarq <onboarding@resend.dev>'
+  const resendFrom = process.env.RESEND_FROM_EMAIL || 'Organizeasy <onboarding@resend.dev>'
 
   if (resendApiKey) {
     try {

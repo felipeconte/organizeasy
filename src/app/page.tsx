@@ -21,13 +21,13 @@ export default function Home() {
   const [activeView, setActiveView] = useState<'lista' | 'kanban' | 'gantt'>('lista')
 
   const stages = [
-    { id: 1, name: '01. Contrato', status: 'concluido', responsavel: 'Beatriz L.', inicio: '01/08', fim: '05/08', progress: 100, duracao: '5 dias' },
-    { id: 2, name: '02. Briefing', status: 'concluido', responsavel: 'Lucas M.', inicio: '06/08', fim: '12/08', progress: 100, duracao: '7 dias' },
-    { id: 3, name: '03. Estudo Preliminar', status: 'concluido', responsavel: 'Carlos E.', inicio: '13/08', fim: '25/08', progress: 100, duracao: '13 dias' },
-    { id: 4, name: '04. Projeto 3D', status: 'em_aprovacao', responsavel: 'Mariana S.', inicio: '01/09', fim: '15/09', progress: 85, duracao: '15 dias' },
-    { id: 5, name: '05. Projeto Executivo', status: 'em_producao', responsavel: 'Carlos E.', inicio: '16/09', fim: '10/10', progress: 30, duracao: '25 dias' },
-    { id: 6, name: '06. Entrega Final', status: 'a_iniciar', responsavel: 'Beatriz L.', inicio: '11/10', fim: '15/10', progress: 0, duracao: '5 dias' },
-    { id: 7, name: '07. Suporte', status: 'a_iniciar', responsavel: 'Lucas M.', inicio: '16/10', fim: '31/10', progress: 0, duracao: '15 dias' },
+    { id: 1, name: '01. Contrato', status: 'concluido', responsavel: 'Beatriz L.', inicio: '01/08', fim: '05/08', progress: 100, duracao: 'Sem prazo' },
+    { id: 2, name: '02. Briefing', status: 'concluido', responsavel: 'Lucas M.', inicio: '06/08', fim: '12/08', progress: 100, duracao: 'Sem prazo' },
+    { id: 3, name: '03. Estudo Preliminar', status: 'concluido', responsavel: 'Carlos E.', inicio: '13/08', fim: '23/08', progress: 100, duracao: '10 dias' },
+    { id: 4, name: '04. Projeto 3D', status: 'em_aprovacao', responsavel: 'Mariana S.', inicio: '24/08', fim: '03/09', progress: 85, duracao: '10 dias' },
+    { id: 5, name: '05. Projeto Executivo', status: 'em_producao', responsavel: 'Carlos E.', inicio: '04/09', fim: '19/09', progress: 30, duracao: '15 dias' },
+    { id: 6, name: '06. Entrega Final', status: 'a_iniciar', responsavel: 'Beatriz L.', inicio: '20/09', fim: '25/09', progress: 0, duracao: 'Sem prazo' },
+    { id: 7, name: '07. Suporte', status: 'a_iniciar', responsavel: 'Lucas M.', inicio: '26/09', fim: '10/10', progress: 0, duracao: 'Sem prazo' },
   ]
 
   const getStatusBadge = (status: string) => {
@@ -64,20 +64,13 @@ export default function Home() {
       {/* Top Navigation Bar */}
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-6 py-3.5">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/20 text-white font-bold">
-              <Building2 className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-lg font-bold tracking-tight text-slate-900">Orgarq</span>
-                <span className="text-[11px] font-semibold uppercase px-2 py-0.5 rounded-full bg-blue-100/70 text-blue-700 border border-blue-200">
-                  Architecture OS
-                </span>
-              </div>
-              <p className="text-xs text-slate-500">Gestão de Projetos e Portal de Aprovação de Clientes</p>
-            </div>
-          </div>
+          <Link href="/" className="flex items-center gap-3 group">
+            <img
+              src="/logos/logo-organize.webp"
+              alt="Organizeasy"
+              className="h-8 sm:h-9 w-auto object-contain"
+            />
+          </Link>
 
           <div className="flex items-center gap-2.5">
             <Link
@@ -108,14 +101,14 @@ export default function Home() {
         {/* Hero Section */}
         <section className="text-center max-w-3xl mx-auto space-y-4 pt-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200/80 text-blue-700 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>A plataforma oficial de produtividade para arquitetos</span>
+            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+            <span>A plataforma inteligente de produtividade e gestão para escritórios</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
-            Gestão técnica e aprovação de clientes com <span className="text-blue-600">precisão cirúrgica</span>.
+            Gestão operacional e aprovação de clientes com <span className="text-blue-600">clareza e precisão</span>.
           </h1>
           <p className="text-base text-slate-600 leading-relaxed">
-            Elimine ruídos de comunicação, gerencie suas 10 etapas da arquitetura em <strong>Lista</strong>, <strong>Kanban</strong> e <strong>Gantt</strong>, e colete aprovações com auditoria no Portal do Cliente sem senha.
+            Elimine ruídos de comunicação, gerencie as etapas dos seus projetos em <strong>Lista</strong>, <strong>Kanban</strong> e <strong>Gantt</strong>, e colete aprovações com auditoria no Portal do Cliente sem burocracia.
           </p>
         </section>
 
@@ -125,10 +118,10 @@ export default function Home() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 text-xs font-mono font-bold bg-slate-100 text-slate-700 rounded-lg">ARQ-2026-01</span>
-                  <h2 className="text-xl font-bold text-slate-900 tracking-tight">Residência Alphaville</h2>
+                  <span className="px-2.5 py-0.5 text-xs font-mono font-bold bg-slate-100 text-slate-700 rounded-lg">PRJ-2026-01</span>
+                  <h2 className="text-xl font-bold text-slate-900 tracking-tight">Expansão Corporativa Alpha</h2>
                 </div>
-                <p className="text-sm text-slate-500">Cliente: <strong>Carlos Eduardo Mendes</strong> • Área: <strong>480 m²</strong> • Prazo Final: <strong>10/11/2026</strong></p>
+                <p className="text-sm text-slate-500">Cliente: <strong>Carlos Eduardo Mendes</strong> • Prazo Final: <strong>10/11/2026</strong></p>
               </div>
 
               {/* Overall Progress Meter */}
@@ -180,7 +173,7 @@ export default function Home() {
 
               <div className="flex items-center gap-2 text-xs text-slate-500">
                 <span className="flex items-center gap-1 font-medium bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/60">
-                  <FileText className="w-3.5 h-3.5 text-blue-600" /> 10 Etapas Padrão
+                  <FileText className="w-3.5 h-3.5 text-blue-600" /> Etapas Padrão
                 </span>
                 <span className="flex items-center gap-1 font-medium bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/60">
                   <UserCheck className="w-3.5 h-3.5 text-emerald-600" /> Portal do Cliente Ativo
@@ -196,7 +189,7 @@ export default function Home() {
                 <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                   <ListTodo className="w-4 h-4 text-blue-600" /> Cronograma de Etapas do Projeto
                 </h3>
-                <span className="text-xs text-slate-500 font-medium">10 Fases Mapeadas</span>
+                <span className="text-xs text-slate-500 font-medium">Fluxo de Entregas Mapeado</span>
               </div>
 
               <div className="overflow-x-auto">
@@ -408,7 +401,7 @@ export default function Home() {
             </div>
             <h3 className="text-base font-bold text-slate-900">Portal do Cliente sem Senha</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Magic Link criptográfico de uso simples para o cliente aprovar pranchas com registro de IP, data e hora em segundos.
+              Magic Link criptográfico de uso simples para o cliente aprovar etapas e entregas com registro de IP, data e hora em segundos.
             </p>
           </div>
         </section>
@@ -417,9 +410,13 @@ export default function Home() {
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200/80 py-8 px-6 mt-12">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-blue-600" />
-            <span className="font-bold text-slate-800">Orgarq SaaS</span> • Todos os direitos reservados.
+          <div className="flex items-center gap-2.5">
+            <img
+              src="/logos/logo-organize.webp"
+              alt="Organizeasy"
+              className="h-5 w-auto object-contain opacity-90"
+            />
+            <span>• Todos os direitos reservados.</span>
           </div>
           <div className="flex items-center gap-6 font-medium">
             <Link href="/login" className="hover:text-blue-600">Login Escritório</Link>

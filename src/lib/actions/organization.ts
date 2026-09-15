@@ -30,7 +30,9 @@ export async function updateOrganizationAction(
     ?.toLowerCase()
     .replace(/[^a-z0-9-]/g, '-')
     .replace(/-+/g, '-')
-  const cau_caubr = sanitizeText(formData.get('cau_caubr') as string)
+  const professional_council_id = sanitizeText(
+    (formData.get('professional_council_id') || formData.get('cau_caubr')) as string
+  )
   const cnpj = sanitizeText(formData.get('cnpj') as string)
   const phone = sanitizeText(formData.get('phone') as string)
   const email = sanitizeText(formData.get('email') as string)
@@ -71,20 +73,28 @@ export async function updateOrganizationAction(
     return { success: false, error: 'Este identificador (slug) já está em uso por outro escritório. Escolha outro.' }
   }
 
-  const updatePayload: OrganizationUpdate = {
+  const updatePayload: Record<string, any> = {
     name,
     slug,
-    cau_caubr: cau_caubr || null,
+    professional_council_id: professional_council_id || null,
+    cau_caubr: professional_council_id || null,
     cnpj: cnpj ? maskCPFOrCNPJ(cnpj) : null,
     phone: phone || null,
     email: email || null,
     logo_url: logo_url || null,
   }
 
-  const { error } = await supabase
+  let { error } = await supabase
     .from('organizations')
-    .update(updatePayload)
+    .update(updatePayload as any)
     .eq('id', orgId)
+
+  // Fallback se a coluna professional_council_id ainda não existir no schema remoto
+  if (error && (error.message?.includes('professional_council_id') || error.code === '42703')) {
+    delete updatePayload.professional_council_id
+    const retry = await supabase.from('organizations').update(updatePayload as any).eq('id', orgId)
+    error = retry.error
+  }
 
   if (error) {
     return { success: false, error: error.message }
@@ -470,7 +480,7 @@ export async function removeMemberAction(
 }
 
 /**
- * Alterna o escritório ativo do usuário gravando o cookie orgarq_active_org_id
+ * Alterna o escritório ativo do usuário gravando o cookie organizeasy_active_org_id
  */
 export async function switchActiveOrganizationAction(
   targetOrgId: string

@@ -1,6 +1,6 @@
 /**
  * ==============================================================================
- * ORGARQ - Server Security Guard & IDOR Prevention
+ * ORGANIZEASY - Server Security Guard & IDOR Prevention
  * ==============================================================================
  * Garante que regras de negócio, autenticação e validações de tenant/ownership
  * sejam executadas exclusivamente no servidor antes de qualquer consulta ou mutação.

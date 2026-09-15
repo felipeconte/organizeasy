@@ -11,7 +11,7 @@ import ProjectFinancialClient from '@/components/projects/ProjectFinancialClient
 import { BreadcrumbSetter } from '@/contexts/BreadcrumbContext'
 
 export const metadata = {
-  title: 'Financeiro do Projeto | Orgarq',
+  title: 'Financeiro do Projeto | Organizeasy',
   description: 'Controle individual de faturamento, comissões RT, despesas e lucratividade deste projeto.',
 }
 

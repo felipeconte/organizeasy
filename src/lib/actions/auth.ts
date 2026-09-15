@@ -86,7 +86,7 @@ export async function registerAction(formData: FormData) {
     }
   }
 
-  // 3. Se confirmação de e-mail estiver ativa (sem sessão imediata), envia e-mail com layout Orgarq via Resend
+  // 3. Se confirmação de e-mail estiver ativa (sem sessão imediata), envia e-mail com layout Organizeasy via Resend
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   const resendApiKey = process.env.RESEND_API_KEY
   if (serviceRoleKey && resendApiKey && !authData.session) {

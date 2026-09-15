@@ -59,8 +59,12 @@ export default function ClientPortalOfficeView({
                 className="w-10 h-10 object-contain rounded-xl bg-white p-1 shrink-0 border border-slate-700"
               />
             ) : (
-              <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                <Building2 className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shrink-0 shadow-xs border border-slate-700">
+                <img
+                  src="/logos/logo-organizeasy-quadrado.webp"
+                  alt={office.name}
+                  className="w-full h-full object-contain"
+                />
               </div>
             )}
             <div className="min-w-0">
@@ -68,7 +72,7 @@ export default function ClientPortalOfficeView({
                 {office.name}
               </h1>
               <p className="text-xs text-slate-400 truncate">
-                Portal do Cliente • {office.cau_caubr ? `CAU: ${office.cau_caubr}` : 'Acompanhamento de Projetos'}
+                Portal do Cliente • {(office.professional_council_id || office.cau_caubr) ? `Registro: ${office.professional_council_id || office.cau_caubr}` : 'Acompanhamento de Projetos'}
               </p>
             </div>
           </div>
@@ -260,7 +264,7 @@ export default function ClientPortalOfficeView({
       </main>
 
       <footer className="mt-16 text-center text-xs text-slate-400">
-        Orgarq Architecture OS • Portal de Acompanhamento e Validação
+        Organizeasy • Portal de Acompanhamento e Validação
       </footer>
     </div>
   )

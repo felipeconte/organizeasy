@@ -633,7 +633,7 @@ export default function CompanyDetailClient({
                   Nenhum projeto vinculado a esta empresa ainda
                 </h4>
                 <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
-                  Clique no botão acima para associar esta empresa a um projeto de arquitetura, registrar o escopo e controlar o repasse da RT.
+                  Clique no botão acima para associar esta empresa a um projeto, registrar o escopo e controlar o repasse de comissões/RT.
                 </p>
               </div>
             ) : (

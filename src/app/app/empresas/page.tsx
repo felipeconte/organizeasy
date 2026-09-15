@@ -6,7 +6,7 @@ import { getCompaniesAction } from '@/lib/actions/companies'
 import CompaniesManagerClient from '@/components/companies/CompaniesManagerClient'
 
 export const metadata = {
-  title: 'Empresas & Serviços | Orgarq',
+  title: 'Empresas e Serviços | Organizeasy',
   description: 'Gestão de fornecedores, prestadores de serviços, vínculos com projetos e controle de comissões/RT',
 }
 

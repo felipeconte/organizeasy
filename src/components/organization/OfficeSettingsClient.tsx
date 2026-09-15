@@ -55,7 +55,8 @@ export interface OrganizationData {
   id: string
   name: string
   slug: string
-  cau_caubr: string | null
+  professional_council_id?: string | null
+  cau_caubr?: string | null
   cnpj: string | null
   phone: string | null
   email: string | null
@@ -137,7 +138,7 @@ export default function OfficeSettingsClient({
   const [formData, setFormData] = useState({
     name: initialOrg.name || '',
     slug: initialOrg.slug || '',
-    cau_caubr: initialOrg.cau_caubr || '',
+    professional_council_id: initialOrg.professional_council_id || initialOrg.cau_caubr || '',
     cnpj: initialOrg.cnpj ? maskCPFOrCNPJ(initialOrg.cnpj) : '',
     phone: initialOrg.phone || '',
     email: initialOrg.email || currentUserEmail || '',
@@ -261,7 +262,8 @@ export default function OfficeSettingsClient({
     const data = new FormData()
     data.append('name', formData.name.trim())
     data.append('slug', formData.slug.trim())
-    data.append('cau_caubr', formData.cau_caubr.trim())
+    data.append('professional_council_id', formData.professional_council_id.trim())
+    data.append('cau_caubr', formData.professional_council_id.trim())
     data.append('cnpj', formData.cnpj.trim())
     data.append('phone', formData.phone.trim())
     data.append('email', formData.email.trim())
@@ -275,7 +277,8 @@ export default function OfficeSettingsClient({
         ...org,
         name: formData.name.trim(),
         slug: formData.slug.trim(),
-        cau_caubr: formData.cau_caubr.trim() || null,
+        professional_council_id: formData.professional_council_id.trim() || null,
+        cau_caubr: formData.professional_council_id.trim() || null,
         cnpj: formData.cnpj.trim() ? maskCPFOrCNPJ(formData.cnpj) : null,
         phone: formData.phone.trim() || null,
         email: formData.email.trim() || null,
@@ -547,7 +550,7 @@ export default function OfficeSettingsClient({
             <Building2 className="w-6 h-6 text-blue-600" /> Perfil do Escritório
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Gerencie os dados cadastrais da empresa de arquitetura e controle os membros com acesso ao sistema.
+            Gerencie os dados cadastrais do escritório e controle os membros com acesso ao sistema.
           </p>
         </div>
 
@@ -557,7 +560,7 @@ export default function OfficeSettingsClient({
               setFormData({
                 name: org.name || '',
                 slug: org.slug || '',
-                cau_caubr: org.cau_caubr || '',
+                professional_council_id: org.professional_council_id || org.cau_caubr || '',
                 cnpj: org.cnpj ? maskCPFOrCNPJ(org.cnpj) : '',
                 phone: org.phone || '',
                 email: org.email || currentUserEmail || '',
@@ -632,7 +635,7 @@ export default function OfficeSettingsClient({
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Ex: Studio Arquitetura & Interiores"
+                  placeholder="Ex: Studio & Consultoria Integrada"
                   className="w-full text-sm border border-slate-200 rounded-xl p-3 outline-hidden focus:border-blue-500 bg-white"
                 />
               </div>
@@ -644,17 +647,17 @@ export default function OfficeSettingsClient({
                   required
                   value={formData.slug}
                   onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                  placeholder="Ex: studio-arquitetura"
+                  placeholder="Ex: meu-escritorio"
                   className="w-full text-sm font-mono border border-slate-200 rounded-xl p-3 outline-hidden focus:border-blue-500 bg-white"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">Registro CAU / CAUBR</label>
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">Registro Profissional (CAU, OAB, CRC, etc.)</label>
                 <input
                   type="text"
-                  value={formData.cau_caubr}
-                  onChange={(e) => setFormData({ ...formData, cau_caubr: e.target.value })}
+                  value={formData.professional_council_id}
+                  onChange={(e) => setFormData({ ...formData, professional_council_id: e.target.value })}
                   placeholder="Ex: A123456-7"
                   className="w-full text-sm border border-slate-200 rounded-xl p-3 outline-hidden focus:border-blue-500 bg-white"
                 />
@@ -668,10 +671,10 @@ export default function OfficeSettingsClient({
                   {docStatus && (
                     <span
                       className={`text-xs font-bold px-2 py-0.5 rounded-md transition-all ${docStatus.type === 'valid'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : docStatus.type === 'invalid'
-                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                            : 'bg-slate-100 text-slate-500'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : docStatus.type === 'invalid'
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                          : 'bg-slate-100 text-slate-500'
                         }`}
                     >
                       {docStatus.message}
@@ -689,10 +692,10 @@ export default function OfficeSettingsClient({
                   }
                   placeholder="000.000.000-00 ou 00.000.000/0001-90"
                   className={`w-full text-sm border rounded-xl p-3 outline-hidden transition-all bg-white ${docStatus?.type === 'invalid'
-                      ? 'border-rose-300 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10'
-                      : docStatus?.type === 'valid'
-                        ? 'border-emerald-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10'
-                        : 'border-slate-200 focus:border-blue-500'
+                    ? 'border-rose-300 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10'
+                    : docStatus?.type === 'valid'
+                      ? 'border-emerald-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10'
+                      : 'border-slate-200 focus:border-blue-500'
                     }`}
                 />
               </div>
@@ -727,7 +730,7 @@ export default function OfficeSettingsClient({
                   setFormData({
                     name: org.name || '',
                     slug: org.slug || '',
-                    cau_caubr: org.cau_caubr || '',
+                    professional_council_id: org.professional_council_id || org.cau_caubr || '',
                     cnpj: org.cnpj ? maskCPFOrCNPJ(org.cnpj) : '',
                     phone: org.phone || '',
                     email: org.email || currentUserEmail || '',
@@ -769,8 +772,8 @@ export default function OfficeSettingsClient({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
               <div className="space-y-1">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">Registro CAU / CAUBR</span>
-                <span className="text-sm text-slate-800 font-medium block">{org.cau_caubr || 'Não informado'}</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">Registro Profissional</span>
+                <span className="text-sm text-slate-800 font-medium block">{org.professional_council_id || org.cau_caubr || 'Não informado'}</span>
               </div>
 
               <div className="space-y-1">
@@ -1073,13 +1076,13 @@ export default function OfficeSettingsClient({
                       setNewMemberEmail(e.target.value)
                       if (memberModalError) setMemberModalError(null)
                     }}
-                    placeholder="usuario@arquiteto.com"
+                    placeholder="usuario@escritorio.com.br"
                     className="w-full text-sm border border-slate-200 rounded-xl p-3 pl-9 outline-hidden focus:border-blue-500 bg-white"
                   />
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 </div>
                 <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-                  Um e-mail será enviado com um link exclusivo para o colaborador acessar o escritório. Não é obrigatório ter cadastro prévio no Orgarq.
+                  Um e-mail será enviado com um link exclusivo para o colaborador acessar o escritório. Não é obrigatório ter cadastro prévio no Organizeasy.
                 </p>
               </div>
 

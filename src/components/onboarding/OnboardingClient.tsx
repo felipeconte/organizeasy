@@ -120,10 +120,11 @@ export default function OnboardingClient({ user, initialInvites }: OnboardingCli
       {/* Topo / Navbar */}
       <header className="border-b border-slate-200/80 bg-white/80 backdrop-blur-md px-6 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-xs shadow-blue-500/20">
-            <Building2 className="w-5 h-5" />
-          </div>
-          <span className="text-lg font-bold text-slate-900 tracking-tight">Orgarq</span>
+          <img
+            src="/logos/logo-organize.webp"
+            alt="Organizeasy"
+            className="h-8 w-auto object-contain"
+          />
         </div>
 
         <div className="flex items-center gap-3">
@@ -157,7 +158,7 @@ export default function OnboardingClient({ user, initialInvites }: OnboardingCli
             Olá, {user.name}! Como deseja começar?
           </h1>
           <p className="text-sm text-slate-600">
-            Você ainda não está associado a nenhum escritório de arquitetura. Escolha uma das opções abaixo para prosseguir:
+            Você ainda não está associado a nenhum escritório. Escolha uma das opções abaixo para prosseguir:
           </p>
         </div>
 
@@ -190,7 +191,7 @@ export default function OnboardingClient({ user, initialInvites }: OnboardingCli
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
-                    <span>Template padrão com as 10 etapas da arquitetura</span>
+                    <span>Template padrão com fluxo de etapas de projetos</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
@@ -210,7 +211,7 @@ export default function OnboardingClient({ user, initialInvites }: OnboardingCli
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Nome do Escritório / Estúdio
+                      Nome do Escritório / Empresa
                     </label>
                     <input
                       type="text"
@@ -218,7 +219,7 @@ export default function OnboardingClient({ user, initialInvites }: OnboardingCli
                       autoFocus
                       value={officeName}
                       onChange={(e) => setOfficeName(e.target.value)}
-                      placeholder="Ex: Studio Forma Arquitetura"
+                      placeholder="Ex: Studio Alpha Gestão & Projetos"
                       className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
                     />
                   </div>
@@ -309,7 +310,7 @@ export default function OnboardingClient({ user, initialInvites }: OnboardingCli
                       >
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-slate-900 truncate">
-                            {inv.organization?.name || 'Escritório de Arquitetura'}
+                            {inv.organization?.name || 'Escritório'}
                           </p>
                           <p className="text-[11px] text-slate-500">
                             Cargo no escritório:{' '}
@@ -428,7 +429,7 @@ export default function OnboardingClient({ user, initialInvites }: OnboardingCli
 
       {/* Rodapé simples */}
       <footer className="py-4 text-center text-xs text-slate-400">
-        &copy; {new Date().getFullYear()} Orgarq. Todos os direitos reservados.
+        &copy; {new Date().getFullYear()} Organizeasy. Todos os direitos reservados.
       </footer>
     </div>
   )

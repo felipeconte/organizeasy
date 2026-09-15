@@ -43,7 +43,9 @@ export default async function ProjectDetailPage({
 
   const cookieStore = await cookies()
   const cookieView =
+    cookieStore.get(`organizeasy_project_view_${id}`)?.value ||
     cookieStore.get(`orgarq_project_view_${id}`)?.value ||
+    cookieStore.get('organizeasy_last_view')?.value ||
     cookieStore.get('orgarq_last_view')?.value
 
   let initialView: ViewType = 'lista'

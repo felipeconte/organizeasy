@@ -6,7 +6,7 @@ import ClientDetailClient from '@/components/clients/ClientDetailClient'
 import { BreadcrumbSetter } from '@/contexts/BreadcrumbContext'
 
 export const metadata = {
-  title: 'Detalhes do Cliente | Orgarq',
+  title: 'Detalhes do Cliente | Organizeasy',
   description: 'Visualização de cadastro e projetos vinculados ao cliente',
 }
 

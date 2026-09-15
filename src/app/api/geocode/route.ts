@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       // Tenta via ip-api
       try {
         const ipRes = await fetch('http://ip-api.com/json', {
-          headers: { 'User-Agent': 'OrgarqSaaS/1.0' },
+          headers: { 'User-Agent': 'OrganizeasySaaS/1.0' },
           next: { revalidate: 3600 },
         })
         if (ipRes.ok) {
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
       if (!userLat || !userLon) {
         try {
           const ipCoRes = await fetch('https://ipapi.co/json/', {
-            headers: { 'User-Agent': 'OrgarqSaaS/1.0' },
+            headers: { 'User-Agent': 'OrganizeasySaaS/1.0' },
             next: { revalidate: 3600 },
           })
           if (ipCoRes.ok) {
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
           const revUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLat}&lon=${userLon}&addressdetails=1&accept-language=pt-BR,en`
           const revRes = await fetch(revUrl, {
             headers: {
-              'User-Agent': 'OrgarqSaaS/1.0 (contact@orgarq.com.br; https://orgarq.com.br)',
+              'User-Agent': 'OrganizeasySaaS/1.0 (contact@organizeasy.com.br; https://www.organizeasy.com.br)',
               'Accept-Language': 'pt-BR,en',
             },
             next: { revalidate: 3600 },
@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
 
       const response = await fetch(reverseUrl, {
         headers: {
-          'User-Agent': 'OrgarqSaaS/1.0 (contact@orgarq.com.br; https://orgarq.com.br)',
+          'User-Agent': 'OrganizeasySaaS/1.0 (contact@organizeasy.com.br; https://www.organizeasy.com.br)',
           'Accept-Language': 'pt-BR,en',
         },
         next: { revalidate: 3600 },
@@ -170,7 +170,7 @@ export async function GET(request: NextRequest) {
         lat
       )}&lon=${encodeURIComponent(lon)}`
       const photonRes = await fetch(photonRevUrl, {
-        headers: { 'User-Agent': 'OrgarqSaaS/1.0' },
+        headers: { 'User-Agent': 'OrganizeasySaaS/1.0' },
       })
 
       if (photonRes.ok) {
@@ -219,7 +219,7 @@ export async function GET(request: NextRequest) {
 
     const response = await fetch(nominatimUrl, {
       headers: {
-        'User-Agent': 'OrgarqSaaS/1.0 (contact@orgarq.com.br; https://orgarq.com.br)',
+        'User-Agent': 'OrganizeasySaaS/1.0 (contact@organizeasy.com.br; https://www.organizeasy.com.br)',
         'Accept-Language': 'pt-BR,en',
       },
       next: { revalidate: 3600 },
@@ -236,7 +236,7 @@ export async function GET(request: NextRequest) {
     const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=6&lang=default`
     const photonRes = await fetch(photonUrl, {
       headers: {
-        'User-Agent': 'OrgarqSaaS/1.0',
+        'User-Agent': 'OrganizeasySaaS/1.0',
       },
     })
 

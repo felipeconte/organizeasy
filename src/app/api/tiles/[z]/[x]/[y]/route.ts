@@ -12,7 +12,7 @@ export async function GET(
     const osmUrl = `https://tile.openstreetmap.org/${z}/${x}/${cleanY}.png`
     let response = await fetch(osmUrl, {
       headers: {
-        'User-Agent': 'OrgarqSaaS/1.0 (contact@orgarq.com.br; https://orgarq.com.br)',
+        'User-Agent': 'OrganizeasySaaS/1.0 (contact@organizeasy.com.br; https://www.organizeasy.com.br)',
       },
       next: { revalidate: 604800 }, // Cache por 7 dias
     })
@@ -22,7 +22,7 @@ export async function GET(
       const cartoUrl = `https://a.basemaps.cartocdn.com/rastertiles/voyager/${z}/${x}/${cleanY}.png`
       response = await fetch(cartoUrl, {
         headers: {
-          'User-Agent': 'OrgarqSaaS/1.0',
+          'User-Agent': 'OrganizeasySaaS/1.0',
         },
         next: { revalidate: 604800 },
       })

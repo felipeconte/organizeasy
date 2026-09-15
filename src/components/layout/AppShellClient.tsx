@@ -69,7 +69,7 @@ export function AppShellClient({
   // Sincroniza estado inicial com localStorage de forma segura para SSR
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('orgarq_sidebar_collapsed')
+      const saved = localStorage.getItem('organizeasy_sidebar_collapsed') ?? localStorage.getItem('orgarq_sidebar_collapsed')
       if (saved !== null) {
         setIsCollapsed(saved === 'true')
       }
@@ -82,7 +82,7 @@ export function AppShellClient({
     setIsCollapsed((prev) => {
       const next = !prev
       try {
-        localStorage.setItem('orgarq_sidebar_collapsed', String(next))
+        localStorage.setItem('organizeasy_sidebar_collapsed', String(next))
       } catch {
         // Ignora erro
       }
@@ -91,7 +91,7 @@ export function AppShellClient({
   }
 
   const getInitials = (name: string) => {
-    if (!name) return 'AR'
+    if (!name) return 'OE'
     const parts = name.trim().split(' ')
     if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
@@ -215,15 +215,19 @@ export function AppShellClient({
                 className="flex items-center justify-center w-full group cursor-pointer"
                 title={`${officeName} (Clique para alternar escritório)`}
               >
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-xs overflow-hidden shrink-0 border border-slate-200/80 group-hover:scale-105 transition-transform">
+                <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center text-slate-800 shadow-xs overflow-hidden shrink-0 border border-slate-200/80 group-hover:scale-105 transition-transform p-1">
                   {orgLogoUrl ? (
                     <img
                       src={orgLogoUrl}
                       alt={officeName}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover rounded-lg"
                     />
                   ) : (
-                    <Building2 className="w-5 h-5" />
+                    <img
+                      src="/logos/logo-organizeasy-quadrado.webp"
+                      alt={officeName}
+                      className="w-full h-full object-contain"
+                    />
                   )}
                 </div>
               </button>
@@ -235,15 +239,19 @@ export function AppShellClient({
                 title="Clique para alternar escritório"
               >
                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                  <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-xs overflow-hidden shrink-0 border border-slate-200/80 group-hover:scale-105 transition-transform">
+                  <div className="h-9 w-9 rounded-xl bg-white flex items-center justify-center text-slate-800 shadow-xs overflow-hidden shrink-0 border border-slate-200/80 group-hover:scale-105 transition-transform p-0.5">
                     {orgLogoUrl ? (
                       <img
                         src={orgLogoUrl}
                         alt={officeName}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover rounded-lg"
                       />
                     ) : (
-                      <Building2 className="w-4.5 h-4.5" />
+                      <img
+                        src="/logos/logo-organizeasy-quadrado.webp"
+                        alt={officeName}
+                        className="w-full h-full object-contain"
+                      />
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -304,15 +312,19 @@ export function AppShellClient({
                           }`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                            <div className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 shrink-0 overflow-hidden">
+                            <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600 shrink-0 overflow-hidden p-0.5">
                               {o.logo_url ? (
                                 <img
                                   src={o.logo_url}
                                   alt={o.name}
-                                  className="w-full h-full object-cover"
+                                  className="w-full h-full object-cover rounded"
                                 />
                               ) : (
-                                <Building2 className="w-3.5 h-3.5" />
+                                <img
+                                  src="/logos/logo-organizeasy-quadrado.webp"
+                                  alt={o.name}
+                                  className="w-full h-full object-contain"
+                                />
                               )}
                             </div>
                             <div className="min-w-0 flex-1">

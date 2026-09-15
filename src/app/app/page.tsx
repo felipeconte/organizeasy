@@ -7,8 +7,8 @@ import OverviewDashboardClient, {
 import { redirect } from 'next/navigation'
 
 export const metadata = {
-  title: 'Visão Geral | Orgarq',
-  description: 'Painel executivo do escritório de arquitetura com projetos, aprovações de clientes e controle financeiro.',
+  title: 'Visão Geral | Organizeasy',
+  description: 'Painel executivo do escritório com projetos, aprovações de clientes e controle financeiro.',
 }
 
 export default async function DashboardPage() {
@@ -50,7 +50,7 @@ export default async function DashboardPage() {
     meta.full_name ||
     meta.display_name ||
     user.email?.split('@')[0] ||
-    'Arquiteto'
+    'Usuário'
 
   // 3. Monta consulta de projetos do escritório ativo com etapas aninhadas
   const { data: projs, error: projsError } = await supabase

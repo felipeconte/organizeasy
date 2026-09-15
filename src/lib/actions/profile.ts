@@ -49,7 +49,9 @@ export async function updateUserProfileAction(formData: FormData): Promise<{
   const email = sanitizeText(formData.get('email') as string)?.toLowerCase().trim()
   const phone = sanitizeText(formData.get('phone') as string)
   const jobRole = sanitizeText(formData.get('jobRole') as string)
-  const cau = sanitizeText(formData.get('cau') as string)
+  const professional_council_id = sanitizeText(
+    (formData.get('professional_council_id') || formData.get('cau')) as string
+  )
   const bio = sanitizeText(formData.get('bio') as string)
   const avatarUrl = formData.get('avatarUrl') as string
 
@@ -105,22 +107,28 @@ export async function updateUserProfileAction(formData: FormData): Promise<{
   }
 
   // 2. Salva na tabela public.user_profiles
-  const { error: dbError } = await supabase
+  const profilePayload: Record<string, any> = {
+    user_id: user.id,
+    full_name: fullName,
+    display_name: fullName,
+    avatar_url: avatarUrl || null,
+    phone: phone || null,
+    job_role: jobRole || null,
+    professional_council_id: professional_council_id || null,
+    cau: professional_council_id || null,
+    bio: bio || null,
+    updated_at: new Date().toISOString(),
+  }
+
+  let { error: dbError } = await supabase
     .from('user_profiles')
-    .upsert(
-      {
-        user_id: user.id,
-        full_name: fullName,
-        display_name: fullName,
-        avatar_url: avatarUrl || null,
-        phone: phone || null,
-        job_role: jobRole || null,
-        cau: cau || null,
-        bio: bio || null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id' }
-    )
+    .upsert(profilePayload as any, { onConflict: 'user_id' })
+
+  if (dbError && (dbError.message?.includes('professional_council_id') || dbError.code === '42703')) {
+    delete profilePayload.professional_council_id
+    const retry = await supabase.from('user_profiles').upsert(profilePayload as any, { onConflict: 'user_id' })
+    dbError = retry.error
+  }
 
   if (dbError) {
     console.error('Error updating user_profiles table:', dbError)
@@ -206,7 +214,7 @@ export async function sendPasswordResetEmailAction(): Promise<{ success: boolean
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   const redirectTo = `${baseUrl}/recuperar-senha`
 
-  // 1. Tenta gerar o link seguro oficial via Admin e enviar com template Orgarq via Resend
+  // 1. Tenta gerar o link seguro oficial via Admin e enviar com template Organizeasy via Resend
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   const resendApiKey = process.env.RESEND_API_KEY
 

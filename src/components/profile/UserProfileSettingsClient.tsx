@@ -36,7 +36,8 @@ export interface UserProfileData {
   avatarUrl: string | null
   phone: string | null
   jobRole: string | null
-  cau: string | null
+  professional_council_id?: string | null
+  cau?: string | null
   bio: string | null
 }
 
@@ -75,7 +76,7 @@ export default function UserProfileSettingsClient({
     email: initialProfile.email || '',
     phone: initialProfile.phone ? maskPhone(initialProfile.phone) : '',
     jobRole: initialProfile.jobRole || '',
-    cau: initialProfile.cau || '',
+    professional_council_id: initialProfile.professional_council_id || initialProfile.cau || '',
     bio: initialProfile.bio || '',
     avatarUrl: initialProfile.avatarUrl || '',
   })
@@ -135,7 +136,8 @@ export default function UserProfileSettingsClient({
     data.append('email', formData.email.trim())
     data.append('phone', formData.phone.trim())
     data.append('jobRole', formData.jobRole.trim())
-    data.append('cau', formData.cau.trim())
+    data.append('professional_council_id', formData.professional_council_id.trim())
+    data.append('cau', formData.professional_council_id.trim())
     data.append('bio', formData.bio.trim())
     data.append('avatarUrl', formData.avatarUrl.trim())
 
@@ -150,7 +152,8 @@ export default function UserProfileSettingsClient({
         email: updatedEmail,
         phone: formData.phone.trim() || null,
         jobRole: formData.jobRole.trim() || null,
-        cau: formData.cau.trim() || null,
+        professional_council_id: formData.professional_council_id.trim() || null,
+        cau: formData.professional_council_id.trim() || null,
         bio: formData.bio.trim() || null,
         avatarUrl: formData.avatarUrl.trim() || null,
       })
@@ -325,7 +328,7 @@ export default function UserProfileSettingsClient({
       <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-6">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-            <BadgeCheck className="w-4 h-4 text-blue-600" /> Dados Pessoais & Exibição
+            <BadgeCheck className="w-4 h-4 text-blue-600" /> Dados Pessoais
           </h2>
 
           {!isEditing && (
@@ -337,7 +340,7 @@ export default function UserProfileSettingsClient({
                   email: profile.email || '',
                   phone: profile.phone ? maskPhone(profile.phone) : '',
                   jobRole: profile.jobRole || '',
-                  cau: profile.cau || '',
+                  professional_council_id: profile.professional_council_id || profile.cau || '',
                   bio: profile.bio || '',
                   avatarUrl: profile.avatarUrl || '',
                 })
@@ -438,17 +441,17 @@ export default function UserProfileSettingsClient({
                   type="text"
                   value={formData.jobRole}
                   onChange={(e) => setFormData({ ...formData, jobRole: e.target.value })}
-                  placeholder="Ex: Arquiteto Titular, Coordenador de Projetos"
+                  placeholder="Ex: Gestor, Coordenador de Projetos, Consultor"
                   className="w-full text-sm border border-slate-200 rounded-xl p-3 outline-hidden focus:border-blue-500 bg-white"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">Registro CAU Pessoal</label>
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">Registro Profissional (CAU, OAB, CRC, etc.)</label>
                 <input
                   type="text"
-                  value={formData.cau}
-                  onChange={(e) => setFormData({ ...formData, cau: e.target.value })}
+                  value={formData.professional_council_id}
+                  onChange={(e) => setFormData({ ...formData, professional_council_id: e.target.value })}
                   placeholder="Ex: A123456-7"
                   className="w-full text-sm border border-slate-200 rounded-xl p-3 outline-hidden focus:border-blue-500 bg-white"
                 />
@@ -487,7 +490,7 @@ export default function UserProfileSettingsClient({
                     email: profile.email || '',
                     phone: profile.phone ? maskPhone(profile.phone) : '',
                     jobRole: profile.jobRole || '',
-                    cau: profile.cau || '',
+                    professional_council_id: profile.professional_council_id || profile.cau || '',
                     bio: profile.bio || '',
                     avatarUrl: profile.avatarUrl || '',
                   })
@@ -535,10 +538,10 @@ export default function UserProfileSettingsClient({
                         normalizedRole === 'intern'
                           ? 'Estagiário'
                           : normalizedRole === 'admin'
-                          ? 'Administrador'
-                          : normalizedRole === 'owner'
-                          ? 'Proprietário'
-                          : 'Colaborador',
+                            ? 'Administrador'
+                            : normalizedRole === 'owner'
+                              ? 'Proprietário'
+                              : 'Colaborador',
                       bg: 'bg-amber-50',
                       text: 'text-amber-700',
                       border: 'border-amber-200',
@@ -548,14 +551,14 @@ export default function UserProfileSettingsClient({
                       profileName?.toLowerCase() === 'intern'
                         ? 'Estagiário'
                         : profileName?.toLowerCase() === 'architect'
-                        ? 'Colaborador'
-                        : profileName?.toLowerCase() === 'collaborator'
-                        ? 'Colaborador'
-                        : profileName?.toLowerCase() === 'admin'
-                        ? 'Administrador'
-                        : profileName?.toLowerCase() === 'owner'
-                        ? 'Proprietário'
-                        : profileName
+                          ? 'Colaborador'
+                          : profileName?.toLowerCase() === 'collaborator'
+                            ? 'Colaborador'
+                            : profileName?.toLowerCase() === 'admin'
+                              ? 'Administrador'
+                              : profileName?.toLowerCase() === 'owner'
+                                ? 'Proprietário'
+                                : profileName
 
                     return displayProfileName ? (
                       <span
@@ -594,9 +597,9 @@ export default function UserProfileSettingsClient({
               </div>
 
               <div className="space-y-1">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">Registro CAU Pessoal</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">Registro Profissional</span>
                 <span className="text-sm text-slate-800 font-medium block">
-                  {profile.cau || 'Não informado'}
+                  {profile.professional_council_id || profile.cau || 'Não informado'}
                 </span>
               </div>
 
@@ -622,7 +625,7 @@ export default function UserProfileSettingsClient({
       <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-6">
         <div className="pb-3 border-b border-slate-100">
           <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-            <Shield className="w-4 h-4 text-blue-600" /> Segurança & Troca de Senha
+            <Shield className="w-4 h-4 text-blue-600" /> Trocar senha
           </h2>
           <p className="text-sm text-slate-500 mt-1">
             Atualize sua senha informando sua senha atual ou solicite um link de redefinição por e-mail.

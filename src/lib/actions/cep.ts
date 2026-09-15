@@ -31,7 +31,7 @@ export async function lookupCepAction(cep: string): Promise<CepAddressResult> {
       signal: controller.signal,
       headers: {
         Accept: 'application/json',
-        'User-Agent': 'Orgarq-App/1.0',
+        'User-Agent': 'Organizeasy-App/1.0',
       },
       cache: 'force-cache',
     })
@@ -65,7 +65,7 @@ export async function lookupCepAction(cep: string): Promise<CepAddressResult> {
       signal: controller.signal,
       headers: {
         Accept: 'application/json',
-        'User-Agent': 'Orgarq-App/1.0',
+        'User-Agent': 'Organizeasy-App/1.0',
       },
       cache: 'force-cache',
     })

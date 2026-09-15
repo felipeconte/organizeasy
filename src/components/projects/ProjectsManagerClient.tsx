@@ -608,7 +608,7 @@ export default function ProjectsManagerClient({
             <p className="text-sm text-slate-500 max-w-sm mx-auto">
               {search || statusFilter !== 'todos'
                 ? 'Tente limpar a busca ou os filtros para ver todos os projetos.'
-                : 'Cadastre seu primeiro projeto e as 10 etapas da arquitetura serão clonadas automaticamente!'}
+                : 'Cadastre seu primeiro projeto e as etapas do fluxo de trabalho serão configuradas automaticamente!'}
             </p>
           </div>
           {search || statusFilter !== 'todos' ? (

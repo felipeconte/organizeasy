@@ -8,7 +8,7 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://orgarq.com.br";
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.organizeasy.com.br";
 
 export const viewport: Viewport = {
   themeColor: "#2563EB",
@@ -19,23 +19,29 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
   title: {
-    default: "Orgarq — Gestão de Projetos",
-    template: "%s | Orgarq",
+    default: "Organizeasy — Gestão Inteligente de Escritórios & Projetos",
+    template: "%s | Organizeasy",
   },
   description:
-    "A plataforma SaaS definitiva para escritórios de arquitetura: cronogramas por etapas, Kanban ágil, Gantt e aprovação simplificada no Portal do Cliente sem senha.",
+    "A plataforma SaaS definitiva para gestão e organização de escritórios: cronogramas por etapas, Kanban ágil, fluxo financeiro e portal do cliente com aprovação sem senha.",
   keywords: [
+    "gestão de escritórios",
     "gestão de projetos",
-    "software para arquitetos",
-    "cronograma de arquitetura",
-    "portal do cliente arquitetura",
-    "etapas AsBEA",
-    "SaaS arquitetura",
-    "aprovação de pranchas",
+    "software para escritórios",
+    "organização de processos",
+    "portal do cliente",
+    "kanban para equipes",
+    "fluxo financeiro escritório",
+    "Organizeasy",
   ],
-  authors: [{ name: "Orgarq Studio" }],
-  creator: "Orgarq",
-  publisher: "Orgarq",
+  authors: [{ name: "Organizeasy" }],
+  creator: "Organizeasy",
+  publisher: "Organizeasy",
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/logos/logo-organizeasy-quadrado.png",
+  },
   robots: {
     index: true,
     follow: true,
@@ -51,16 +57,25 @@ export const metadata: Metadata = {
     type: "website",
     locale: "pt_BR",
     url: baseUrl,
-    title: "Orgarq — Gestão de Projetos",
+    title: "Organizeasy — Gestão Inteligente de Escritórios & Projetos",
     description:
       "Controle prazos, visualize etapas em Lista, Kanban e Gantt, e colete aprovações com auditoria no Portal do Cliente.",
-    siteName: "Orgarq",
+    siteName: "Organizeasy",
+    images: [
+      {
+        url: "/logos/logo-organizeasy-quadrado.png",
+        width: 1200,
+        height: 1200,
+        alt: "Organizeasy",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Orgarq — Gestão de Projetos",
+    title: "Organizeasy — Gestão Inteligente de Escritórios & Projetos",
     description:
-      "Plataforma completa de gestão de etapas, Kanban e portal do cliente para arquitetos.",
+      "Plataforma completa de organização, fluxo de projetos, Kanban e portal do cliente para escritórios.",
+    images: ["/logos/logo-organizeasy-quadrado.png"],
   },
 };
 

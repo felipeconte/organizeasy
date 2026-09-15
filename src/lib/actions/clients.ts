@@ -575,7 +575,7 @@ export async function resendClientPortalAccessAction(clientId: string): Promise<
       .eq('id', client.organization_id)
       .single()
 
-    const officeName = orgData?.name || 'Escritório de Arquitetura'
+    const officeName = orgData?.name || 'Meu Escritório'
 
     // Envia o e-mail diretamente ao cliente com o magic link e código de acesso
     await sendClientPortalAccessDetailsEmail({

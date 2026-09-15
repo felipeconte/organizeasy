@@ -5,15 +5,19 @@ export default function CustomerPortalLandingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-slate-100 to-slate-200 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 antialiased">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-4">
-        <div className="w-16 h-16 rounded-3xl bg-slate-900 text-white mx-auto flex items-center justify-center shadow-lg">
-          <Building2 className="w-8 h-8 text-blue-400" />
+        <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 p-2 mx-auto flex items-center justify-center shadow-md">
+          <img
+            src="/logos/logo-organizeasy-quadrado.webp"
+            alt="Organizeasy"
+            className="w-full h-full object-contain"
+          />
         </div>
 
         <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
           Portal do Cliente
         </h1>
         <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-          Orgarq Architecture OS
+          Organizeasy
         </p>
       </div>
 
@@ -28,7 +32,7 @@ export default function CustomerPortalLandingPage() {
               Acesso Exclusivo via Magic Link
             </h2>
             <p className="text-xs text-slate-600 leading-relaxed">
-              O acesso aos seus projetos de arquitetura agora é simplificado e não exige login com senha.
+              O acesso aos seus projetos agora é simplificado e não exige login com senha.
             </p>
           </div>
 
@@ -44,7 +48,7 @@ export default function CustomerPortalLandingPage() {
           </div>
 
           <div className="pt-2 text-xs text-slate-400">
-            Dúvidas? Entre em contato diretamente com a equipe do seu escritório de arquitetura.
+            Dúvidas? Entre em contato diretamente com a equipe do seu escritório.
           </div>
         </div>
       </div>

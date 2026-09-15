@@ -69,7 +69,7 @@ export default async function ProjectBriefingPage({
           <BackButton fallbackHref={`/app/projetos/${id}`} />
           <div>
             <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-              Ficha de Briefing & Programa
+              Ficha de Briefing e Programa
             </h1>
             <p className="text-xs text-slate-500">
               Projeto: <strong className="text-slate-800">{project.title}</strong> ({project.code})
@@ -84,17 +84,17 @@ export default async function ProjectBriefingPage({
           {/* Estilo & Inspirações */}
           <div className="space-y-3">
             <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-blue-600" /> Preferências Estéticas & Inspirações
+              <Sparkles className="w-4 h-4 text-blue-600" /> Diretrizes, Escopo e Preferências
             </label>
             <p className="text-xs text-slate-500">
-              Estilo arquitetônico preferido pelo cliente (Moderno, Contemporâneo, Minimalista, Rústico Chic, Industrial), paleta de materiais e referências visuais.
+              Diretrizes gerais, preferências definidas pelo cliente, premissas de execução e referências de qualidade.
             </p>
             <textarea
               name="stylePreferences"
               rows={3}
               disabled={!canEdit}
               defaultValue={briefing?.style_preferences || ''}
-              placeholder="Ex: Cliente busca arquitetura contemporânea com uso de concreto aparente, madeira cumaru e esquadrias pretas minimalistas..."
+              placeholder="Ex: Cliente busca soluções funcionais de alto padrão, priorizando eficiência de processos, excelência na entrega e inovação..."
               className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 disabled:opacity-75 disabled:bg-slate-100/80"
             />
           </div>
@@ -102,17 +102,17 @@ export default async function ProjectBriefingPage({
           {/* Condicionantes do Terreno / Local */}
           <div className="space-y-3 pt-4 border-t border-slate-100">
             <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <Compass className="w-4 h-4 text-blue-600" /> Condicionantes do Terreno / Edificação
+              <Compass className="w-4 h-4 text-blue-600" /> Condicionantes Técnicas / Local
             </label>
             <p className="text-xs text-slate-500">
-              Topografia, orientação solar (norte/sul), ventilação predominante, recuos obrigatórios na prefeitura e vistas privilegiadas.
+              Particularidades técnicas, localização, infraestrutura do ambiente ou restrições regulatórias do projeto.
             </p>
             <textarea
               name="siteConditions"
               rows={3}
               disabled={!canEdit}
               defaultValue={briefing?.site_conditions || ''}
-              placeholder="Ex: Terreno com declive suave de 2,5m. Fachada principal voltada para o Leste (sol da manhã). Vista panorâmica para a mata nos fundos..."
+              placeholder="Ex: Espaço comercial com restrição de horários para intervenções, infraestrutura elétrica e de dados a ser revisada..."
               className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 disabled:opacity-75 disabled:bg-slate-100/80"
             />
           </div>
@@ -120,17 +120,17 @@ export default async function ProjectBriefingPage({
           {/* Observações de Orçamento / Investimento */}
           <div className="space-y-3 pt-4 border-t border-slate-100">
             <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <Home className="w-4 h-4 text-blue-600" /> Expectativas de Orçamento & Prazos do Cliente
+              <Home className="w-4 h-4 text-blue-600" /> Expectativas de Orçamento e Prazos
             </label>
             <p className="text-xs text-slate-500">
-              Expectativas financeiras para a construção/reforma, prioridades de investimento e prazos ideais para início de obra.
+              Expectativas financeiras para o projeto/serviço, prioridades de investimento e datas-chave do cliente.
             </p>
             <textarea
               name="budgetNotes"
               rows={3}
               disabled={!canEdit}
               defaultValue={briefing?.budget_notes || ''}
-              placeholder="Ex: Teto orçamentário de R$ 900.000 para a obra civil. Prioridade em isolamento acústico na suíte master e energia solar fotovoltaica..."
+              placeholder="Ex: Teto orçamentário previsto com margem para contingências. Prioridade em cumprimento de prazos contratuais e entrega em etapas..."
               className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 disabled:opacity-75 disabled:bg-slate-100/80"
             />
           </div>
@@ -138,7 +138,7 @@ export default async function ProjectBriefingPage({
           {/* Notas Gerais de Reuniões */}
           <div className="space-y-3 pt-4 border-t border-slate-100">
             <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <FileText className="w-4 h-4 text-blue-600" /> Notas Gerais & Atas de Reunião
+              <FileText className="w-4 h-4 text-blue-600" /> Notas Gerais e Atas de Reunião
             </label>
             <p className="text-xs text-slate-500">
               Histórico de decisões tomadas em reuniões presenciais ou videoconferências com o cliente.

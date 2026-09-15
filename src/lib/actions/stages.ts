@@ -799,7 +799,7 @@ export async function addStageCommentAction(
     profile?.display_name ||
     profile?.full_name ||
     user.user_metadata?.full_name ||
-    (user.email ? user.email.split('@')[0] : 'Arquiteto')
+    (user.email ? user.email.split('@')[0] : 'Usuário')
 
   const newComment: StageComment = {
     id: `cmt-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,

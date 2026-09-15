@@ -37,7 +37,8 @@ export default async function OfficeProfilePage() {
     id: activeOrg.id,
     name: activeOrg.name,
     slug: activeOrg.slug,
-    cau_caubr: null,
+    professional_council_id: (orgData as any)?.professional_council_id || (orgData as any)?.cau_caubr || null,
+    cau_caubr: (orgData as any)?.cau_caubr || (orgData as any)?.professional_council_id || null,
     cnpj: null,
     phone: null,
     email: user.email || null,
@@ -149,7 +150,7 @@ export default async function OfficeProfilePage() {
       pendingInvites={pendingInvites}
       profiles={profiles}
       currentUserId={user.id}
-      currentUserEmail={user.email || 'Arquiteto'}
+      currentUserEmail={user.email || 'Usuário'}
       isOwner={isOwner}
       userPermissions={userPermissions}
     />

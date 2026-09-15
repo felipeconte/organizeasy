@@ -59,8 +59,12 @@ export default function ClientPortalCodeChallenge({
               className="h-16 w-auto object-contain rounded-2xl p-1 bg-white border border-slate-200 shadow-sm"
             />
           ) : (
-            <div className="w-16 h-16 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-md">
-              <Building2 className="w-8 h-8 text-blue-400" />
+            <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center p-2">
+              <img
+                src="/logos/logo-organizeasy-quadrado.webp"
+                alt={office.name}
+                className="w-full h-full object-contain"
+              />
             </div>
           )}
         </div>
@@ -143,7 +147,7 @@ export default function ClientPortalCodeChallenge({
         </div>
 
         <p className="mt-6 text-center text-[11px] text-slate-400 font-medium">
-          Orgarq Architecture OS • Ambiente Criptografado
+          Organizeasy • Ambiente Criptografado & Seguro
         </p>
       </div>
     </div>

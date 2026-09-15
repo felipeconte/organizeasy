@@ -474,7 +474,7 @@ export default function ClientModal({
                     })
                   }
                 }}
-                placeholder={personType === 'PJ' ? 'Ex: Studio Arquitetura & Design Ltda.' : 'Ex: Dra. Mariana Vasconcelos'}
+                placeholder={personType === 'PJ' ? 'Ex: Alpha Soluções & Consultoria Ltda.' : 'Ex: Dra. Mariana Vasconcelos'}
                 className={`w-full text-sm font-medium border rounded-xl p-3 outline-hidden transition-all bg-slate-50/50 focus:bg-white ${errors.name
                   ? 'border-rose-300 ring-2 ring-rose-500/20 text-rose-900'
                   : 'border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-slate-900'
