@@ -49,6 +49,9 @@ export default function RecoverPasswordPage() {
     setSuccessMessage(null)
 
     const formData = new FormData(e.currentTarget)
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      formData.set('origin', window.location.origin)
+    }
     const res = await resetPasswordAction(formData)
 
     if (res?.error) {

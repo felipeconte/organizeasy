@@ -1,7 +1,7 @@
 import { maskCPF } from '@/lib/formatters-and-validators'
-import { getAppBaseUrl } from '@/lib/app-url'
+import { getAppBaseUrl, getEmailAssetBaseUrl } from '@/lib/app-url'
 
-const DEFAULT_APP_URL = getAppBaseUrl()
+const DEFAULT_APP_URL = getEmailAssetBaseUrl()
 
 /**
  * Serviço de Envio de E-mails para o Portal do Cliente

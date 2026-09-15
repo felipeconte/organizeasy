@@ -9,7 +9,7 @@ import { cleanDigits, maskCPFOrCNPJ, validateCPF, validateCNPJ } from '@/lib/for
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendUserInvitationEmail } from '@/lib/server/email'
 import { ACTIVE_ORG_COOKIE } from '@/types/organization'
-import { getAppBaseUrl } from '@/lib/app-url'
+import { getAppBaseUrl, getRequestBaseUrl } from '@/lib/app-url'
 
 
 type OrganizationUpdate = Database['public']['Tables']['organizations']['Update']
@@ -213,7 +213,7 @@ export async function addOrganizationMemberAction(
       inviteCode = newInvite.invite_code
     }
 
-    const baseUrl = getAppBaseUrl()
+    const baseUrl = await getRequestBaseUrl()
     const personalizedInviteLink = `${baseUrl}/convite/${inviteId}`
 
     const { data: orgData } = await adminClient
@@ -298,7 +298,7 @@ export async function resendOfficeInviteAction(
       .eq('id', orgId)
       .single()
 
-    const baseUrl = getAppBaseUrl()
+    const baseUrl = await getRequestBaseUrl()
     const personalizedInviteLink = `${baseUrl}/convite/${invite.id}`
 
     const inviterName =

@@ -256,7 +256,8 @@ export default function UserProfileSettingsClient({
     if (!ok) return
 
     setSendingResetEmail(true)
-    const res = await sendPasswordResetEmailAction()
+    const clientOrigin = typeof window !== 'undefined' ? window.location.origin : undefined
+    const res = await sendPasswordResetEmailAction(clientOrigin)
     setSendingResetEmail(false)
 
     if (res.success) {
