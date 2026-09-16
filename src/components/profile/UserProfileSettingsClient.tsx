@@ -20,6 +20,7 @@ import {
   Send,
   X,
   Camera,
+  Crop,
 } from 'lucide-react'
 import {
   updateUserProfileAction,
@@ -92,6 +93,7 @@ export default function UserProfileSettingsClient({
 
   // Image Cropper State
   const [cropperRawImage, setCropperRawImage] = useState<string | null>(null)
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   // Status & Feedback
@@ -299,8 +301,9 @@ export default function UserProfileSettingsClient({
       {cropperRawImage && (
         <ImageCropperModal
           imageSrc={cropperRawImage}
+          cropShape="round"
           title="Ajustar Foto de Perfil"
-          description="Arraste e use o zoom para centralizar sua foto perfeitamente."
+          description="Arraste e use o zoom para enquadrar seu rosto no círculo."
           confirmText="Aplicar Foto de Perfil"
           onCropComplete={async (croppedUrl) => {
             setCropperRawImage(null)
@@ -399,23 +402,43 @@ export default function UserProfileSettingsClient({
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:border-blue-300 hover:text-blue-600 text-slate-700 text-sm font-semibold transition-all shadow-2xs cursor-pointer"
-                >
-                  <UploadCloud className="w-4 h-4 text-blue-600" />
-                  {formData.avatarUrl ? 'Trocar Foto' : 'Anexar Foto'}
-                </button>
-
-                {formData.avatarUrl && (
+                {formData.avatarUrl ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setCropperRawImage(formData.avatarUrl)}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 hover:border-blue-300 hover:text-blue-600 text-slate-700 text-xs font-semibold transition-all shadow-2xs cursor-pointer"
+                      title="Ajustar enquadramento da foto atual"
+                    >
+                      <Crop className="w-3.5 h-3.5 text-blue-600" />
+                      Ajustar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 hover:border-blue-300 hover:text-blue-600 text-slate-700 text-xs font-semibold transition-all shadow-2xs cursor-pointer"
+                      title="Escolher novo arquivo de foto"
+                    >
+                      <UploadCloud className="w-3.5 h-3.5 text-slate-500" />
+                      Trocar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, avatarUrl: '' })}
+                      className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shadow-2xs cursor-pointer"
+                      title="Remover Foto"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                ) : (
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, avatarUrl: '' })}
-                    className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shadow-2xs cursor-pointer"
-                    title="Remover Foto"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:border-blue-300 hover:text-blue-600 text-slate-700 text-sm font-semibold transition-all shadow-2xs cursor-pointer"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <UploadCloud className="w-4 h-4 text-blue-600" />
+                    Anexar Foto
                   </button>
                 )}
               </div>
@@ -550,12 +573,81 @@ export default function UserProfileSettingsClient({
                 </div>
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => {
+                    if (profile.avatarUrl) {
+                      setAvatarMenuOpen(!avatarMenuOpen)
+                    } else {
+                      fileInputRef.current?.click()
+                    }
+                  }}
                   className="absolute inset-0 bg-slate-900/50 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-md"
-                  title="Alterar foto de perfil"
+                  title={profile.avatarUrl ? 'Opções da foto de perfil' : 'Adicionar foto de perfil'}
                 >
                   <Camera className="w-5 h-5" />
                 </button>
+
+                {/* Dropdown Menu de opções quando a foto já existe */}
+                {avatarMenuOpen && profile.avatarUrl && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setAvatarMenuOpen(false)} />
+                    <div className="absolute top-full left-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-slate-200/80 p-1.5 z-50 animate-in fade-in-0 zoom-in-95">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAvatarMenuOpen(false)
+                          setCropperRawImage(profile.avatarUrl)
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-blue-600 hover:bg-blue-50/70 rounded-xl transition-colors text-left cursor-pointer"
+                      >
+                        <Crop className="w-4 h-4 text-blue-500" />
+                        Ajustar Enquadramento
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAvatarMenuOpen(false)
+                          fileInputRef.current?.click()
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-blue-600 hover:bg-blue-50/70 rounded-xl transition-colors text-left cursor-pointer"
+                      >
+                        <UploadCloud className="w-4 h-4 text-slate-500" />
+                        Carregar Nova Foto
+                      </button>
+                      <div className="my-1 border-t border-slate-100" />
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setAvatarMenuOpen(false)
+                          const confirmed = await confirm({
+                            title: 'Remover foto de perfil',
+                            message: 'Tem certeza que deseja remover sua foto de perfil?',
+                            confirmText: 'Sim, remover',
+                            cancelText: 'Cancelar',
+                            variant: 'danger',
+                          })
+                          if (confirmed) {
+                            setProfile((prev) => ({ ...prev, avatarUrl: null }))
+                            setFormData((prev) => ({ ...prev, avatarUrl: '' }))
+                            const res = await updateUserAvatarAction('')
+                            if (res.success) {
+                              showToast('Foto de perfil removida com sucesso.')
+                            } else {
+                              showAlert({
+                                title: 'Erro',
+                                message: res.error || 'Não foi possível remover a foto de perfil.',
+                                variant: 'error',
+                              })
+                            }
+                          }
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-xl transition-colors text-left cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4 text-rose-500" />
+                        Remover Foto
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
               <div>
                 <h3 className="text-xl font-bold text-slate-900">{profile.fullName}</h3>
