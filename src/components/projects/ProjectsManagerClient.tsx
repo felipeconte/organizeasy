@@ -29,14 +29,27 @@ import {
   Loader2,
   Check,
   Copy,
-  Lock
+  Lock,
+  Sparkles,
+  AlertCircle,
 } from 'lucide-react'
 import { updateProjectAction, deleteProjectAction } from '@/lib/actions/projects'
 import { ClientData } from '@/lib/actions/clients'
 import ClientMultiSelect from '@/components/projects/ClientMultiSelect'
 import TypologySelect from '@/components/projects/TypologySelect'
 import { useAlert } from '@/components/ui/ConfirmDialog'
-import { formatProjectClientDisplay, formatAreaOnlyNumbers, formatNumberBRL } from '@/lib/formatters-and-validators'
+import {
+  formatProjectClientDisplay,
+  formatAreaOnlyNumbers,
+  formatNumberBRL,
+  maskCEP,
+} from '@/lib/formatters-and-validators'
+import {
+  lookupCepAction,
+  searchAddressByTextAction,
+  geocodeAddressAction,
+  AddressSearchResult,
+} from '@/lib/actions/cep'
 import { usePermissions } from '@/contexts/PermissionsContext'
 import { ProfilePermissions } from '@/types/profiles'
 
@@ -176,7 +189,9 @@ export default function ProjectsManagerClient({
   // Endereço e Localização
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearchingAddress, setIsSearchingAddress] = useState(false)
-  const [addressSuggestions, setAddressSuggestions] = useState<NominatimPlace[]>([])
+  const [isSearchingCep, setIsSearchingCep] = useState(false)
+  const [addressSuccessMessage, setAddressSuccessMessage] = useState<string | null>(null)
+  const [addressSuggestions, setAddressSuggestions] = useState<AddressSearchResult[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [addressRoad, setAddressRoad] = useState('')
   const [addressNumber, setAddressNumber] = useState('')
@@ -188,6 +203,12 @@ export default function ProjectsManagerClient({
   const [lat, setLat] = useState<number | null>(null)
   const [lng, setLng] = useState<number | null>(null)
 
+  const [numberWarning, setNumberWarning] = useState<string | null>(null)
+  const [isGeocodingNumber, setIsGeocodingNumber] = useState(false)
+  const numberTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  const isSelectingAddressRef = useRef(false)
+  const numberInputRef = useRef<HTMLInputElement>(null)
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const searchContainerRef = useRef<HTMLDivElement>(null)
 
@@ -254,11 +275,14 @@ export default function ProjectsManagerClient({
     setLng(newLng)
   }
 
+  // Busca de Endereço Escrito via Server Action
   const handleAddressSearchChange = (query: string) => {
+    isSelectingAddressRef.current = false
     setSearchQuery(query)
+    setAddressSuccessMessage(null)
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
 
-    if (!query || query.trim().length < 3) {
+    if (query.trim().length < 3) {
       setAddressSuggestions([])
       setShowSuggestions(false)
       setIsSearchingAddress(false)
@@ -268,37 +292,204 @@ export default function ProjectsManagerClient({
     setIsSearchingAddress(true)
     searchTimeoutRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/address/search?q=${encodeURIComponent(query.trim())}`)
-        if (res.ok) {
-          const data = await res.json()
-          setAddressSuggestions(data || [])
-          setShowSuggestions(data && data.length > 0)
+        const res = await searchAddressByTextAction(query.trim())
+        if (res.success && res.results) {
+          setAddressSuggestions(res.results)
+          setShowSuggestions(res.results.length > 0)
+        } else {
+          setAddressSuggestions([])
         }
       } catch (err) {
         console.error('Erro ao buscar endereço:', err)
+        setAddressSuggestions([])
       } finally {
         setIsSearchingAddress(false)
       }
-    }, 400)
+    }, 350)
   }
 
-  const handleSelectSuggestion = (place: NominatimPlace) => {
-    const road = place.address?.road || place.address?.pedestrian || place.address?.street || ''
-    const number = place.address?.house_number || ''
-    const neighborhood = place.address?.suburb || place.address?.neighbourhood || place.address?.quarter || ''
-    const cityVal = place.address?.city || place.address?.town || place.address?.municipality || place.address?.village || ''
-    const stateVal = place.address?.state || ''
-    const postalCodeVal = place.address?.postcode || ''
-
-    setAddressRoad(road || place.display_name.split(',')[0])
-    setAddressNumber(number)
-    setAddressNeighborhood(neighborhood)
-    setAddressCity(cityVal)
-    setAddressState(stateVal)
-    setAddressPostalCode(postalCodeVal)
-    setLat(parseFloat(place.lat))
-    setLng(parseFloat(place.lon))
+  // Seleção de Endereço sugerido no dropdown
+  const handleSelectSuggestion = (place: AddressSearchResult) => {
+    isSelectingAddressRef.current = true
+    setIsSearchingAddress(false)
     setShowSuggestions(false)
+    setAddressSuggestions([])
+
+    setSearchQuery(place.label)
+    if (place.street) setAddressRoad(place.street)
+    if (place.number) setAddressNumber(place.number)
+    if (place.neighborhood) setAddressNeighborhood(place.neighborhood)
+    if (place.city) setAddressCity(place.city)
+    if (place.state) setAddressState(place.state.toUpperCase())
+    if (place.zipCode) setAddressPostalCode(maskCEP(place.zipCode))
+
+    if (place.lat && place.lng) {
+      setLat(place.lat)
+      setLng(place.lng)
+    }
+
+    setNumberWarning(null)
+    setAddressSuccessMessage('Endereço preenchido com sucesso!')
+    setTimeout(() => setAddressSuccessMessage(null), 4000)
+
+    if (!place.number) {
+      setTimeout(() => {
+        numberInputRef.current?.focus()
+      }, 100)
+    }
+  }
+
+  // Handle mudança no logradouro
+  const handleRoadChange = (val: string) => {
+    setAddressRoad(val)
+
+    if (val.trim() && addressNumber.trim()) {
+      setNumberWarning(null)
+      if (numberTimeoutRef.current) clearTimeout(numberTimeoutRef.current)
+      numberTimeoutRef.current = setTimeout(async () => {
+        setIsGeocodingNumber(true)
+        try {
+          const res = await geocodeAddressAction({
+            street: val.trim(),
+            number: addressNumber.trim(),
+            neighborhood: addressNeighborhood,
+            city: addressCity,
+            state: addressState,
+          })
+          if (res.success && res.lat && res.lng) {
+            setLat(res.lat)
+            setLng(res.lng)
+            setAddressSuccessMessage(`Pin atualizado para o nº ${addressNumber.trim()}!`)
+            setTimeout(() => setAddressSuccessMessage(null), 3500)
+          }
+        } catch (err) {
+          console.warn('Erro ao atualizar pin para o número:', err)
+        } finally {
+          setIsGeocodingNumber(false)
+        }
+      }, 500)
+    } else if (!val.trim() && addressNumber.trim()) {
+      setNumberWarning('Preencha o logradouro para localizar o endereço completo e posicionar o pin no mapa.')
+    } else {
+      setNumberWarning(null)
+    }
+  }
+
+  // Handle mudança no número do endereço
+  const handleNumberChange = (val: string) => {
+    setAddressNumber(val)
+    if (numberTimeoutRef.current) clearTimeout(numberTimeoutRef.current)
+
+    const trimmedNumber = val.trim()
+
+    // Se o número foi apagado, limpa aviso
+    if (!trimmedNumber) {
+      setNumberWarning(null)
+      return
+    }
+
+    // Se preencheu só o número e não o endereço (logradouro vazio)
+    if (!addressRoad || !addressRoad.trim()) {
+      setNumberWarning('Preencha o logradouro para localizar o endereço completo e posicionar o pin no mapa.')
+      // NÃO mexe o pin até que complete
+      return
+    }
+
+    setNumberWarning(null)
+
+    // Debounce de 500ms para atualizar o pin no mapa com o endereço + número
+    numberTimeoutRef.current = setTimeout(async () => {
+      setIsGeocodingNumber(true)
+      try {
+        const res = await geocodeAddressAction({
+          street: addressRoad.trim(),
+          number: trimmedNumber,
+          neighborhood: addressNeighborhood,
+          city: addressCity,
+          state: addressState,
+        })
+        if (res.success && res.lat && res.lng) {
+          setLat(res.lat)
+          setLng(res.lng)
+          setAddressSuccessMessage(`Pin atualizado para o nº ${trimmedNumber}!`)
+          setTimeout(() => setAddressSuccessMessage(null), 3500)
+        }
+      } catch (err) {
+        console.warn('Erro ao atualizar pin para o número:', err)
+      } finally {
+        setIsGeocodingNumber(false)
+      }
+    }, 500)
+  }
+
+  // Busca automática por CEP
+  const triggerCepLookup = async (cepValue: string) => {
+    const rawDigits = cepValue.replace(/\D/g, '')
+    if (rawDigits.length !== 8) {
+      return
+    }
+
+    setIsSearchingCep(true)
+    setAddressSuccessMessage(null)
+    setNumberWarning(null)
+
+    const res = await lookupCepAction(rawDigits)
+    setIsSearchingCep(false)
+
+    if (res.success && res.data) {
+      // Limpa a busca escrita e o número ao buscar por CEP
+      isSelectingAddressRef.current = false
+      setSearchQuery('')
+      setAddressSuggestions([])
+      setShowSuggestions(false)
+      setIsSearchingAddress(false)
+      setAddressNumber('')
+      setNumberWarning(null)
+
+      if (res.data.street) setAddressRoad(res.data.street)
+      if (res.data.neighborhood) setAddressNeighborhood(res.data.neighborhood)
+      if (res.data.city) setAddressCity(res.data.city)
+      if (res.data.state) setAddressState(res.data.state.toUpperCase())
+
+      setAddressSuccessMessage('Endereço preenchido com sucesso!')
+      setTimeout(() => setAddressSuccessMessage(null), 4000)
+
+      setTimeout(() => {
+        numberInputRef.current?.focus()
+      }, 100)
+
+      // Tenta geocodificar o endereço encontrado para atualizar coordenadas no mapa
+      try {
+        const queryText = `${res.data.street}, ${res.data.city} - ${res.data.state}, Brasil`
+        const geoRes = await fetch(`/api/geocode?q=${encodeURIComponent(queryText)}`)
+        if (geoRes.ok) {
+          const geoData = await geoRes.json()
+          if (Array.isArray(geoData) && geoData.length > 0) {
+            const pLat = parseFloat(geoData[0].lat)
+            const pLng = parseFloat(geoData[0].lon)
+            if (!isNaN(pLat) && !isNaN(pLng)) {
+              setLat(pLat)
+              setLng(pLng)
+            }
+          }
+        }
+      } catch (geoErr) {
+        console.warn('Geocoding CEP falhou:', geoErr)
+      }
+    }
+  }
+
+  // Handle CEP input com máscara e busca automática em 8 dígitos
+  const handleCepChange = (val: string) => {
+    const masked = maskCEP(val)
+    setAddressPostalCode(masked)
+
+    const rawDigits = masked.replace(/\D/g, '')
+    if (rawDigits.length === 8) {
+      triggerCepLookup(rawDigits)
+    } else {
+      setAddressSuccessMessage(null)
+    }
   }
 
   // Filtered Projects
@@ -341,6 +532,11 @@ export default function ProjectsManagerClient({
     setSearchQuery('')
     setAddressSuggestions([])
     setShowSuggestions(false)
+    setIsSearchingAddress(false)
+    setIsSearchingCep(false)
+    setAddressSuccessMessage(null)
+    setNumberWarning(null)
+    isSelectingAddressRef.current = false
 
     // Parse coordinates and address parts
     let rawAddress = p.address || ''
@@ -985,7 +1181,7 @@ export default function ProjectsManagerClient({
               {/* Section 3: Cronograma & Localização */}
               <div className="space-y-4 pt-4 border-t border-slate-100">
                 <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-slate-100">
-                  <Calendar className="w-4 h-4 text-blue-600" /> Cronograma & Localização do Projeto
+                  <Calendar className="w-4 h-4 text-blue-600" /> Cronograma Estimado
                 </h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1014,86 +1210,202 @@ export default function ProjectsManagerClient({
                   </div>
                 </div>
 
-                {/* Busca Global de Endereço */}
+                {/* Busca por Endereço Escrito com Autocomplete */}
                 <div className="space-y-3">
+                  {numberWarning && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium rounded-xl flex items-start gap-2.5 animate-in fade-in">
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="font-semibold block text-amber-950">Atenção ao endereço</strong>
+                        <p className="text-[11px] text-amber-800 mt-0.5">{numberWarning}</p>
+                      </div>
+                    </div>
+                  )}
+                  {addressSuccessMessage && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold rounded-xl flex items-center gap-2 animate-in fade-in">
+                      <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{addressSuccessMessage}</span>
+                    </div>
+                  )}
+
                   <div ref={searchContainerRef} className="relative">
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                      Buscar Endereço
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Search className="w-3.5 h-3.5 text-blue-600" />
+                        Buscar por Endereço
+                      </span>
                     </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                        {isSearchingAddress ? (
-                          <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                        ) : (
-                          <Search className="w-4 h-4" />
-                        )}
+                    <div className="relative flex items-center">
+                      <div className="absolute left-3.5 text-slate-400 pointer-events-none flex items-center">
+                        <Search className="w-4 h-4" />
                       </div>
                       <input
                         type="text"
                         value={searchQuery}
                         onChange={(e) => handleAddressSearchChange(e.target.value)}
                         onFocus={() => {
-                          if (addressSuggestions.length > 0) setShowSuggestions(true)
+                          if (!isSelectingAddressRef.current && addressSuggestions.length > 0) {
+                            setShowSuggestions(true)
+                          }
                         }}
-                        placeholder="Digite rua, avenida, condomínio ou cidade para autocompletar..."
-                        className="block w-full pl-9 pr-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                        placeholder="Ex: Av. Paulista, 1000, Bela Vista, São Paulo..."
+                        className="block w-full pl-10 pr-10 py-2.5 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
                       />
+                      <div className="absolute right-3 flex items-center gap-1">
+                        {isSearchingAddress && (
+                          <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                        )}
+                        {searchQuery && !isSearchingAddress && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              isSelectingAddressRef.current = false
+                              setSearchQuery('')
+                              setAddressSuggestions([])
+                              setShowSuggestions(false)
+                              setIsSearchingAddress(false)
+                              setAddressSuccessMessage(null)
+                            }}
+                            className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer transition-colors"
+                            title="Limpar busca"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    {showSuggestions && addressSuggestions.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl border border-slate-200 shadow-lg z-30 max-h-60 overflow-y-auto">
-                        {addressSuggestions.map((place) => (
-                          <button
-                            key={place.place_id}
-                            type="button"
-                            onClick={() => handleSelectSuggestion(place)}
-                            className="w-full text-left px-3.5 py-2.5 hover:bg-slate-50 border-b border-slate-100 last:border-0 flex items-start gap-2.5 transition-colors cursor-pointer"
-                          >
-                            <MapPin className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                            <div className="truncate">
-                              <span className="text-sm font-semibold text-slate-800 block truncate">
-                                {place.display_name}
-                              </span>
-                              <span className="text-xs text-slate-400 block">
-                                Lat: {parseFloat(place.lat).toFixed(4)}, Long: {parseFloat(place.lon).toFixed(4)}
-                              </span>
+                    {showSuggestions && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl border border-slate-200 shadow-xl z-30 max-h-60 overflow-y-auto divide-y divide-slate-100">
+                        {isSearchingAddress ? (
+                          <div className="p-3.5 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+                            <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                            Buscando sugestões de endereços...
+                          </div>
+                        ) : addressSuggestions.length > 0 ? (
+                          <>
+                            <div className="px-3.5 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/70">
+                              Sugestões Encontradas ({addressSuggestions.length})
                             </div>
-                          </button>
-                        ))}
+                            {addressSuggestions.map((place) => (
+                              <button
+                                key={place.id}
+                                type="button"
+                                onClick={() => handleSelectSuggestion(place)}
+                                className="w-full text-left px-3.5 py-2.5 hover:bg-blue-50/60 transition-colors flex items-start gap-2.5 group cursor-pointer"
+                              >
+                                <div className="mt-0.5 p-1 rounded-lg bg-slate-100 group-hover:bg-blue-100 text-slate-500 group-hover:text-blue-600 shrink-0 transition-colors">
+                                  <MapPin className="w-3.5 h-3.5" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-semibold text-slate-800 group-hover:text-blue-900 truncate">
+                                    {place.street ? `${place.street}${place.number ? ', ' + place.number : ''}` : place.label}
+                                  </p>
+                                  <p className="text-[11px] text-slate-500 truncate">
+                                    {[
+                                      place.neighborhood ? `Bairro ${place.neighborhood}` : '',
+                                      place.city && place.state ? `${place.city} - ${place.state}` : place.city || place.state,
+                                      place.zipCode ? `CEP: ${place.zipCode}` : '',
+                                    ]
+                                      .filter(Boolean)
+                                      .join(' • ')}
+                                  </p>
+                                </div>
+                              </button>
+                            ))}
+                          </>
+                        ) : searchQuery.trim().length >= 3 ? (
+                          <div className="p-4 text-center">
+                            <p className="text-xs text-slate-600 font-medium">
+                              Nenhum endereço encontrado para &ldquo;{searchQuery}&rdquo;.
+                            </p>
+                            <p className="text-[11px] text-slate-400 mt-1">
+                              Você pode tentar outro termo ou preencher os campos abaixo diretamente.
+                            </p>
+                          </div>
+                        ) : null}
                       </div>
                     )}
                   </div>
 
-                  {/* Campos de Logradouro, Número e Complemento separados */}
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                    <div className="sm:col-span-2">
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                        Logradouro
+                  {/* Linha 1: CEP (lado esquerdo) e Logradouro (lado direito) */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div className="md:col-span-1">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                        <span>CEP</span>
+                      </label>
+                      <div className="relative flex items-center">
+                        <input
+                          type="text"
+                          value={addressPostalCode}
+                          onChange={(e) => handleCepChange(e.target.value)}
+                          placeholder="00000-000"
+                          maxLength={9}
+                          className="block w-full px-3.5 py-2.5 pr-9 bg-slate-50/50 border border-slate-200 rounded-xl text-sm font-mono text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                        />
+                        <div className="absolute right-2.5 flex items-center">
+                          {isSearchingCep ? (
+                            <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => triggerCepLookup(addressPostalCode)}
+                              title="Buscar endereço por este CEP"
+                              className="text-slate-400 hover:text-blue-600 p-0.5 cursor-pointer transition-colors"
+                            >
+                              <Search className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-3">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Logradouro / Rua / Avenida
                       </label>
                       <input
                         type="text"
                         value={addressRoad}
-                        onChange={(e) => setAddressRoad(e.target.value)}
-                        placeholder="Rua Oscar Freire"
+                        onChange={(e) => handleRoadChange(e.target.value)}
+                        placeholder="Ex: Av. Paulista, Rua Oscar Freire..."
                         className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
                       />
                     </div>
+                  </div>
 
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                        Número
+                  {/* Linha 2: Número, Complemento e Bairro */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div className="md:col-span-1">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                        <span>Número</span>
+                        {isGeocodingNumber && (
+                          <span className="text-[10px] text-blue-600 font-normal lowercase flex items-center gap-1">
+                            <Loader2 className="w-3 h-3 animate-spin" /> buscando...
+                          </span>
+                        )}
                       </label>
                       <input
+                        ref={numberInputRef}
                         type="text"
                         value={addressNumber}
-                        onChange={(e) => setAddressNumber(e.target.value)}
-                        placeholder="1000"
-                        className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                        onChange={(e) => handleNumberChange(e.target.value)}
+                        placeholder="1000 ou S/N"
+                        className={`block w-full px-3.5 py-2.5 bg-slate-50/50 border rounded-xl text-sm font-mono text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 transition-colors ${numberWarning
+                          ? 'border-amber-400 focus:ring-amber-500/20 focus:border-amber-500'
+                          : 'border-slate-200 focus:ring-blue-500/20 focus:border-blue-600'
+                          }`}
                       />
+                      {numberWarning && (
+                        <p className="text-[11px] text-amber-600 font-medium flex items-center gap-1 mt-1 animate-in fade-in">
+                          <AlertCircle className="w-3 h-3 shrink-0" />
+                          <span>Preencha o logradouro</span>
+                        </p>
+                      )}
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    <div className="md:col-span-1">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                         Complemento <span className="text-slate-400 font-normal lowercase">(opcional)</span>
                       </label>
                       <input
@@ -1104,25 +1416,25 @@ export default function ProjectsManagerClient({
                         className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
                       />
                     </div>
-                  </div>
 
-                  {/* Campos de Bairro, Cidade, Estado e CEP separados */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                         Bairro
                       </label>
                       <input
                         type="text"
                         value={addressNeighborhood}
                         onChange={(e) => setAddressNeighborhood(e.target.value)}
-                        placeholder="Bela Vista ou Jardins"
+                        placeholder="Bela Vista"
                         className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
                       />
                     </div>
+                  </div>
 
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  {/* Linha 3: Cidade e Estado / UF */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div className="md:col-span-3">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                         Cidade
                       </label>
                       <input
@@ -1134,8 +1446,8 @@ export default function ProjectsManagerClient({
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    <div className="md:col-span-1">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                         Estado / UF
                       </label>
                       <input
@@ -1143,20 +1455,8 @@ export default function ProjectsManagerClient({
                         value={addressState}
                         onChange={(e) => setAddressState(e.target.value)}
                         placeholder="SP"
-                        className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                        CEP
-                      </label>
-                      <input
-                        type="text"
-                        value={addressPostalCode}
-                        onChange={(e) => setAddressPostalCode(e.target.value)}
-                        placeholder="01310-100"
-                        className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                        maxLength={2}
+                        className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm uppercase text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
                       />
                     </div>
                   </div>

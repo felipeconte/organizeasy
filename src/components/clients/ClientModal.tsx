@@ -30,7 +30,11 @@ import {
   validatePhone,
   ESTADOS_BRASIL,
 } from '@/lib/formatters-and-validators'
-import { lookupCepAction } from '@/lib/actions/cep'
+import {
+  lookupCepAction,
+  searchAddressByTextAction,
+  AddressSearchResult,
+} from '@/lib/actions/cep'
 import { useAlert } from '@/components/ui/ConfirmDialog'
 
 export interface ClientModalProps {
@@ -98,6 +102,15 @@ export default function ClientModal({
   const [notes, setNotes] = useState('')
   const [status, setStatus] = useState<'ativo' | 'inativo'>('ativo')
 
+  // Address Text Search State
+  const [addressSearchText, setAddressSearchText] = useState('')
+  const [addressSearchResults, setAddressSearchResults] = useState<AddressSearchResult[]>([])
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false)
+  const [showAddressDropdown, setShowAddressDropdown] = useState(false)
+  const [addressSearchSuccess, setAddressSearchSuccess] = useState<string | null>(null)
+  const addressDropdownRef = useRef<HTMLDivElement>(null)
+  const isSelectingAddressRef = useRef(false)
+
   // Validation and Loading State
   const [isSearchingCep, setIsSearchingCep] = useState(false)
   const [cepSuccessMessage, setCepSuccessMessage] = useState<string | null>(null)
@@ -144,9 +157,106 @@ export default function ClientModal({
       setNotes('')
       setStatus('ativo')
     }
+    isSelectingAddressRef.current = false
+    setAddressSearchText('')
+    setAddressSearchResults([])
+    setIsSearchingAddress(false)
+    setShowAddressDropdown(false)
+    setAddressSearchSuccess(null)
     setCepSuccessMessage(null)
     setErrors({})
   }, [clientToEdit, isOpen])
+
+  // Debounce automático para busca de endereço escrito
+  useEffect(() => {
+    // Se acabamos de selecionar um endereço, não refazemos a busca
+    if (isSelectingAddressRef.current) {
+      isSelectingAddressRef.current = false
+      setIsSearchingAddress(false)
+      return
+    }
+
+    const trimmed = addressSearchText.trim()
+    if (trimmed.length < 3) {
+      setAddressSearchResults([])
+      setShowAddressDropdown(false)
+      setIsSearchingAddress(false)
+      return
+    }
+
+    setIsSearchingAddress(true)
+    const timer = setTimeout(async () => {
+      try {
+        const res = await searchAddressByTextAction(trimmed)
+        if (res.success && res.results) {
+          setAddressSearchResults(res.results)
+          setShowAddressDropdown(true)
+        } else {
+          setAddressSearchResults([])
+        }
+      } catch (err) {
+        console.error('Erro na busca por endereço:', err)
+        setAddressSearchResults([])
+      } finally {
+        setIsSearchingAddress(false)
+      }
+    }, 350)
+
+    return () => clearTimeout(timer)
+  }, [addressSearchText])
+
+  // Fechar dropdown de sugestões de endereço ao clicar fora
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        addressDropdownRef.current &&
+        !addressDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowAddressDropdown(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
+
+  // Selecionar endereço encontrado e preencher os campos automaticamente
+  const handleSelectAddress = (item: AddressSearchResult) => {
+    // Sinaliza que foi uma seleção manual do usuário para não disparar nova busca
+    isSelectingAddressRef.current = true
+    setIsSearchingAddress(false)
+    setShowAddressDropdown(false)
+    setAddressSearchResults([])
+
+    if (item.street) setStreet(item.street)
+    if (item.number) setNumber(item.number)
+    if (item.neighborhood) setNeighborhood(item.neighborhood)
+    if (item.city) setCity(item.city)
+    if (item.state) setState(item.state.toUpperCase())
+
+    // Sobrescrever CEP pelo novo retornado pela busca
+    if (item.zipCode) {
+      setZipCode(maskCEP(item.zipCode))
+      setErrors((prev) => {
+        const next = { ...prev }
+        delete next.zipCode
+        return next
+      })
+    }
+
+    setAddressSearchText(item.label)
+    setAddressSearchSuccess('Endereço preenchido com sucesso!')
+    setTimeout(() => setAddressSearchSuccess(null), 4000)
+
+    // Se o número não veio preenchido, focar automaticamente no campo de número
+    if (!item.number) {
+      setTimeout(() => {
+        numberInputRef.current?.focus()
+      }, 100)
+    }
+  }
 
   if (!isOpen) return null
 
@@ -244,6 +354,15 @@ export default function ClientModal({
     setIsSearchingCep(false)
 
     if (res.success && res.data) {
+      // Limpa a busca escrita e o número ao buscar por CEP
+      isSelectingAddressRef.current = false
+      setAddressSearchText('')
+      setAddressSearchResults([])
+      setShowAddressDropdown(false)
+      setIsSearchingAddress(false)
+      setAddressSearchSuccess(null)
+      setNumber('')
+
       if (res.data.street) setStreet(res.data.street)
       if (res.data.neighborhood) setNeighborhood(res.data.neighborhood)
       if (res.data.city) setCity(res.data.city)
@@ -395,7 +514,7 @@ export default function ClientModal({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 antialiased animate-in fade-in duration-200">
-      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden flex flex-col max-h-[92vh]">
         {/* Modal Header */}
         <div className="p-5 sm:px-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/70 shrink-0">
           <div className="flex items-center gap-2.5">
@@ -578,20 +697,139 @@ export default function ClientModal({
           </div>
 
           {/* Endereço & CEP com Busca Automática e Campos Separados */}
-          <div className="space-y-3.5 pt-3 border-t border-slate-100">
+          <div className="space-y-4 pt-3 border-t border-slate-100">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block flex items-center gap-1.5">
                 <MapPin className="w-4 h-4 text-blue-600" /> Localização & Endereço
               </span>
-              {isSearchingCep && (
-                <span className="text-xs font-semibold text-blue-600 flex items-center gap-1 animate-pulse">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Buscando dados do CEP...
+              <div className="flex items-center gap-2">
+                {isSearchingCep && (
+                  <span className="text-xs font-semibold text-blue-600 flex items-center gap-1 animate-pulse">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Buscando dados do CEP...
+                  </span>
+                )}
+                {isSearchingAddress && (
+                  <span className="text-xs font-semibold text-blue-600 flex items-center gap-1 animate-pulse">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Buscando endereço...
+                  </span>
+                )}
+                {(cepSuccessMessage || addressSearchSuccess) && !isSearchingCep && !isSearchingAddress && (
+                  <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 animate-in fade-in duration-200">
+                    <Check className="w-4 h-4" /> {addressSearchSuccess || cepSuccessMessage}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Campo de Busca por Endereço Escrito com Autocomplete */}
+            <div className="relative" ref={addressDropdownRef}>
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Search className="w-3.5 h-3.5 text-blue-600" />
+                  Buscar por Endereço
                 </span>
-              )}
-              {cepSuccessMessage && !isSearchingCep && (
-                <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 animate-in fade-in duration-200">
-                  <Check className="w-4 h-4" /> {cepSuccessMessage}
+                <span className="text-xs text-slate-400 font-normal normal-case">
+                  Digite rua, avenida, praça ou bairro
                 </span>
+              </label>
+
+              <div className="relative flex items-center">
+                <div className="absolute left-3.5 text-slate-400 pointer-events-none flex items-center">
+                  <Search className="w-4 h-4" />
+                </div>
+
+                <input
+                  type="text"
+                  value={addressSearchText}
+                  onChange={(e) => {
+                    isSelectingAddressRef.current = false
+                    setAddressSearchText(e.target.value)
+                    setAddressSearchSuccess(null)
+                  }}
+                  onFocus={() => {
+                    if (!isSelectingAddressRef.current && addressSearchResults.length > 0) {
+                      setShowAddressDropdown(true)
+                    }
+                  }}
+                  placeholder="Ex: Av. Paulista, 1000, Bela Vista, São Paulo..."
+                  className="w-full text-sm font-medium border border-slate-200 rounded-xl py-3 pl-10 pr-10 bg-slate-50/50 hover:bg-white focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-hidden transition-all text-slate-900 placeholder:text-slate-400"
+                />
+
+                <div className="absolute right-3 flex items-center gap-1">
+                  {isSearchingAddress && (
+                    <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                  )}
+                  {addressSearchText && !isSearchingAddress && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        isSelectingAddressRef.current = false
+                        setAddressSearchText('')
+                        setAddressSearchResults([])
+                        setShowAddressDropdown(false)
+                        setIsSearchingAddress(false)
+                        setAddressSearchSuccess(null)
+                      }}
+                      className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer transition-colors"
+                      title="Limpar busca"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Dropdown com os Resultados da Busca */}
+              {showAddressDropdown && (
+                <div className="absolute z-20 top-full left-0 right-0 mt-1.5 bg-white rounded-2xl shadow-xl border border-slate-200/80 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                  {isSearchingAddress ? (
+                    <div className="p-4 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                      Buscando sugestões de endereços...
+                    </div>
+                  ) : addressSearchResults.length > 0 ? (
+                    <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 py-1">
+                      <div className="px-3.5 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/70">
+                        Sugestões Encontradas ({addressSearchResults.length})
+                      </div>
+                      {addressSearchResults.map((res) => (
+                        <button
+                          key={res.id}
+                          type="button"
+                          onClick={() => handleSelectAddress(res)}
+                          className="w-full text-left px-3.5 py-2.5 hover:bg-blue-50/60 transition-colors flex items-start gap-2.5 group cursor-pointer"
+                        >
+                          <div className="mt-0.5 p-1 rounded-lg bg-slate-100 group-hover:bg-blue-100 text-slate-500 group-hover:text-blue-600 shrink-0 transition-colors">
+                            <MapPin className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold text-slate-800 group-hover:text-blue-900 truncate">
+                              {res.street ? `${res.street}${res.number ? ', ' + res.number : ''}` : res.label}
+                            </p>
+                            <p className="text-[11px] text-slate-500 truncate">
+                              {[
+                                res.neighborhood ? `Bairro ${res.neighborhood}` : '',
+                                res.city && res.state ? `${res.city} - ${res.state}` : res.city || res.state,
+                                res.zipCode ? `CEP: ${res.zipCode}` : '',
+                              ]
+                                .filter(Boolean)
+                                .join(' • ')}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : addressSearchText.trim().length >= 3 ? (
+                    <div className="p-4 text-center">
+                      <p className="text-xs text-slate-600 font-medium">
+                        Nenhum endereço encontrado para &ldquo;{addressSearchText}&rdquo;.
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        Você pode tentar outro termo ou preencher os campos abaixo diretamente.
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
               )}
             </div>
 
@@ -600,7 +838,6 @@ export default function ClientModal({
               <div className="sm:col-span-1">
                 <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
                   <span>CEP</span>
-                  <span className="text-xs text-blue-600 font-semibold lowercase">busca automática</span>
                 </label>
                 <div className="relative flex items-center">
                   <input
