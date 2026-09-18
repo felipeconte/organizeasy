@@ -39,6 +39,7 @@ import {
 } from '@/lib/actions/financial'
 import { generateRecurrenceDates } from '@/lib/financial-recurrence'
 import { usePermissions } from '@/contexts/PermissionsContext'
+import FinancialCategorySelect from '@/components/financial/FinancialCategorySelect'
 
 interface ProjectOption {
   id: string
@@ -182,7 +183,7 @@ export default function TransactionModal({
         setDescription('')
         setAmount('')
         const defaultCats = FINANCIAL_CATEGORIES.filter((c) => c.type === defaultType)
-        setCategory(defaultCats[0]?.id || '')
+        setCategory(defaultCats[0]?.label || defaultCats[0]?.id || '')
         setProjectId(defaultProjectId || '')
         setCompanyId('')
         const today = new Date().toISOString().split('T')[0]
@@ -209,8 +210,8 @@ export default function TransactionModal({
   const handleTypeChange = (newType: TransactionType) => {
     setType(newType)
     const available = FINANCIAL_CATEGORIES.filter((c) => c.type === newType)
-    if (!available.some((c) => c.id === category)) {
-      setCategory(available[0]?.id || '')
+    if (!available.some((c) => c.id === category || c.label.toLowerCase() === category.toLowerCase())) {
+      setCategory(available[0]?.label || available[0]?.id || '')
     }
   }
 
@@ -537,17 +538,12 @@ export default function TransactionModal({
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block min-h-[20px] flex items-center justify-between">
                 <span>Categoria *</span>
               </label>
-              <select
+              <FinancialCategorySelect
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full h-11 px-3.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white text-slate-800 font-medium text-sm cursor-pointer transition-all"
-              >
-                {availableCategories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
+                onChange={setCategory}
+                type={type}
+                organizationId={organizationId}
+              />
             </div>
 
             <div className="space-y-1.5">

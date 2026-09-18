@@ -413,6 +413,44 @@ export type Database = {
           },
         ]
       }
+      financial_categories: {
+        Row: {
+          color: string | null
+          created_at: string
+          id: string
+          name: string
+          organization_id: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          organization_id: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          organization_id?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financial_categories_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       financial_transactions: {
         Row: {
           amount: number

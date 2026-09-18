@@ -28,6 +28,7 @@ import {
   updateRecurringExpenseAction,
   deleteRecurringExpenseAction
 } from '@/lib/actions/financial'
+import FinancialCategorySelect from '@/components/financial/FinancialCategorySelect'
 
 interface ProjectOption {
   id: string
@@ -113,7 +114,7 @@ export default function RecurringExpenseModal({
         setType(defaultType)
         setTitle('')
         const availableCats = FINANCIAL_CATEGORIES.filter((c) => c.type === defaultType)
-        setCategory(availableCats[0]?.id || (defaultType === 'income' ? 'fee_acompanhamento' : 'aluguel_condominio'))
+        setCategory(availableCats[0]?.label || availableCats[0]?.id || (defaultType === 'income' ? 'Fee Mensal de Acompanhamento / Gestão' : 'Aluguel e Condomínio do Escritório'))
         setAmount('')
         setFrequency('monthly')
         setDueDay('5')
@@ -132,8 +133,8 @@ export default function RecurringExpenseModal({
   const handleTypeChange = (newType: TransactionType) => {
     setType(newType)
     const available = FINANCIAL_CATEGORIES.filter((c) => c.type === newType)
-    if (!available.some((c) => c.id === category)) {
-      setCategory(available[0]?.id || '')
+    if (!available.some((c) => c.id === category || c.label.toLowerCase() === category.toLowerCase())) {
+      setCategory(available[0]?.label || available[0]?.id || '')
     }
     if (newType === 'income' && paymentMethod === 'Boleto') {
       setPaymentMethod('PIX')
@@ -353,17 +354,12 @@ export default function RecurringExpenseModal({
           {/* Category */}
           <div className="space-y-1.5">
             <label className="font-bold text-slate-700">Categoria *</label>
-            <select
+            <FinancialCategorySelect
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white text-slate-800 font-medium"
-            >
-              {availableCategories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+              onChange={setCategory}
+              type={type}
+              organizationId={organizationId}
+            />
           </div>
 
           {/* Amount, Frequency & Due Day Grid */}

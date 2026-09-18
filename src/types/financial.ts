@@ -36,6 +36,16 @@ export interface FinancialCategoryOption {
   color?: string
 }
 
+export interface FinancialCategoryItem {
+  id?: string
+  name: string
+  type: TransactionType
+  group?: 'projeto' | 'escritorio' | 'geral'
+  color?: string
+  is_custom?: boolean
+  transaction_count?: number
+}
+
 export const FINANCIAL_CATEGORIES: FinancialCategoryOption[] = [
   // Receitas (Income)
   { id: 'honorarios_projeto', label: 'Honorários de Projeto / Serviços', type: 'income', group: 'projeto', color: 'emerald' },

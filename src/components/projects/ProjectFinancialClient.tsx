@@ -127,9 +127,10 @@ export default function ProjectFinancialClient({
       const amt = Number(tx.amount || 0)
       const isPaid = tx.status === 'paid'
 
+      const catClean = (tx.category || '').toLowerCase()
       if (tx.type === 'income') {
         if (isPaid) {
-          if (tx.category === 'comissao_rt') {
+          if (catClean === 'comissao_rt' || catClean === 'comissões e parcerias comerciais') {
             commissionsRevenue += amt
           } else {
             directRevenue += amt
@@ -140,12 +141,12 @@ export default function ProjectFinancialClient({
       } else if (tx.type === 'expense') {
         if (isPaid) {
           expensesTotal += amt
-          if (tx.category === 'visitas_deslocamento') breakdown.visitas += amt
-          else if (tx.category === 'brindes_mimos') breakdown.brindes += amt
-          else if (tx.category === 'locacao_espaco') breakdown.locacao += amt
-          else if (tx.category === 'impressao_plotagem') breakdown.plotagens += amt
-          else if (tx.category === 'maquete_render') breakdown.maquetes += amt
-          else if (tx.category === 'taxas_art_rrt') breakdown.taxas += amt
+          if (catClean === 'visitas_deslocamento' || catClean === 'visitas técnicas / deslocamento') breakdown.visitas += amt
+          else if (catClean === 'brindes_mimos' || catClean === 'brindes / mimos de cliente') breakdown.brindes += amt
+          else if (catClean === 'locacao_espaco' || catClean === 'aluguel de sala de reunião / coworking') breakdown.locacao += amt
+          else if (catClean === 'impressao_plotagem' || catClean === 'impressões / plotagens / documentos') breakdown.plotagens += amt
+          else if (catClean === 'maquete_render' || catClean === 'serviços técnicos / criação terceirizada') breakdown.maquetes += amt
+          else if (catClean === 'taxas_art_rrt' || catClean === 'taxas, alvarás e registros de classe') breakdown.taxas += amt
           else breakdown.outros += amt
         } else {
           pendingExpense += amt
@@ -560,7 +561,9 @@ export default function ProjectFinancialClient({
                 {transactions.map((tx) => {
                   const isIncome = tx.type === 'income'
                   const isPaid = tx.status === 'paid'
-                  const catDef = FINANCIAL_CATEGORIES.find((c) => c.id === tx.category)
+                  const catDef = FINANCIAL_CATEGORIES.find(
+                    (c) => c.id === tx.category || c.label === tx.category
+                  )
 
                   return (
                     <tr key={tx.id} className="hover:bg-slate-50/70 transition-colors group">

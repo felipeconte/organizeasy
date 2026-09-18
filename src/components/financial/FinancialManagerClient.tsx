@@ -255,6 +255,21 @@ export default function FinancialManagerClient({
     })
   }
 
+  // Lista unificada de categorias para o filtro (padrão + personalizadas dos lançamentos)
+  const allCategoryOptions = useMemo(() => {
+    const set = new Set<string>()
+    FINANCIAL_CATEGORIES.forEach((c) => set.add(c.label))
+    transactions.forEach((tx) => {
+      if (tx.category) {
+        const def = FINANCIAL_CATEGORIES.find(
+          (c) => c.id === tx.category || c.label === tx.category
+        )
+        set.add(def ? def.label : tx.category)
+      }
+    })
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  }, [transactions])
+
   // Filtro dos lançamentos exibidos na aba Extrato
   const filteredTransactions = useMemo(() => {
     return transactions.filter((tx) => {
@@ -283,7 +298,17 @@ export default function FinancialManagerClient({
       if (selectedProjectId !== 'all' && tx.project_id !== selectedProjectId) return false
 
       // Categoria
-      if (selectedCategory !== 'all' && tx.category !== selectedCategory) return false
+      if (selectedCategory !== 'all') {
+        const selLower = selectedCategory.toLowerCase()
+        const txLower = (tx.category || '').toLowerCase()
+        const def = FINANCIAL_CATEGORIES.find(
+          (c) => c.id.toLowerCase() === selLower || c.label.toLowerCase() === selLower
+        )
+        const isMatch =
+          txLower === selLower ||
+          (def && (txLower === def.id.toLowerCase() || txLower === def.label.toLowerCase()))
+        if (!isMatch) return false
+      }
 
       // Período
       if (dateRangeMode !== 'all') {
@@ -724,9 +749,9 @@ export default function FinancialManagerClient({
                 className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold focus:outline-none"
               >
                 <option value="all">Categorias: Todas</option>
-                {FINANCIAL_CATEGORIES.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.label}
+                {allCategoryOptions.map((catName) => (
+                  <option key={catName} value={catName}>
+                    {catName}
                   </option>
                 ))}
               </select>
@@ -805,7 +830,9 @@ export default function FinancialManagerClient({
                     {filteredTransactions.map((tx) => {
                       const isIncome = tx.type === 'income'
                       const isPaid = tx.status === 'paid'
-                      const catDef = FINANCIAL_CATEGORIES.find((c) => c.id === tx.category)
+                      const catDef = FINANCIAL_CATEGORIES.find(
+                        (c) => c.id === tx.category || c.label === tx.category
+                      )
 
                       return (
                         <tr

@@ -1616,28 +1616,29 @@ export async function getProjectsProfitabilityAction(
           const amt = Number(tx.amount || 0)
           const isPaid = tx.status === 'paid'
 
+          const catClean = (tx.category || '').toLowerCase()
           if (tx.type === 'income') {
             if (isPaid) {
-              if (tx.category === 'comissao_rt') {
+              if (catClean === 'comissao_rt' || catClean === 'comissões e parcerias comerciais') {
                 commissionsIncome += amt
               } else {
                 directContractIncome += amt
               }
             } else if (tx.status === 'pending' || tx.status === 'overdue') {
               pendingRevenue += amt
-              if (tx.category === 'comissao_rt') {
+              if (catClean === 'comissao_rt' || catClean === 'comissões e parcerias comerciais') {
                 pendingCommissions += amt
               }
             }
           } else if (tx.type === 'expense') {
             if (isPaid) {
               expensesTotal += amt
-              if (tx.category === 'visitas_deslocamento') expensesBreakdown.visitas += amt
-              else if (tx.category === 'brindes_mimos') expensesBreakdown.brindes += amt
-              else if (tx.category === 'locacao_espaco') expensesBreakdown.locacao += amt
-              else if (tx.category === 'impressao_plotagem') expensesBreakdown.plotagens += amt
-              else if (tx.category === 'maquete_render') expensesBreakdown.maquetes += amt
-              else if (tx.category === 'taxas_art_rrt') expensesBreakdown.taxas += amt
+              if (catClean === 'visitas_deslocamento' || catClean === 'visitas técnicas / deslocamento') expensesBreakdown.visitas += amt
+              else if (catClean === 'brindes_mimos' || catClean === 'brindes / mimos de cliente') expensesBreakdown.brindes += amt
+              else if (catClean === 'locacao_espaco' || catClean === 'aluguel de sala de reunião / coworking') expensesBreakdown.locacao += amt
+              else if (catClean === 'impressao_plotagem' || catClean === 'impressões / plotagens / documentos') expensesBreakdown.plotagens += amt
+              else if (catClean === 'maquete_render' || catClean === 'serviços técnicos / criação terceirizada') expensesBreakdown.maquetes += amt
+              else if (catClean === 'taxas_art_rrt' || catClean === 'taxas, alvarás e registros de classe') expensesBreakdown.taxas += amt
               else expensesBreakdown.outros += amt
             } else if (tx.status === 'pending' || tx.status === 'overdue') {
               pendingExpenses += amt
