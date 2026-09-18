@@ -13,8 +13,12 @@ import {
   TransactionType,
   TransactionStatus,
   PaymentMethod,
-  RecurringFrequency
+  RecurringFrequency,
+  RecurrenceUnit,
+  RecurrenceEndCondition,
+  RecurrenceEditScope
 } from '@/types/financial'
+import { generateRecurrenceDates } from '@/lib/financial-recurrence'
 
 type TransactionUpdate = Database['public']['Tables']['financial_transactions']['Update']
 type RecurringExpenseUpdate = Database['public']['Tables']['recurring_expenses']['Update']
@@ -137,33 +141,65 @@ export async function syncRecurringTransactionsForRange(
         .not('recurring_expense_id', 'is', null)
 
       const existingMap = new Set(
-        existingTxs?.map((tx: any) => `${tx.recurring_expense_id}_${tx.due_date?.slice(0, 7)}`) || []
+        existingTxs?.map((tx: any) => `${tx.recurring_expense_id}_${tx.due_date}`) || []
       )
 
       const toInsert: any[] = []
       const plannedKeys = new Set<string>()
 
+      const rangeStartStr = rangeStart.toISOString().split('T')[0]
+      const rangeEndStr = rangeEnd.toISOString().split('T')[0]
+
       for (const rec of recurrings) {
+        const rawFrequency = rec.frequency || 'monthly'
+        const [freqBase, exPart] = rawFrequency.split('|ex:')
+        const excludedDates = new Set(exPart ? exPart.split(',').filter(Boolean) : [])
+
         const recStartStr = rec.start_date || '2000-01-01'
         const recEndStr = rec.end_date
 
-        for (const m of monthsToSync) {
-          const monthKey = `${m.year}-${String(m.month).padStart(2, '0')}`
-          const key = `${rec.id}_${monthKey}`
+        let interval = 1
+        let unit: RecurrenceUnit = 'month'
+        let weekDays: number[] = []
 
+        if (freqBase.startsWith('custom:')) {
+          const parts = freqBase.split(':')
+          interval = parseInt(parts[1], 10) || 1
+          unit = (parts[2] as RecurrenceUnit) || 'month'
+          if (parts[3]) {
+            weekDays = parts[3].split(',').map(Number).filter((n: number) => !isNaN(n))
+          }
+        } else if (freqBase === 'weekly') {
+          interval = 1
+          unit = 'week'
+        } else if (freqBase === 'yearly') {
+          interval = 1
+          unit = 'year'
+        } else if (freqBase === 'daily') {
+          interval = 1
+          unit = 'day'
+        } else if (freqBase === 'quarterly') {
+          interval = 3
+          unit = 'month'
+        }
+
+        const dates = generateRecurrenceDates({
+          startDate: recStartStr,
+          interval,
+          unit,
+          weekDays,
+          endCondition: recEndStr ? 'date' : 'never',
+          endDate: recEndStr,
+          maxNeverOccurrences: 60
+        })
+
+        for (const dueDateStr of dates) {
+          if (dueDateStr < rangeStartStr) continue
+          if (dueDateStr > rangeEndStr) break
+          if (excludedDates.has(dueDateStr)) continue // Pula ocorrência excluída manualmente pelo usuário!
+
+          const key = `${rec.id}_${dueDateStr}`
           if (existingMap.has(key) || plannedKeys.has(key)) {
-            continue
-          }
-
-          // Calcula dia de vencimento
-          const lastDayOfMonth = new Date(m.year, m.month, 0).getDate()
-          const dueDay = Math.min(Math.max(1, rec.due_day || 5), lastDayOfMonth)
-          const dueDateStr = `${monthKey}-${String(dueDay).padStart(2, '0')}`
-
-          if (dueDateStr < recStartStr) {
-            continue
-          }
-          if (recEndStr && dueDateStr > recEndStr) {
             continue
           }
 
@@ -709,6 +745,12 @@ export interface CreateTransactionInput {
   receiptUrl?: string | null
   isRecurring?: boolean
   recurringFrequency?: RecurringFrequency
+  recurringInterval?: number
+  recurringUnit?: RecurrenceUnit
+  recurringWeekDays?: number[]
+  recurringEndCondition?: RecurrenceEndCondition
+  recurringEndDate?: string | null
+  recurringOccurrences?: number | null
 }
 
 export async function createFinancialTransactionAction(
@@ -730,9 +772,45 @@ export async function createFinancialTransactionAction(
     }
 
     let recurringId: string | null = null
+    let allDates: string[] = [input.dueDate]
 
     // Se o usuário marcou para tornar recorrente
     if (input.isRecurring) {
+      const interval = Math.min(Math.max(1, input.recurringInterval || 1), 99)
+      const unit = input.recurringUnit || 'month'
+      const weekDays = input.recurringWeekDays || []
+      const endCondition = input.recurringEndCondition || 'never'
+      const endDate = input.recurringEndDate || null
+      const occurrences = input.recurringOccurrences || null
+
+      let frequencyStr: string = 'monthly'
+      if (interval === 1 && (!weekDays || weekDays.length <= 1)) {
+        if (unit === 'day') frequencyStr = 'daily'
+        else if (unit === 'week') frequencyStr = 'weekly'
+        else if (unit === 'month') frequencyStr = 'monthly'
+        else if (unit === 'year') frequencyStr = 'yearly'
+      } else {
+        frequencyStr = `custom:${interval}:${unit}:${weekDays.join(',')}`
+      }
+
+      allDates = generateRecurrenceDates({
+        startDate: input.dueDate,
+        interval,
+        unit,
+        weekDays,
+        endCondition,
+        endDate,
+        occurrences,
+        maxNeverOccurrences: 12
+      })
+
+      const finalEndDate =
+        endCondition === 'never'
+          ? null
+          : endCondition === 'date'
+            ? endDate
+            : allDates[allDates.length - 1] || null
+
       const dueDay = parseInt(input.dueDate.split('-')[2], 10) || 5
       const { data: recData, error: recError } = await supabase
         .from('recurring_expenses')
@@ -742,9 +820,10 @@ export async function createFinancialTransactionAction(
           title: input.title.trim(),
           category: input.category,
           amount: Number(input.amount),
-          frequency: input.recurringFrequency || 'monthly',
+          frequency: frequencyStr,
           due_day: dueDay,
           start_date: input.dueDate,
+          end_date: finalEndDate,
           payment_method: input.paymentMethod || null,
           project_id: input.projectId || null,
           client_id: input.clientId || null,
@@ -807,6 +886,32 @@ export async function createFinancialTransactionAction(
       return { success: false, error: 'Falha ao salvar lançamento no banco de dados.' }
     }
 
+    // Se gerou regra recorrente e temos ocorrências futuras calculadas, cria todas de imediato como 'pending'
+    if (recurringId && allDates.length > 1) {
+      const futureTxs = allDates.slice(1).map((dateStr) => ({
+        organization_id: input.organizationId,
+        project_id: input.projectId || null,
+        company_id: input.companyId || null,
+        client_id: input.clientId || null,
+        recurring_expense_id: recurringId,
+        type: input.type,
+        category: input.category,
+        title: input.title.trim(),
+        description: input.description?.trim() || null,
+        amount: Number(input.amount),
+        due_date: dateStr,
+        payment_date: null,
+        status: 'pending',
+        payment_method: input.paymentMethod || null,
+        receipt_url: null,
+        created_by: user.id
+      }))
+
+      if (futureTxs.length > 0) {
+        await supabase.from('financial_transactions').insert(futureTxs)
+      }
+    }
+
     revalidatePath('/app/financeiro')
     if (input.projectId) {
       revalidatePath(`/app/projetos/${input.projectId}`)
@@ -839,6 +944,7 @@ export interface UpdateTransactionInput {
   status?: TransactionStatus
   paymentMethod?: PaymentMethod | string | null
   receiptUrl?: string | null
+  editScope?: RecurrenceEditScope
 }
 
 export async function updateFinancialTransactionAction(
@@ -846,6 +952,59 @@ export async function updateFinancialTransactionAction(
 ): Promise<{ success: boolean; transaction?: FinancialTransaction; error?: string }> {
   try {
     const { supabase } = await requirePermission(input.organizationId, 'financial_create_edit')
+
+    const { data: existing } = await supabase
+      .from('financial_transactions')
+      .select('id, recurring_expense_id, due_date')
+      .eq('id', input.id)
+      .eq('organization_id', input.organizationId)
+      .maybeSingle()
+
+    // Se faz parte de uma recorrência e o escopo foi 'future' ou 'all'
+    if (existing?.recurring_expense_id && input.editScope && input.editScope !== 'single') {
+      const scopePayload: any = {}
+      if (input.title !== undefined) scopePayload.title = input.title.trim()
+      if (input.description !== undefined) scopePayload.description = input.description?.trim() || null
+      if (input.amount !== undefined) scopePayload.amount = Number(input.amount)
+      if (input.type !== undefined) scopePayload.type = input.type
+      if (input.category !== undefined) scopePayload.category = input.category
+      if (input.paymentMethod !== undefined) scopePayload.payment_method = input.paymentMethod
+      if (input.projectId !== undefined) scopePayload.project_id = input.projectId
+      if (input.companyId !== undefined) scopePayload.company_id = input.companyId
+      if (input.clientId !== undefined) scopePayload.client_id = input.clientId
+
+      let scopeQuery = supabase
+        .from('financial_transactions')
+        .update(scopePayload)
+        .eq('recurring_expense_id', existing.recurring_expense_id)
+        .eq('organization_id', input.organizationId)
+        .neq('id', input.id)
+
+      if (input.editScope === 'future') {
+        scopeQuery = scopeQuery.gte('due_date', existing.due_date)
+      }
+
+      await scopeQuery
+
+      // Atualiza também os dados cadastrais da regra de recorrência
+      const recUpdate: any = {}
+      if (input.title !== undefined) recUpdate.title = input.title.trim()
+      if (input.amount !== undefined) recUpdate.amount = Number(input.amount)
+      if (input.category !== undefined) recUpdate.category = input.category
+      if (input.type !== undefined) recUpdate.type = input.type
+      if (input.paymentMethod !== undefined) recUpdate.payment_method = input.paymentMethod
+      if (input.projectId !== undefined) recUpdate.project_id = input.projectId
+      if (input.companyId !== undefined) recUpdate.company_id = input.companyId
+      if (input.clientId !== undefined) recUpdate.client_id = input.clientId
+
+      if (Object.keys(recUpdate).length > 0) {
+        await supabase
+          .from('recurring_expenses')
+          .update(recUpdate)
+          .eq('id', existing.recurring_expense_id)
+          .eq('organization_id', input.organizationId)
+      }
+    }
 
     const updatePayload: TransactionUpdate = {}
 
@@ -912,46 +1071,124 @@ export async function updateFinancialTransactionAction(
 export async function deleteFinancialTransactionAction({
   id,
   organizationId,
-  deleteSeries = false
+  deleteSeries = false,
+  deleteScope = 'single'
 }: {
   id: string
   organizationId: string
   deleteSeries?: boolean
+  deleteScope?: RecurrenceEditScope
 }): Promise<{ success: boolean; deletedRecurringId?: string | null; error?: string }> {
   try {
     const { supabase } = await requirePermission(organizationId, 'financial_delete')
 
     const { data: existing } = await supabase
       .from('financial_transactions')
-      .select('project_id, recurring_expense_id')
+      .select('project_id, recurring_expense_id, due_date')
       .eq('id', id)
       .eq('organization_id', organizationId)
       .maybeSingle()
 
-    if (existing?.recurring_expense_id && deleteSeries) {
-      // 1. Remove primeiro todos os lançamentos vinculados a essa recorrência (evita ON DELETE SET NULL)
-      await supabase
+    const effectiveScope: RecurrenceEditScope = deleteSeries ? 'all' : (deleteScope || 'single')
+
+    if (existing?.recurring_expense_id && effectiveScope === 'all') {
+      // 1. Remove todos os lançamentos vinculados a essa recorrência
+      const { error: txErr } = await supabase
         .from('financial_transactions')
         .delete()
         .eq('recurring_expense_id', existing.recurring_expense_id)
         .eq('organization_id', organizationId)
 
-      // 2. Remove a regra de recorrência da tabela principal
-      await supabase
+      if (txErr) {
+        console.error('Erro ao excluir transações da recorrência:', txErr)
+        return { success: false, error: 'Falha ao remover lançamentos da série.' }
+      }
+
+      // 2. Remove a regra de recorrência
+      const { error: recErr } = await supabase
         .from('recurring_expenses')
         .delete()
         .eq('id', existing.recurring_expense_id)
         .eq('organization_id', organizationId)
+
+      if (recErr) {
+        console.error('Erro ao excluir regra de recorrência:', recErr)
+        return { success: false, error: 'Falha ao remover regra de recorrência.' }
+      }
+    } else if (existing?.recurring_expense_id && effectiveScope === 'future') {
+      // 1. Remove este e todos os lançamentos futuros da série
+      const { error: txErr } = await supabase
+        .from('financial_transactions')
+        .delete()
+        .eq('recurring_expense_id', existing.recurring_expense_id)
+        .eq('organization_id', organizationId)
+        .gte('due_date', existing.due_date)
+
+      if (txErr) {
+        console.error('Erro ao excluir lançamentos futuros:', txErr)
+        return { success: false, error: 'Falha ao remover lançamentos futuros.' }
+      }
+
+      // 2. Verifica se sobrou algum lançamento anterior desta recorrência
+      const { data: remainingTxs } = await supabase
+        .from('financial_transactions')
+        .select('id, due_date')
+        .eq('recurring_expense_id', existing.recurring_expense_id)
+        .eq('organization_id', organizationId)
+        .order('due_date', { ascending: false })
+        .limit(1)
+
+      if (!remainingTxs || remainingTxs.length === 0) {
+        // Se não restou nenhum lançamento anterior, remove a regra de recorrência por completo
+        await supabase
+          .from('recurring_expenses')
+          .delete()
+          .eq('id', existing.recurring_expense_id)
+          .eq('organization_id', organizationId)
+      } else {
+        // Ajusta a data final da regra para a data da última ocorrência restante
+        const lastRemainingDate = remainingTxs[0].due_date
+        await supabase
+          .from('recurring_expenses')
+          .update({ end_date: lastRemainingDate })
+          .eq('id', existing.recurring_expense_id)
+          .eq('organization_id', organizationId)
+      }
     } else {
-      const { error } = await supabase
+      // Escopo 'single' (ou lançamento avulso sem recorrência)
+      const { error: delError } = await supabase
         .from('financial_transactions')
         .delete()
         .eq('id', id)
         .eq('organization_id', organizationId)
 
-      if (error) {
-        console.error('Erro ao deletar lançamento:', error)
+      if (delError) {
+        console.error('Erro ao deletar lançamento:', delError)
         return { success: false, error: 'Falha ao remover lançamento.' }
+      }
+
+      // Se fazia parte de uma recorrência, registra a data excluída na regra para nunca ser recriada no sync
+      if (existing?.recurring_expense_id && existing?.due_date) {
+        const { data: rec } = await supabase
+          .from('recurring_expenses')
+          .select('id, frequency')
+          .eq('id', existing.recurring_expense_id)
+          .eq('organization_id', organizationId)
+          .maybeSingle()
+
+        if (rec) {
+          const [freqBase, exPart] = (rec.frequency || 'monthly').split('|ex:')
+          const currentEx = exPart ? exPart.split(',').filter(Boolean) : []
+          if (!currentEx.includes(existing.due_date)) {
+            currentEx.push(existing.due_date)
+            const newFrequency = `${freqBase}|ex:${currentEx.join(',')}`
+            await supabase
+              .from('recurring_expenses')
+              .update({ frequency: newFrequency })
+              .eq('id', rec.id)
+              .eq('organization_id', organizationId)
+          }
+        }
       }
     }
 
@@ -963,7 +1200,7 @@ export async function deleteFinancialTransactionAction({
 
     return {
       success: true,
-      deletedRecurringId: deleteSeries ? existing?.recurring_expense_id : null
+      deletedRecurringId: effectiveScope !== 'single' ? existing?.recurring_expense_id : null
     }
   } catch (error: any) {
     console.error('Erro em deleteFinancialTransactionAction:', error)

@@ -43,7 +43,8 @@ import {
   MonthCashFlowProjection,
   FINANCIAL_CATEGORIES,
   TransactionType,
-  TransactionStatus
+  TransactionStatus,
+  RecurrenceEditScope
 } from '@/types/financial'
 import {
   toggleTransactionStatusAction,
@@ -195,12 +196,23 @@ export default function FinancialManagerClient({
   }
 
   // Callback de sucesso ao salvar/editar/excluir lançamento
-  const handleTxSuccess = (savedTx: FinancialTransaction, isDeleted?: boolean) => {
+  const handleTxSuccess = (
+    savedTx: FinancialTransaction,
+    isDeleted?: boolean,
+    deleteScope: RecurrenceEditScope = 'single'
+  ) => {
     let updated: FinancialTransaction[]
     if (isDeleted) {
-      if (savedTx.recurring_expense_id) {
+      if (deleteScope === 'all') {
         updated = transactions.filter(
-          (t) => t.id !== savedTx.id && (!t.recurring_expense_id || t.recurring_expense_id !== savedTx.recurring_expense_id)
+          (t) => !savedTx.recurring_expense_id || t.recurring_expense_id !== savedTx.recurring_expense_id
+        )
+      } else if (deleteScope === 'future') {
+        updated = transactions.filter(
+          (t) =>
+            !savedTx.recurring_expense_id ||
+            t.recurring_expense_id !== savedTx.recurring_expense_id ||
+            Boolean(t.due_date && savedTx.due_date && t.due_date < savedTx.due_date)
         )
       } else {
         updated = transactions.filter((t) => t.id !== savedTx.id)

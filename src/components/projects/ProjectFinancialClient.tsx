@@ -30,7 +30,8 @@ import {
   ProjectProfitabilityItem,
   FINANCIAL_CATEGORIES,
   TransactionType,
-  TransactionStatus
+  TransactionStatus,
+  RecurrenceEditScope
 } from '@/types/financial'
 import {
   toggleTransactionStatusAction,
@@ -200,9 +201,30 @@ export default function ProjectFinancialClient({
     setIsTxModalOpen(true)
   }
 
-  const handleTxSuccess = (savedTx: FinancialTransaction, isDeleted?: boolean) => {
+  const handleTxSuccess = (
+    savedTx: FinancialTransaction,
+    isDeleted?: boolean,
+    deleteScope: RecurrenceEditScope = 'single'
+  ) => {
     if (isDeleted) {
-      setTransactions(transactions.filter((t) => t.id !== savedTx.id))
+      if (deleteScope === 'all') {
+        setTransactions(
+          transactions.filter(
+            (t) => !savedTx.recurring_expense_id || t.recurring_expense_id !== savedTx.recurring_expense_id
+          )
+        )
+      } else if (deleteScope === 'future') {
+        setTransactions(
+          transactions.filter(
+            (t) =>
+              !savedTx.recurring_expense_id ||
+              t.recurring_expense_id !== savedTx.recurring_expense_id ||
+              Boolean(t.due_date && savedTx.due_date && t.due_date < savedTx.due_date)
+          )
+        )
+      } else {
+        setTransactions(transactions.filter((t) => t.id !== savedTx.id))
+      }
     } else {
       const exists = transactions.some((t) => t.id === savedTx.id)
       if (exists) {

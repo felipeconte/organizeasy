@@ -272,6 +272,21 @@ export const ESTADOS_BRASIL = [
 ]
 
 /**
+ * Normaliza qualquer formato de estado (sigla 'SP', minúsculo 'sp', ou nome completo 'São Paulo')
+ * para a sigla oficial de 2 letras do estado brasileiro.
+ */
+export function normalizeUF(raw?: string | null): string {
+  if (!raw) return ''
+  const trimmed = raw.trim()
+  if (!trimmed) return ''
+  const upper = trimmed.toUpperCase()
+  const found = ESTADOS_BRASIL.find(
+    (e) => e.sigla === upper || e.nome.toLowerCase() === trimmed.toLowerCase()
+  )
+  return found ? found.sigla : upper.length === 2 ? upper : ''
+}
+
+/**
  * Formata a exibição de cliente(s) para cabeçalhos e listagens de projetos.
  * Se houver múltiplos clientes (por IDs vinculados ou se o nome contiver múltiplos separados por '&' ou vírgula),
  * retorna label 'Clientes' e junta os nomes com vírgula (', ').

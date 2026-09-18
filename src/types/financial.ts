@@ -12,7 +12,20 @@ export type PaymentMethod =
   | 'Dinheiro'
   | 'Outro'
 
-export type RecurringFrequency = 'monthly' | 'yearly' | 'quarterly' | 'weekly'
+export type RecurringFrequency = 'monthly' | 'yearly' | 'quarterly' | 'weekly' | string
+
+export type RecurrenceUnit = 'day' | 'week' | 'month' | 'year'
+export type RecurrenceEndCondition = 'never' | 'date' | 'occurrences'
+export type RecurrenceEditScope = 'single' | 'future' | 'all'
+
+export interface RecurrenceConfig {
+  interval: number // 1 a 99
+  unit: RecurrenceUnit
+  weekDays?: number[] // 0=Dom, 1=Seg, 2=Ter, 3=Qua, 4=Qui, 5=Sex, 6=Sáb
+  endCondition: RecurrenceEndCondition
+  endDate?: string | null
+  occurrences?: number | null
+}
 
 // Categorias padronizadas
 export interface FinancialCategoryOption {

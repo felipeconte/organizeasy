@@ -19,3 +19,9 @@ body {
 .leaflet-container img {
   max-width: none !important;
 }
+
+/* Custom map marker pin without borders or background box */
+.custom-project-pin {
+  background: transparent !important;
+  border: none !important;
+}

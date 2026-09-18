@@ -887,9 +887,9 @@ export default function ClientModal({
               </div>
             </div>
 
-            {/* Linha 2: Número + Complemento (Opcional) + Bairro */}
-            <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
-              <div className="sm:col-span-2">
+            {/* Linha 2: Número + Complemento (Opcional) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="sm:col-span-1">
                 <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
                   Número
                 </label>
@@ -915,7 +915,10 @@ export default function ClientModal({
                   className="w-full text-sm font-medium border border-slate-200 rounded-xl p-3 bg-slate-50/50 focus:bg-white focus:border-blue-500 outline-hidden transition-all text-slate-900"
                 />
               </div>
+            </div>
 
+            {/* Linha 3: Bairro + Cidade + Estado (UF) */}
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
               <div className="sm:col-span-2">
                 <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
                   Bairro
@@ -928,10 +931,7 @@ export default function ClientModal({
                   className="w-full text-sm font-medium border border-slate-200 rounded-xl p-3 bg-slate-50/50 focus:bg-white focus:border-blue-500 outline-hidden transition-all text-slate-900"
                 />
               </div>
-            </div>
 
-            {/* Linha 3: Cidade + Estado (UF) */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="sm:col-span-2">
                 <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
                   Cidade

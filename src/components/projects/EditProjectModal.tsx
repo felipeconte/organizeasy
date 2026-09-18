@@ -21,7 +21,7 @@ import { ClientData } from '@/lib/actions/clients'
 import ClientMultiSelect from '@/components/projects/ClientMultiSelect'
 import TypologySelect from '@/components/projects/TypologySelect'
 import { ProjectItem } from '@/components/projects/ProjectsManagerClient'
-import { formatAreaOnlyNumbers, maskCEP } from '@/lib/formatters-and-validators'
+import { formatAreaOnlyNumbers, maskCEP, ESTADOS_BRASIL, normalizeUF } from '@/lib/formatters-and-validators'
 import {
   lookupCepAction,
   searchAddressByTextAction,
@@ -229,7 +229,7 @@ export default function EditProjectModal({
         .trim()
       setAddressRoad(cleanRoad)
       setAddressCity(project.city || '')
-      setAddressState(project.state || '')
+      setAddressState(normalizeUF(project.state))
     }
   }, [isOpen, project])
 
@@ -335,7 +335,7 @@ export default function EditProjectModal({
     if (place.number) setAddressNumber(place.number)
     if (place.neighborhood) setAddressNeighborhood(place.neighborhood)
     if (place.city) setAddressCity(place.city)
-    if (place.state) setAddressState(place.state.toUpperCase())
+    if (place.state) setAddressState(normalizeUF(place.state))
     if (place.zipCode) setAddressPostalCode(maskCEP(place.zipCode))
 
     if (place.lat && place.lng) {
@@ -464,7 +464,7 @@ export default function EditProjectModal({
       if (res.data.street) setAddressRoad(res.data.street)
       if (res.data.neighborhood) setAddressNeighborhood(res.data.neighborhood)
       if (res.data.city) setAddressCity(res.data.city)
-      if (res.data.state) setAddressState(res.data.state.toUpperCase())
+      if (res.data.state) setAddressState(normalizeUF(res.data.state))
 
       setAddressSuccessMessage('Endereço preenchido com sucesso!')
       setTimeout(() => setAddressSuccessMessage(null), 4000)
@@ -955,7 +955,7 @@ export default function EditProjectModal({
 
                 <div className="md:col-span-3">
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Logradouro / Rua / Avenida
+                    Logradouro
                   </label>
                   <input
                     type="text"
@@ -997,7 +997,7 @@ export default function EditProjectModal({
                   )}
                 </div>
 
-                <div className="md:col-span-1">
+                <div className="md:col-span-3">
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Complemento <span className="text-slate-400 font-normal lowercase">(opcional)</span>
                   </label>
@@ -1009,7 +1009,10 @@ export default function EditProjectModal({
                     className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
                   />
                 </div>
+              </div>
 
+              {/* Linha 3: Bairro, Cidade e Estado / UF */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                 <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Bairro
@@ -1022,11 +1025,8 @@ export default function EditProjectModal({
                     className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
                   />
                 </div>
-              </div>
 
-              {/* Linha 3: Cidade e Estado / UF */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div className="md:col-span-3">
+                <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Cidade
                   </label>
@@ -1041,16 +1041,21 @@ export default function EditProjectModal({
 
                 <div className="md:col-span-1">
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Estado / UF
+                    UF - Estado
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={addressState}
                     onChange={(e) => setAddressState(e.target.value)}
-                    placeholder="SP"
-                    maxLength={2}
-                    className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm uppercase text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-                  />
+                    className={`block w-full px-3 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 cursor-pointer transition-all ${!addressState ? 'text-slate-400' : 'text-slate-900'
+                      }`}
+                  >
+                    <option value="">UF</option>
+                    {ESTADOS_BRASIL.map((uf) => (
+                      <option key={uf.sigla} value={uf.sigla} className="text-slate-900">
+                        {uf.sigla} - {uf.nome}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 

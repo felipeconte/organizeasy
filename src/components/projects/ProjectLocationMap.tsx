@@ -15,6 +15,29 @@ interface ProjectLocationMapProps {
 const BELEM_LAT = -1.4558
 const BELEM_LNG = -48.4902
 
+/**
+ * Cria o ícone do marcador com formato de agulha/pin tradicional,
+ * sem borda ou círculo em volta e com ponta afiada apontando exatamente para o endereço geográfico.
+ */
+function createCustomPinIcon() {
+  const pinHtml = `
+    <div style="position: relative; width: 30px; height: 40px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; outline: none; pointer-events: none;">
+      <svg width="30" height="40" viewBox="0 0 30 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: block; filter: drop-shadow(0 3px 5px rgba(15,23,42,0.35));">
+        <path d="M15 0C6.716 0 0 6.716 0 15C0 25.5 13.9 39.15 14.47 39.71C14.76 40 15.24 40 15.53 39.71C16.1 39.15 30 25.5 30 15C30 6.716 23.284 0 15 0Z" fill="#2563eb"/>
+        <circle cx="15" cy="14" r="5" fill="#ffffff"/>
+      </svg>
+    </div>
+  `
+
+  return L.divIcon({
+    html: pinHtml,
+    className: 'custom-project-pin',
+    iconSize: [30, 40],
+    iconAnchor: [15, 40],
+    popupAnchor: [0, -40],
+  })
+}
+
 export default function ProjectLocationMap({
   lat,
   lng,
@@ -117,25 +140,8 @@ export default function ProjectLocationMap({
         maxZoom: 19,
       }).addTo(map)
 
-      // Ícone customizado elegante para o pin do projeto
-      const customPinHtml = `
-        <div style="transform: translate(-50%, -100%); position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
-          <div style="width: 36px; height: 36px; background-color: #2563eb; border-radius: 9999px; box-shadow: 0 10px 15px -3px rgba(37,99,235,0.4); display: flex; align-items: center; justify-content: center; color: white; border: 2px solid white;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
-              <circle cx="12" cy="10" r="3"/>
-            </svg>
-          </div>
-          <div style="position: absolute; bottom: -2px; width: 10px; height: 4px; background-color: rgba(15,23,42,0.3); border-radius: 9999px; filter: blur(1px);"></div>
-        </div>
-      `
-
-      const customIcon = L.divIcon({
-        html: customPinHtml,
-        className: 'custom-map-pin',
-        iconSize: [36, 36],
-        iconAnchor: [18, 36],
-      })
+      // Ícone com ponta afiada sem borda
+      const customIcon = createCustomPinIcon()
 
       if (hasCoordinates) {
         const marker = L.marker([initialLat, initialLng], {
@@ -235,26 +241,10 @@ export default function ProjectLocationMap({
     map.invalidateSize()
     map.setView([lat, lng], 16, { animate: true })
 
-    const customPinHtml = `
-      <div style="transform: translate(-50%, -100%); position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
-        <div style="width: 36px; height: 36px; background-color: #2563eb; border-radius: 9999px; box-shadow: 0 10px 15px -3px rgba(37,99,235,0.4); display: flex; align-items: center; justify-content: center; color: white; border: 2px solid white;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
-            <circle cx="12" cy="10" r="3"/>
-          </svg>
-        </div>
-        <div style="position: absolute; bottom: -2px; width: 10px; height: 4px; background-color: rgba(15,23,42,0.3); border-radius: 9999px; filter: blur(1px);"></div>
-      </div>
-    `
-
-    const customIcon = L.divIcon({
-      html: customPinHtml,
-      className: 'custom-map-pin',
-      iconSize: [36, 36],
-      iconAnchor: [18, 36],
-    })
+    const customIcon = createCustomPinIcon()
 
     if (markerRef.current) {
+      markerRef.current.setIcon(customIcon)
       markerRef.current.setLatLng([lat, lng])
       if (addressTitle) {
         markerRef.current.bindPopup(`<strong style="font-size: 12px;">${addressTitle}</strong>`)
