@@ -107,8 +107,8 @@ export async function createProjectAction(formData: FormData): Promise<{ success
   const primaryClientEmail = linkedClients[0]?.email || clientEmail || null
   const primaryClientPhone = linkedClients[0]?.phone || clientPhone || null
 
-  if (!code || !title || (!finalClientName && clientIds.length === 0)) {
-    return { success: false, error: 'Código, título e ao menos um cliente são obrigatórios.' }
+  if (!title || (!finalClientName && clientIds.length === 0)) {
+    return { success: false, error: 'Título e ao menos um cliente são obrigatórios.' }
   }
 
   // Se organizationId não foi informada ou está vazia, busca ou auto-provisiona para o usuário
@@ -190,31 +190,33 @@ export async function createProjectAction(formData: FormData): Promise<{ success
   const areaSqm = parseCleanNumber(areaSqmStr)
   const estimatedBudget = parseCleanNumber(estimatedBudgetStr)
 
+  const insertPayload = {
+    organization_id: organizationId,
+    title,
+    client_id: primaryClientId,
+    client_name: finalClientName,
+    client_email: primaryClientEmail,
+    client_phone: primaryClientPhone,
+    typology: typology || 'Residencial',
+    area_sqm: areaSqm,
+    estimated_budget: estimatedBudget,
+    address: address || null,
+    city: city || null,
+    state: state || null,
+    start_date: startDate || null,
+    deadline: deadline || null,
+    description: description || null,
+    created_by: user.id,
+    status: 'ativo' as const,
+    stage_template_id: finalStageTemplateId,
+    skip_default_stages: skipDefaultStages,
+    ...(code ? { code } : {}),
+  }
+
   const { data: project, error } = await supabase
     .from('projects')
-    .insert({
-      organization_id: organizationId,
-      code,
-      title,
-      client_id: primaryClientId,
-      client_name: finalClientName,
-      client_email: primaryClientEmail,
-      client_phone: primaryClientPhone,
-      typology: typology || 'Residencial',
-      area_sqm: areaSqm,
-      estimated_budget: estimatedBudget,
-      address: address || null,
-      city: city || null,
-      state: state || null,
-      start_date: startDate || null,
-      deadline: deadline || null,
-      description: description || null,
-      created_by: user.id,
-      status: 'ativo',
-      stage_template_id: finalStageTemplateId,
-      skip_default_stages: skipDefaultStages,
-    } as any)
-    .select('id')
+    .insert(insertPayload)
+    .select('id, code')
     .single()
 
   if (error || !project) {

@@ -423,7 +423,7 @@ export default function RecurringExpenseModal({
                 <option value="">Nenhum projeto (Custo/Receita Geral)</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.code} - {p.title}
+                    {p.title}
                   </option>
                 ))}
               </select>

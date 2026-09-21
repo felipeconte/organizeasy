@@ -73,7 +73,7 @@ export default function ProjectDetailHeader({
                 </button>
               )}
 
-              <span className="px-2.5 py-0.5 text-xs font-mono font-bold bg-slate-100 text-slate-700 rounded-lg">
+              <span className="px-2 py-0.5 text-xs font-mono font-medium bg-slate-100 text-slate-500 rounded-md">
                 {currentProject.code}
               </span>
             </div>

@@ -259,9 +259,8 @@ export async function addProjectCompanyAction(input: ProjectCompanyInput): Promi
     if (expectedCommissionAmount > 0 || receivedCommissionAmount > 0 || contractValue > 0) {
       const compName = company.trade_name || company.name || 'Fornecedor'
       const { data: proj } = await supabase.from('projects').select('title, code').eq('id', input.projectId).single()
-      const projPart = proj?.code ? `[${proj.code}] ` : ''
       const projTitle = proj?.title ? ` - ${proj.title}` : ''
-      const title = `Comissão RT: ${compName} ${projPart}${projTitle}`.trim()
+      const title = `Comissão RT: ${compName}${projTitle}`.trim()
       const isPaid = commissionStatus === 'pago_total'
       const amount = isPaid ? (receivedCommissionAmount > 0 ? receivedCommissionAmount : expectedCommissionAmount) : (expectedCommissionAmount > 0 ? expectedCommissionAmount : contractValue)
       const dueDate = input.commissionDueDate || newLink.created_at?.slice(0, 10) || new Date().toISOString().split('T')[0]

@@ -559,7 +559,7 @@ export default function TransactionModal({
                 <option value="">Nenhum (Despesa/Receita Geral do Escritório)</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
-                    [{p.code}] {p.title} {p.client_name ? `• ${p.client_name}` : ''}
+                    {p.title} {p.client_name ? `• ${p.client_name}` : ''}
                   </option>
                 ))}
               </select>

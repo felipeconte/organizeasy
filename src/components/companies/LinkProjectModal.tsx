@@ -243,7 +243,7 @@ export default function LinkProjectModal({
                 <option value="">Selecione um projeto...</option>
                 {availableProjects.map((p) => (
                   <option key={p.id} value={p.id}>
-                    [{p.code}] {p.title} {p.client_name ? `(${p.client_name})` : ''}
+                    {p.title} {p.client_name ? `(${p.client_name})` : ''}
                   </option>
                 ))}
               </select>

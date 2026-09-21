@@ -370,9 +370,8 @@ export async function syncProjectCommissionsToFinancial(
       const comp = pc.companies || {}
       const compName = comp.trade_name || comp.name || 'Fornecedor'
       const proj = pc.projects || {}
-      const projPart = proj.code ? `[${proj.code}] ` : ''
       const projTitle = proj.title ? ` - ${proj.title}` : ''
-      const title = `Comissão RT: ${compName} ${projPart}${projTitle}`.trim()
+      const title = `Comissão RT: ${compName}${projTitle}`.trim()
 
       const dueDate = pc.commission_due_date || pc.created_at?.slice(0, 10) || new Date().toISOString().split('T')[0]
       const paymentDate = isPaid ? (pc.commission_paid_date || dueDate) : null

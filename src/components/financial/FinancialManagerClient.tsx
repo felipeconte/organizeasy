@@ -737,7 +737,7 @@ export default function FinancialManagerClient({
                 <option value="all">Projetos: Todos</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.code} - {p.title}
+                    {p.title}
                   </option>
                 ))}
               </select>
@@ -915,7 +915,7 @@ export default function FinancialManagerClient({
                                 href={`/app/projetos/${tx.projects.id}/financeiro`}
                                 className="font-bold text-blue-600 hover:underline block truncate"
                               >
-                                [{tx.projects.code}] {tx.projects.title}
+                                {tx.projects.title}
                               </Link>
                             ) : (
                               <span className="text-slate-400 font-medium text-xs">
@@ -1046,7 +1046,7 @@ export default function FinancialManagerClient({
                           href={`/app/projetos/${p.projectId}/financeiro`}
                           className="font-bold text-slate-900 hover:text-blue-600 block"
                         >
-                          [{p.projectCode}] {p.projectTitle}
+                          {p.projectTitle}
                         </Link>
                         <span className="text-[11px] text-slate-500 block">{p.clientName}</span>
                       </td>

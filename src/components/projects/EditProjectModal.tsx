@@ -611,7 +611,7 @@ export default function EditProjectModal({
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 bg-slate-50/50">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="px-2.5 py-0.5 text-xs font-mono font-bold bg-slate-200/80 text-slate-700 rounded-md">
+              <span className="px-2 py-0.5 text-xs font-mono font-medium bg-slate-100 text-slate-500 rounded-md">
                 {project.code}
               </span>
               <button

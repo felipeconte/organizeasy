@@ -656,6 +656,38 @@ export type Database = {
           },
         ]
       }
+      organization_project_counters: {
+        Row: {
+          created_at: string
+          last_val: number
+          organization_id: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          last_val?: number
+          organization_id: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          last_val?: number
+          organization_id?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_project_counters_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_task_counters: {
         Row: {
           created_at: string
@@ -1063,7 +1095,7 @@ export type Database = {
           client_id?: string | null
           client_name: string
           client_phone?: string | null
-          code: string
+          code?: string
           created_at?: string
           created_by?: string | null
           deadline?: string | null
