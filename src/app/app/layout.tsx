@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 import { getActiveOrganization } from '@/lib/server/active-org'
 import { AppShellClient } from '@/components/layout/AppShellClient'
 import { redirect } from 'next/navigation'
@@ -8,6 +9,10 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode
 }) {
+  const cookieStore = await cookies()
+  const sidebarCollapsedCookie = cookieStore.get('organizeasy_sidebar_collapsed')
+  const initialCollapsed = sidebarCollapsedCookie ? sidebarCollapsedCookie.value === 'true' : false
+
   const {
     supabase,
     user,
@@ -66,6 +71,7 @@ export default async function AppLayout({
         pendingClientUpdatesCount={pendingClientUpdatesCount}
         userOrganizations={userOrganizations}
         activeOrgId={activeOrg.id}
+        initialCollapsed={initialCollapsed}
       >
         {children}
       </AppShellClient>

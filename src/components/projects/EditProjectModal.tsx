@@ -101,6 +101,17 @@ export default function EditProjectModal({
   organizationId,
   onSaved,
 }: EditProjectModalProps) {
+  const [currentClients, setCurrentClients] = useState<ClientData[]>(clients)
+
+  useEffect(() => {
+    setCurrentClients((prev) => {
+      const map = new Map<string, ClientData>()
+      clients.forEach((c) => map.set(c.id, c))
+      prev.forEach((c) => map.set(c.id, c))
+      return Array.from(map.values())
+    })
+  }, [clients])
+
   const [editTitle, setEditTitle] = useState('')
   const [editStatus, setEditStatus] = useState('ativo')
   const [editTypology, setEditTypology] = useState('Residencial')
@@ -564,7 +575,7 @@ export default function EditProjectModal({
       setLoading(false)
 
       if (res.success) {
-        const linkedClients = clients.filter((c) => editClientIds.includes(c.id))
+        const linkedClients = currentClients.filter((c) => editClientIds.includes(c.id))
         const updatedClientName =
           linkedClients.length > 0
             ? linkedClients.map((c) => c.name).join(', ')
@@ -758,11 +769,14 @@ export default function EditProjectModal({
           {/* Section 2: Vínculo de Clientes (Multi-Clientes) */}
           <div className="pt-4 border-t border-slate-100">
             <ClientMultiSelect
-              clients={clients}
+              clients={currentClients}
               selectedClientIds={editClientIds}
               onChange={(ids) => {
                 setEditClientIds(ids)
                 if (ids.length > 0) setEditClientError(null)
+              }}
+              onClientCreated={(newClient) => {
+                setCurrentClients((prev) => [newClient, ...prev.filter((c) => c.id !== newClient.id)])
               }}
               organizationId={organizationId}
               error={editClientError}

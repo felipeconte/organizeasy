@@ -168,9 +168,19 @@ export default function ProjectsManagerClient({
   const canDelete = effectiveIsOwner || can('projects_delete')
 
   const [projects, setProjects] = useState<ProjectItem[]>(initialProjects)
+  const [availableClients, setAvailableClients] = useState<ClientData[]>(initialClients)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('todos')
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
+
+  useEffect(() => {
+    setAvailableClients((prev) => {
+      const map = new Map<string, ClientData>()
+      initialClients.forEach((c) => map.set(c.id, c))
+      prev.forEach((c) => map.set(c.id, c))
+      return Array.from(map.values())
+    })
+  }, [initialClients])
 
   // Edit Modal State
   const [editingProject, setEditingProject] = useState<ProjectItem | null>(null)
@@ -638,7 +648,7 @@ export default function ProjectsManagerClient({
     setLoading(false)
 
     if (res.success) {
-      const linkedClients = (initialClients || []).filter((c) => editClientIds.includes(c.id))
+      const linkedClients = (availableClients || []).filter((c) => editClientIds.includes(c.id))
       const updatedClientName = linkedClients.length > 0
         ? linkedClients.map((c) => c.name).join(', ')
         : editingProject.client_name
@@ -1168,11 +1178,14 @@ export default function ProjectsManagerClient({
               {/* Section 2: Vínculo de Clientes (Multi-Clientes) */}
               <div className="pt-4 border-t border-slate-100">
                 <ClientMultiSelect
-                  clients={initialClients}
+                  clients={availableClients}
                   selectedClientIds={editClientIds}
                   onChange={(ids) => {
                     setEditClientIds(ids)
                     if (ids.length > 0) setEditClientError(null)
+                  }}
+                  onClientCreated={(newClient) => {
+                    setAvailableClients((prev) => [newClient, ...prev.filter((c) => c.id !== newClient.id)])
                   }}
                   organizationId={organizationId}
                   error={editClientError}

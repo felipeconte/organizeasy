@@ -15,6 +15,18 @@ import {
 } from 'lucide-react'
 import { ClientData } from '@/lib/actions/clients'
 import ClientModal from '@/components/clients/ClientModal'
+import { cleanDigits } from '@/lib/formatters-and-validators'
+
+const PAGE_SIZE = 20
+
+function normalizeSearchText(text?: string | null): string {
+  if (!text) return ''
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
 
 export interface ClientMultiSelectProps {
   clients: ClientData[]
@@ -23,6 +35,7 @@ export interface ClientMultiSelectProps {
   organizationId?: string
   error?: string | null
   required?: boolean
+  onClientCreated?: (client: ClientData) => void
 }
 
 export default function ClientMultiSelect({
@@ -32,6 +45,7 @@ export default function ClientMultiSelect({
   organizationId,
   error,
   required = true,
+  onClientCreated,
 }: ClientMultiSelectProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [isOpen, setIsOpen] = useState(false)
@@ -68,19 +82,74 @@ export default function ClientMultiSelect({
       .filter((c): c is ClientData => Boolean(c))
   }, [selectedClientIds, allClients])
 
-  // Filter available clients
+  // Pagination (Infinite Scroll) limit
+  const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE)
+
+  // Reset pagination limit when search query changes or dropdown closes
+  useEffect(() => {
+    setVisibleLimit(PAGE_SIZE)
+  }, [searchQuery, isOpen])
+
+  // Filter available clients using approximate (ilike style), accent-insensitive and token-based search
   const filteredClients = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim()
-    return allClients.filter((c) => {
-      const matchSearch =
-        !q ||
-        c.name.toLowerCase().includes(q) ||
-        (c.email && c.email.toLowerCase().includes(q)) ||
-        (c.document_number && c.document_number.includes(q)) ||
-        (c.phone && c.phone.includes(q))
-      return matchSearch
+    const rawQuery = searchQuery.trim()
+    if (!rawQuery) return allClients
+
+    const normalizedQuery = normalizeSearchText(rawQuery)
+    const queryTokens = normalizedQuery.split(/\s+/).filter(Boolean)
+    const queryDigits = cleanDigits(rawQuery)
+
+    const matches = allClients.filter((client) => {
+      const clientNameNorm = normalizeSearchText(client.name)
+      const clientEmailNorm = normalizeSearchText(client.email)
+      const clientCityNorm = normalizeSearchText(client.city)
+      const clientDocDigits = cleanDigits(client.document_number)
+      const clientPhoneDigits = cleanDigits(client.phone)
+
+      // 1. Busca direta por dígitos caso o usuário digite 3 ou mais dígitos numéricos (CPF, CNPJ, Telefone)
+      if (queryDigits.length >= 3) {
+        if (clientDocDigits.includes(queryDigits) || clientPhoneDigits.includes(queryDigits)) {
+          return true
+        }
+      }
+
+      // 2. Busca aproximada por tokens: todas as partes digitadas devem estar presentes no nome, e-mail ou cidade
+      const matchesAllTokens = queryTokens.every((token) => {
+        return (
+          clientNameNorm.includes(token) ||
+          clientEmailNorm.includes(token) ||
+          clientCityNorm.includes(token) ||
+          (client.document_number && normalizeSearchText(client.document_number).includes(token))
+        )
+      })
+
+      return matchesAllTokens
+    })
+
+    // Ordenação por relevância: clientes cujo nome inicia com o primeiro termo vêm antes, seguido de ordem alfabética
+    const firstToken = queryTokens[0] || ''
+    return matches.sort((a, b) => {
+      const aStarts = normalizeSearchText(a.name).startsWith(firstToken) ? 1 : 0
+      const bStarts = normalizeSearchText(b.name).startsWith(firstToken) ? 1 : 0
+      if (aStarts !== bStarts) return bStarts - aStarts
+      return a.name.localeCompare(b.name)
     })
   }, [allClients, searchQuery])
+
+  // Slice paginado exibido no dropdown para não sobrecarregar o DOM
+  const displayedClients = useMemo(() => {
+    return filteredClients.slice(0, visibleLimit)
+  }, [filteredClients, visibleLimit])
+
+  const hasMore = visibleLimit < filteredClients.length
+
+  // Carrega mais itens automaticamente ao rolar próximo ao final
+  const handleDropdownScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+    if (scrollHeight - scrollTop - clientHeight < 60 && hasMore) {
+      setVisibleLimit((prev) => Math.min(prev + PAGE_SIZE, filteredClients.length))
+    }
+  }
 
   // Toggle selection
   const handleToggleClient = (clientId: string) => {
@@ -95,10 +164,24 @@ export default function ClientMultiSelect({
     onChange(selectedClientIds.filter((id) => id !== clientId))
   }
 
-  const handleNewClientCreated = () => {
-    // If the modal revalidates or returns, the new client is in the DB
-    // We can also trigger a fast fetch or wait for page revalidation
+  const handleNewClientCreated = (newClient: ClientData) => {
+    // Adiciona o novo cliente à lista local para exibição imediata
+    setAllClients((prev) => {
+      const exists = prev.some((c) => c.id === newClient.id)
+      if (exists) {
+        return prev.map((c) => (c.id === newClient.id ? newClient : c))
+      }
+      return [newClient, ...prev]
+    })
+
+    // Vincula automaticamente o novo cliente ao projeto
+    if (!selectedClientIds.includes(newClient.id)) {
+      onChange([...selectedClientIds, newClient.id])
+    }
+
+    setSearchQuery('')
     setIsClientModalOpen(false)
+    onClientCreated?.(newClient)
   }
 
   return (
@@ -116,6 +199,131 @@ export default function ClientMultiSelect({
         >
           <Plus className="w-4 h-4" /> Cadastrar Novo Cliente
         </button>
+      </div>
+
+      {/* Search and Dropdown Trigger */}
+      <div className="relative">
+        <div
+          className={`flex items-center gap-2 px-3.5 py-2.5 bg-slate-50/50 border rounded-xl transition-all cursor-text ${
+            isOpen
+              ? 'bg-white ring-2 ring-blue-500/20 border-blue-600'
+              : error
+              ? 'border-rose-300 ring-2 ring-rose-500/20'
+              : 'border-slate-200 hover:border-slate-300'
+          }`}
+          onClick={() => setIsOpen(true)}
+        >
+          <Search className="w-4 h-4 text-slate-400 shrink-0" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value)
+              setIsOpen(true)
+            }}
+            onFocus={() => setIsOpen(true)}
+            placeholder={
+              selectedClients.length > 0
+                ? 'Buscar mais clientes para vincular (por Nome, CPF/CNPJ, E-mail)...'
+                : 'Buscar cliente para vincular ao projeto (por Nome, CPF/CNPJ, E-mail)...'
+            }
+            className="w-full text-sm text-slate-900 placeholder-slate-400 bg-transparent outline-none"
+          />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setIsOpen(!isOpen)
+            }}
+            className="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+          >
+            <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
+
+        {/* Dropdown Options with Infinite Scroll */}
+        {isOpen && (
+          <div
+            onScroll={handleDropdownScroll}
+            className="absolute z-50 left-0 right-0 mt-1.5 max-h-64 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl p-1 space-y-1 animate-in fade-in duration-100"
+          >
+            {displayedClients.length > 0 ? (
+              <>
+                {displayedClients.map((client) => {
+                  const isSelected = selectedClientIds.includes(client.id)
+                  const isPJ = client.person_type === 'PJ'
+
+                  return (
+                    <button
+                      key={client.id}
+                      type="button"
+                      onClick={() => handleToggleClient(client.id)}
+                      className={`w-full text-left p-2.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer ${
+                        isSelected ? 'bg-blue-50/80 text-blue-950 font-semibold' : 'hover:bg-slate-50 text-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
+                            isPJ ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+                          }`}
+                        >
+                          {isPJ ? 'PJ' : 'PF'}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold truncate">{client.name}</p>
+                          <p className="text-xs text-slate-500 truncate">
+                            {[client.document_number, client.email, client.phone].filter(Boolean).join(' • ')}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 ml-2">
+                        <div
+                          className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                            isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300'
+                          }`}
+                        >
+                          {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+
+                {/* Footer de Paginação Automática / Status de Contagem */}
+                <div className="pt-2 pb-1.5 px-3 border-t border-slate-100 mt-1 flex items-center justify-between text-xs text-slate-400 select-none bg-slate-50/60 rounded-b-lg">
+                  <span className="font-medium text-slate-600">
+                    Exibindo {displayedClients.length} de {filteredClients.length}
+                  </span>
+                  {hasMore ? (
+                    <span className="text-blue-600 font-semibold flex items-center gap-1">
+                      Role para carregar mais
+                    </span>
+                  ) : (
+                    <span className="text-slate-400">Todos carregados</span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="p-4 text-center">
+                <p className="text-sm text-slate-500 font-medium">
+                  Nenhum cliente encontrado para &quot;{searchQuery}&quot;
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOpen(false)
+                    setIsClientModalOpen(true)
+                  }}
+                  className="mt-2 text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                >
+                  + Cadastrar &quot;{searchQuery}&quot; como novo cliente
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <p className="text-sm text-slate-500">
@@ -197,116 +405,10 @@ export default function ClientMultiSelect({
             Nenhum cliente selecionado
           </p>
           <p className="text-xs text-slate-500 mt-0.5">
-            Busque e selecione abaixo os clientes que fazem parte deste projeto.
+            Busque e selecione acima os clientes que fazem parte deste projeto.
           </p>
         </div>
       )}
-
-      {/* Search and Dropdown Trigger */}
-      <div className="relative">
-        <div
-          className={`flex items-center gap-2 px-3.5 py-2.5 bg-slate-50/50 border rounded-xl transition-all cursor-text ${
-            isOpen
-              ? 'bg-white ring-2 ring-blue-500/20 border-blue-600'
-              : error
-              ? 'border-rose-300 ring-2 ring-rose-500/20'
-              : 'border-slate-200 hover:border-slate-300'
-          }`}
-          onClick={() => setIsOpen(true)}
-        >
-          <Search className="w-4 h-4 text-slate-400 shrink-0" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value)
-              setIsOpen(true)
-            }}
-            onFocus={() => setIsOpen(true)}
-            placeholder={
-              selectedClients.length > 0
-                ? 'Buscar mais clientes para vincular (por Nome, CPF/CNPJ, E-mail)...'
-                : 'Buscar cliente para vincular ao projeto (por Nome, CPF/CNPJ, E-mail)...'
-            }
-            className="w-full text-sm text-slate-900 placeholder-slate-400 bg-transparent outline-none"
-          />
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              setIsOpen(!isOpen)
-            }}
-            className="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
-          >
-            <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-          </button>
-        </div>
-
-        {/* Dropdown Options */}
-        {isOpen && (
-          <div className="absolute z-50 left-0 right-0 mt-1.5 max-h-64 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl p-1 space-y-1 animate-in fade-in duration-100">
-            {filteredClients.length > 0 ? (
-              filteredClients.map((client) => {
-                const isSelected = selectedClientIds.includes(client.id)
-                const isPJ = client.person_type === 'PJ'
-
-                return (
-                  <button
-                    key={client.id}
-                    type="button"
-                    onClick={() => handleToggleClient(client.id)}
-                    className={`w-full text-left p-2.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer ${
-                      isSelected ? 'bg-blue-50/80 text-blue-950 font-semibold' : 'hover:bg-slate-50 text-slate-800'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div
-                        className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
-                          isPJ ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
-                        }`}
-                      >
-                        {isPJ ? 'PJ' : 'PF'}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold truncate">{client.name}</p>
-                        <p className="text-xs text-slate-500 truncate">
-                          {[client.document_number, client.email, client.phone].filter(Boolean).join(' • ')}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="shrink-0 ml-2">
-                      <div
-                        className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
-                          isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300'
-                        }`}
-                      >
-                        {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
-                      </div>
-                    </div>
-                  </button>
-                )
-              })
-            ) : (
-              <div className="p-4 text-center">
-                <p className="text-sm text-slate-500 font-medium">
-                  Nenhum cliente encontrado para &quot;{searchQuery}&quot;
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsOpen(false)
-                    setIsClientModalOpen(true)
-                  }}
-                  className="mt-2 text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
-                >
-                  + Cadastrar &quot;{searchQuery}&quot; como novo cliente
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
 
       {error && (
         <p className="text-xs font-semibold text-rose-600 animate-in fade-in">

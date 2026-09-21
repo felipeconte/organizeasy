@@ -43,6 +43,7 @@ interface AppShellClientProps {
   pendingClientUpdatesCount: number
   userOrganizations?: UserOrganizationItem[]
   activeOrgId?: string
+  initialCollapsed?: boolean
   children: React.ReactNode
 }
 
@@ -58,20 +59,29 @@ export function AppShellClient({
   pendingClientUpdatesCount,
   userOrganizations = [],
   activeOrgId,
+  initialCollapsed = false,
   children,
 }: AppShellClientProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(false)
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(initialCollapsed)
+  const [isMounted, setIsMounted] = useState<boolean>(false)
   const [isOrgMenuOpen, setIsOrgMenuOpen] = useState<boolean>(false)
   const [switchingOrgId, setSwitchingOrgId] = useState<string | null>(null)
 
-  // Sincroniza estado inicial com localStorage de forma segura para SSR
+  // Sincroniza estado inicial com localStorage e cookie de forma segura para SSR
   useEffect(() => {
+    setIsMounted(true)
     try {
       const saved = localStorage.getItem('organizeasy_sidebar_collapsed') ?? localStorage.getItem('orgarq_sidebar_collapsed')
       if (saved !== null) {
-        setIsCollapsed(saved === 'true')
+        const savedBool = saved === 'true'
+        if (savedBool !== isCollapsed) {
+          setIsCollapsed(savedBool)
+        }
+        document.cookie = `organizeasy_sidebar_collapsed=${savedBool}; path=/; max-age=31536000; SameSite=Lax`
+      } else {
+        document.cookie = `organizeasy_sidebar_collapsed=${isCollapsed}; path=/; max-age=31536000; SameSite=Lax`
       }
     } catch {
       // Ignora erro de acesso ao localStorage se restrito
@@ -83,6 +93,7 @@ export function AppShellClient({
       const next = !prev
       try {
         localStorage.setItem('organizeasy_sidebar_collapsed', String(next))
+        document.cookie = `organizeasy_sidebar_collapsed=${next}; path=/; max-age=31536000; SameSite=Lax`
       } catch {
         // Ignora erro
       }
@@ -188,7 +199,9 @@ export function AppShellClient({
       <aside
         className={`${
           isCollapsed ? 'w-20' : 'w-64'
-        } bg-white border-r border-slate-200/80 flex flex-col justify-between shrink-0 fixed inset-y-0 z-20 transition-all duration-300 ease-in-out`}
+        } bg-white border-r border-slate-200/80 flex flex-col justify-between shrink-0 fixed inset-y-0 z-20 ${
+          isMounted ? 'transition-all duration-300 ease-in-out' : ''
+        }`}
       >
         {/* Botão flutuante na borda para recolher/expandir */}
         <button
@@ -589,7 +602,9 @@ export function AppShellClient({
       <div
         className={`${
           isCollapsed ? 'pl-20' : 'pl-64'
-        } flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out`}
+        } flex-1 flex flex-col min-w-0 ${
+          isMounted ? 'transition-all duration-300 ease-in-out' : ''
+        }`}
       >
         <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-8 py-3.5 flex items-center justify-between">
           <Breadcrumbs />

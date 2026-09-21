@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import {
   X,
   User,
@@ -81,6 +82,11 @@ export default function ClientModal({
 }: ClientModalProps) {
   const showAlert = useAlert()
   const numberInputRef = useRef<HTMLInputElement>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Form State
   const [personType, setPersonType] = useState<'PF' | 'PJ'>('PF')
@@ -258,7 +264,7 @@ export default function ClientModal({
     }
   }
 
-  if (!isOpen) return null
+  if (!isOpen || !mounted) return null
 
   // Change Person Type
   const handlePersonTypeChange = (type: 'PF' | 'PJ') => {
@@ -401,6 +407,7 @@ export default function ClientModal({
   // Submit Handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    e.stopPropagation()
 
     const newErrors: Record<string, string> = {}
     if (!name.trim() || name.trim().length < 2) {
@@ -512,7 +519,7 @@ export default function ClientModal({
     }
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 antialiased animate-in fade-in duration-200">
       <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden flex flex-col max-h-[92vh]">
         {/* Modal Header */}
@@ -543,7 +550,14 @@ export default function ClientModal({
         </div>
 
         {/* Modal Body Form */}
-        <form onSubmit={handleSubmit} className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-1">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            handleSubmit(e)
+          }}
+          className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-1"
+        >
           {/* Tipo de Pessoa Toggle (PF x PJ) */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
@@ -1012,6 +1026,7 @@ export default function ClientModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Users,
   UserPlus,
@@ -42,6 +43,7 @@ export default function ClientsManagerClient({
   isOwner: propIsOwner,
   userPermissions: propUserPermissions,
 }: ClientsManagerClientProps) {
+  const router = useRouter()
   const permissionsContext = usePermissions()
   const isOwner = propIsOwner ?? permissionsContext.isOwner
   const userPermissions = propUserPermissions ?? permissionsContext.permissions
@@ -292,7 +294,7 @@ export default function ClientsManagerClient({
                     key={client.id}
                     className="hover:bg-blue-50/40 transition-colors group cursor-pointer"
                     onClick={() => {
-                      window.location.href = `/app/clientes/${client.id}`
+                      router.push(`/app/clientes/${client.id}`)
                     }}
                   >
                     {/* Nome & Avatar */}

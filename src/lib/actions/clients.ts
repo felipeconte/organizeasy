@@ -295,7 +295,7 @@ export async function createClientAction(input: ClientInput): Promise<{
       return { success: false, error: 'Organização não identificada.' }
     }
 
-    await requirePermission(orgId, 'clients_create_edit')
+    await requirePermission(orgId, ['clients_create_edit', 'projects_create', 'projects_edit'])
 
     const name = sanitizeText(input.name)
     if (!name || name.trim().length < 2) {

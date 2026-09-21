@@ -131,10 +131,20 @@ export default function NewProjectForm({
   const [isPending, startTransition] = useTransition()
 
   // 0. Clientes Cadastrados & Vínculo Multi-Clientes
+  const [clientsList, setClientsList] = useState<ClientData[]>(initialClients)
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>(
     initialClientId ? [initialClientId] : []
   )
   const [clientError, setClientError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setClientsList((prev) => {
+      const map = new Map<string, ClientData>()
+      initialClients.forEach((c) => map.set(c.id, c))
+      prev.forEach((c) => map.set(c.id, c))
+      return Array.from(map.values())
+    })
+  }, [initialClients])
 
 
 
@@ -668,11 +678,14 @@ export default function NewProjectForm({
           {/* Section 2: Vínculo de Clientes (Multi-Clientes) */}
           <div className="pt-4 border-t border-slate-100">
             <ClientMultiSelect
-              clients={initialClients}
+              clients={clientsList}
               selectedClientIds={selectedClientIds}
               onChange={(ids) => {
                 setSelectedClientIds(ids)
                 if (ids.length > 0) setClientError(null)
+              }}
+              onClientCreated={(newClient) => {
+                setClientsList((prev) => [newClient, ...prev.filter((c) => c.id !== newClient.id)])
               }}
               organizationId={organizationId}
               error={clientError}
