@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { cache } from 'react'
+import { createClient } from '@/lib/supabase/server'
 import { requireAuth } from '@/lib/server/guard'
 import { FULL_PERMISSIONS, ProfilePermissions } from '@/types/profiles'
 import { ACTIVE_ORG_COOKIE, LEGACY_ACTIVE_ORG_COOKIE, UserOrganizationItem } from '@/types/organization'
@@ -10,10 +11,10 @@ export { ACTIVE_ORG_COOKIE, LEGACY_ACTIVE_ORG_COOKIE }
 /**
  * Busca todas as organizações às quais o usuário tem acesso (como proprietário ou membro)
  */
-export async function getUserOrganizations(
+export const getUserOrganizations = cache(async (
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string
-): Promise<UserOrganizationItem[]> {
+): Promise<UserOrganizationItem[]> => {
   const orgMap = new Map<string, UserOrganizationItem>()
 
   // 1. Busca todas as associações de membros
@@ -89,12 +90,12 @@ export async function getUserOrganizations(
   }
 
   return Array.from(orgMap.values())
-}
+})
 
 /**
- * Obtém a organização ativa para a sessão atual a partir do cookie organizeasy_active_org_id
+ * Obtém a organização ativa para a sessão atual a partir do cookie organizeasy_active_org_id (memoizado por requisição)
  */
-export async function getActiveOrganization(): Promise<{
+export const getActiveOrganization = cache(async (): Promise<{
   supabase: Awaited<ReturnType<typeof createClient>>
   user: {
     id: string
@@ -105,7 +106,7 @@ export async function getActiveOrganization(): Promise<{
   userOrganizations: UserOrganizationItem[]
   isOwner: boolean
   userPermissions: ProfilePermissions
-}> {
+}> => {
   const { supabase, user } = await requireAuth()
   const userOrganizations = await getUserOrganizations(supabase, user.id)
 
@@ -156,5 +157,5 @@ export async function getActiveOrganization(): Promise<{
     isOwner,
     userPermissions: permissions,
   }
-}
+})
 

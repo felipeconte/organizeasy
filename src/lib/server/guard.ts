@@ -8,6 +8,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { cache } from 'react'
 import { Database } from '@/types/database.types'
 
 type MemberRow = Database['public']['Tables']['organization_members']['Row']
@@ -20,9 +21,9 @@ export interface AuthenticatedUser {
 }
 
 /**
- * 1. Exige autenticação válida do usuário no servidor.
+ * 1. Exige autenticação válida do usuário no servidor (memoizado por requisição).
  */
-export async function requireAuth(): Promise<{ supabase: Awaited<ReturnType<typeof createClient>>; user: AuthenticatedUser }> {
+export const requireAuth = cache(async (): Promise<{ supabase: Awaited<ReturnType<typeof createClient>>; user: AuthenticatedUser }> => {
   const supabase = await createClient()
   const {
     data: { user },
@@ -41,7 +42,7 @@ export async function requireAuth(): Promise<{ supabase: Awaited<ReturnType<type
       user_metadata: user.user_metadata || {},
     },
   }
-}
+})
 
 
 import { PermissionKey, ProfilePermissions, FULL_PERMISSIONS } from '@/types/profiles'

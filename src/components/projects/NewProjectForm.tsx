@@ -24,6 +24,7 @@ import {
   X,
 } from 'lucide-react'
 import { createProjectAction } from '@/lib/actions/projects'
+import { startNavigationProgress } from '@/components/layout/NavigationProgressBar'
 import { ClientData } from '@/lib/actions/clients'
 import ClientMultiSelect from '@/components/projects/ClientMultiSelect'
 import TypologySelect from '@/components/projects/TypologySelect'
@@ -129,6 +130,7 @@ export default function NewProjectForm({
 }: NewProjectFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [isNavigatingAway, setIsNavigatingAway] = useState(false)
 
   // 0. Clientes Cadastrados & Vínculo Multi-Clientes
   const [clientsList, setClientsList] = useState<ClientData[]>(initialClients)
@@ -561,6 +563,9 @@ export default function NewProjectForm({
           return
         }
 
+        setIsNavigatingAway(true)
+        startNavigationProgress()
+
         if (result && 'projectId' in result && result.projectId) {
           router.push(`/app/projetos/${result.projectId}`)
         } else {
@@ -570,6 +575,7 @@ export default function NewProjectForm({
         console.error('Erro ao submeter projeto:', err)
         const msg = err instanceof Error ? err.message : 'Falha ao salvar projeto no banco.'
         setErrorMessage(msg)
+        setIsNavigatingAway(false)
       }
     })
   }
@@ -1138,12 +1144,13 @@ export default function NewProjectForm({
 
             <button
               type="submit"
-              disabled={isPending}
+              disabled={isPending || isNavigatingAway}
               className="py-2.5 px-6 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-500/25 transition-all flex items-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
             >
-              {isPending ? (
+              {isPending || isNavigatingAway ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Criando Projeto...
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {isNavigatingAway ? 'Abrindo Projeto...' : 'Criando Projeto...'}
                 </>
               ) : (
                 <>

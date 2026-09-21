@@ -79,7 +79,9 @@ export const metadata: Metadata = {
   },
 };
 
+import { Suspense } from "react";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
+import { NavigationProgressBar } from "@/components/layout/NavigationProgressBar";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -92,6 +94,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className={`${inter.className} min-h-full flex flex-col bg-[#F8FAFC] text-slate-800 text-sm selection:bg-blue-100 selection:text-blue-700`}>
+        <Suspense fallback={null}>
+          <NavigationProgressBar />
+        </Suspense>
         <ConfirmProvider>
           {children}
         </ConfirmProvider>
