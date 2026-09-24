@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import {
   FolderGit2,
@@ -20,6 +20,8 @@ import { updateProjectAction } from '@/lib/actions/projects'
 import { ClientData } from '@/lib/actions/clients'
 import ClientMultiSelect from '@/components/projects/ClientMultiSelect'
 import TypologySelect from '@/components/projects/TypologySelect'
+import JellyRadio, { PROJECT_STATUS_JELLY_ITEMS } from '@/components/ui/JellyRadio'
+import { usePromptSaveOrDiscard } from '@/components/ui/ConfirmDialog'
 import { ProjectItem } from '@/components/projects/ProjectsManagerClient'
 import { formatAreaOnlyNumbers, maskCEP, ESTADOS_BRASIL, normalizeUF } from '@/lib/formatters-and-validators'
 import {
@@ -93,6 +95,29 @@ export interface EditProjectModalProps {
   onSaved?: (updatedProject: ProjectItem) => void
 }
 
+interface FormSnapshot {
+  title: string
+  status: string
+  typology: string
+  areaRaw: number | null
+  areaInput: string
+  budgetRaw: number | null
+  budgetInput: string
+  clientIds: string[]
+  startDate: string
+  deadline: string
+  description: string
+  road: string
+  number: string
+  complement: string
+  neighborhood: string
+  city: string
+  state: string
+  postalCode: string
+  lat: number | null
+  lng: number | null
+}
+
 export default function EditProjectModal({
   isOpen,
   onClose,
@@ -155,33 +180,55 @@ export default function EditProjectModal({
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const searchContainerRef = useRef<HTMLDivElement>(null)
 
+  const promptSaveOrDiscard = usePromptSaveOrDiscard()
+  const initialStateRef = useRef<FormSnapshot | null>(null)
+  const openedProjectIdRef = useRef<string | null>(null)
+  const isPromptingRef = useRef(false)
+
   // Inicializa dados quando o projeto ou o modal abrem
   useEffect(() => {
+    if (!isOpen) {
+      openedProjectIdRef.current = null
+      initialStateRef.current = null
+      return
+    }
+
     if (isOpen && project) {
+      // Se já está aberto com os dados deste projeto, não sobrescreve os dados que o usuário está digitando
+      if (openedProjectIdRef.current === project.id) {
+        return
+      }
+      openedProjectIdRef.current = project.id
+
       setEditTitle(project.title || '')
-      setEditStatus(project.status || 'ativo')
+      setEditStatus(project.status === 'em_producao' ? 'ativo' : (project.status || 'ativo'))
       setEditTypology(project.typology || 'Residencial')
-      setEditAreaInput(
+
+      const formattedArea =
         project.area_sqm !== null && project.area_sqm !== undefined
           ? formatAreaOnlyNumbers(project.area_sqm).display
           : ''
-      )
+      setEditAreaInput(formattedArea)
       setEditAreaRaw(project.area_sqm || null)
+
       const budgetNum =
         project.estimated_budget !== null && project.estimated_budget !== undefined
           ? Number(project.estimated_budget)
           : null
 
+      let formattedBudget = ''
       if (budgetNum !== null && !isNaN(budgetNum) && budgetNum > 0) {
-        setEditBudgetInput(formatCurrencyBRL(budgetNum).formatted)
+        formattedBudget = formatCurrencyBRL(budgetNum).formatted
+        setEditBudgetInput(formattedBudget)
         setEditBudgetRaw(budgetNum)
       } else {
         setEditBudgetInput('')
         setEditBudgetRaw(null)
       }
-      setEditClientIds(
+
+      const initialClientIds =
         project.client_ids || (project.client_id ? [project.client_id] : [])
-      )
+      setEditClientIds(initialClientIds)
       setEditClientError(null)
       setEditStartDate(project.start_date || '')
       setEditDeadline(project.deadline || '')
@@ -200,9 +247,13 @@ export default function EditProjectModal({
       // Parse coordenadas e partes do endereço
       let rawAddress = project.address || ''
       const coordMatch = rawAddress.match(/\(Coordenadas:\s*([-\d.]+)[,\s]+([-\d.]+)\)/i)
+      let parsedLat: number | null = null
+      let parsedLng: number | null = null
       if (coordMatch) {
-        setLat(parseFloat(coordMatch[1]))
-        setLng(parseFloat(coordMatch[2]))
+        parsedLat = parseFloat(coordMatch[1])
+        parsedLng = parseFloat(coordMatch[2])
+        setLat(parsedLat)
+        setLng(parsedLng)
         rawAddress = rawAddress.replace(coordMatch[0], '').trim().replace(/-\s*$/, '').trim()
       } else {
         setLat(null)
@@ -210,24 +261,30 @@ export default function EditProjectModal({
       }
 
       const cepMatch = rawAddress.match(/CEP:\s*([\d-]+)/i)
+      let parsedCep = ''
       if (cepMatch) {
-        setAddressPostalCode(cepMatch[1])
+        parsedCep = cepMatch[1]
+        setAddressPostalCode(parsedCep)
         rawAddress = rawAddress.replace(cepMatch[0], '').trim().replace(/-\s*$/, '').trim()
       } else {
         setAddressPostalCode('')
       }
 
-      const bairroMatch = rawAddress.match(/Bairro:\s*([^ -]+)/i)
+      const bairroMatch = rawAddress.match(/Bairro:\s*([^-]+)/i)
+      let parsedNeighborhood = ''
       if (bairroMatch) {
-        setAddressNeighborhood(bairroMatch[1])
+        parsedNeighborhood = bairroMatch[1].trim()
+        setAddressNeighborhood(parsedNeighborhood)
         rawAddress = rawAddress.replace(bairroMatch[0], '').trim().replace(/-\s*$/, '').trim()
       } else {
         setAddressNeighborhood('')
       }
 
       const numMatch = rawAddress.match(/Nº\s*([^\s,]+)/i)
+      let parsedNumber = ''
       if (numMatch) {
-        setAddressNumber(numMatch[1])
+        parsedNumber = numMatch[1].trim()
+        setAddressNumber(parsedNumber)
         rawAddress = rawAddress.replace(numMatch[0], '').trim()
       } else {
         setAddressNumber('')
@@ -239,10 +296,90 @@ export default function EditProjectModal({
         .replace(/\s*-\s*$/, '')
         .trim()
       setAddressRoad(cleanRoad)
+      setAddressComplement('')
       setAddressCity(project.city || '')
       setAddressState(normalizeUF(project.state))
+
+      // Salva snapshot inicial para detecção de alterações não salvas
+      initialStateRef.current = {
+        title: project.title || '',
+        status: project.status === 'em_producao' ? 'ativo' : (project.status || 'ativo'),
+        typology: project.typology || 'Residencial',
+        areaRaw: project.area_sqm || null,
+        areaInput: formattedArea,
+        budgetRaw: budgetNum,
+        budgetInput: formattedBudget,
+        clientIds: initialClientIds,
+        startDate: project.start_date || '',
+        deadline: project.deadline || '',
+        description: project.description || '',
+        road: cleanRoad,
+        number: parsedNumber,
+        complement: '',
+        neighborhood: parsedNeighborhood,
+        city: project.city || '',
+        state: normalizeUF(project.state),
+        postalCode: parsedCep,
+        lat: parsedLat,
+        lng: parsedLng,
+      }
     }
   }, [isOpen, project])
+
+  // Verifica se qualquer dado foi alterado pelo usuário
+  const isDirty = useCallback(() => {
+    if (!initialStateRef.current) return false
+    const init = initialStateRef.current
+
+    if (editTitle.trim() !== init.title.trim()) return true
+    if (editStatus !== init.status) return true
+    if (editTypology !== init.typology) return true
+    if ((editAreaRaw ?? null) !== (init.areaRaw ?? null)) return true
+    if (editAreaInput.trim() !== init.areaInput.trim()) return true
+    if ((editBudgetRaw ?? null) !== (init.budgetRaw ?? null)) return true
+    if (editBudgetInput.trim() !== init.budgetInput.trim()) return true
+    if ((editStartDate || '') !== (init.startDate || '')) return true
+    if ((editDeadline || '') !== (init.deadline || '')) return true
+    if (editDescription.trim() !== init.description.trim()) return true
+
+    // Compara clientes vinculados
+    const currentClientsStr = [...editClientIds].sort().join(',')
+    const initClientsStr = [...init.clientIds].sort().join(',')
+    if (currentClientsStr !== initClientsStr) return true
+
+    // Compara campos de endereço e localização
+    if (addressRoad.trim() !== init.road.trim()) return true
+    if (addressNumber.trim() !== init.number.trim()) return true
+    if (addressComplement.trim() !== init.complement.trim()) return true
+    if (addressNeighborhood.trim() !== init.neighborhood.trim()) return true
+    if (addressCity.trim() !== init.city.trim()) return true
+    if (addressState.trim() !== init.state.trim()) return true
+    if (addressPostalCode.replace(/\D/g, '') !== init.postalCode.replace(/\D/g, '')) return true
+    if (lat !== init.lat || lng !== init.lng) return true
+
+    return false
+  }, [
+    editTitle,
+    editStatus,
+    editTypology,
+    editAreaRaw,
+    editAreaInput,
+    editBudgetRaw,
+    editBudgetInput,
+    editStartDate,
+    editDeadline,
+    editDescription,
+    editClientIds,
+    addressRoad,
+    addressNumber,
+    addressComplement,
+    addressNeighborhood,
+    addressCity,
+    addressState,
+    addressPostalCode,
+    lat,
+    lng,
+  ])
 
   // Fecha dropdown de busca ao clicar fora
   useEffect(() => {
@@ -518,13 +655,16 @@ export default function EditProjectModal({
     }
   }
 
-  const handleSaveEdit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!project || !editTitle.trim()) return
+  const handleSaveEdit = async (e?: React.FormEvent): Promise<boolean> => {
+    if (e) e.preventDefault()
+    if (!project || !editTitle.trim()) {
+      setErrorMsg('O título do projeto é obrigatório.')
+      return false
+    }
 
     if (editClientIds.length === 0) {
       setEditClientError('Selecione ao menos um cliente cadastrado para o projeto.')
-      return
+      return false
     }
 
     setEditClientError(null)
@@ -602,24 +742,91 @@ export default function EditProjectModal({
           state: addressState.trim() || null,
         }
 
+        initialStateRef.current = null
         onSaved?.(updatedProject)
         onClose()
+        return true
       } else {
         setErrorMsg(res.error || 'Erro ao atualizar dados do projeto.')
+        return false
       }
     } catch (err: any) {
       setLoading(false)
       setErrorMsg(err?.message || 'Erro inesperado ao salvar alterações.')
+      return false
     }
   }
+
+  // Tenta fechar o modal: se houver alterações não salvas, pede confirmação
+  const handleAttemptClose = useCallback(async () => {
+    if (loading || isPromptingRef.current) return
+
+    if (!isDirty()) {
+      onClose()
+      return
+    }
+
+    isPromptingRef.current = true
+    try {
+      const choice = await promptSaveOrDiscard({
+        title: 'Salvar alterações?',
+        message: 'Você fez alterações no projeto que ainda não foram salvas.',
+        description: 'Deseja salvar as alterações antes de fechar ou prefere descartá-las?',
+        saveText: 'Salvar Alterações',
+        discardText: 'Descartar Alterações',
+        cancelText: 'Continuar Editando',
+      })
+
+      if (choice === 'save') {
+        const saved = await handleSaveEdit()
+        if (saved) {
+          onClose()
+        }
+      } else if (choice === 'discard') {
+        onClose()
+      }
+    } finally {
+      isPromptingRef.current = false
+    }
+  }, [loading, isDirty, onClose, promptSaveOrDiscard, handleSaveEdit])
+
+  // Escuta tecla Escape para fechar com validação
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showSuggestions) {
+          setShowSuggestions(false)
+          return
+        }
+        handleAttemptClose()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, showSuggestions, handleAttemptClose])
 
   if (!isOpen || !project) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
-      <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-8">
+      <div className="fixed inset-0" onClick={handleAttemptClose} />
+      <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-8 z-10 flex flex-col max-h-[90vh]">
+        {/* Loading Overlay */}
+        {loading && (
+          <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-xs flex flex-col items-center justify-center gap-3 animate-in fade-in duration-200">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200/60 flex items-center justify-center text-blue-600 shadow-sm animate-pulse">
+              <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+            </div>
+            <div className="text-center space-y-1">
+              <p className="text-sm font-bold text-slate-900">Salvando alterações...</p>
+              <p className="text-xs text-slate-500 font-medium">Por favor, aguarde enquanto atualizamos os dados do projeto.</p>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 bg-slate-50/50">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 bg-slate-50/50 shrink-0">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="px-2 py-0.5 text-xs font-mono font-medium bg-slate-100 text-slate-500 rounded-md">
@@ -651,57 +858,58 @@ export default function EditProjectModal({
 
           <button
             type="button"
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-2 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+            disabled={loading}
+            onClick={handleAttemptClose}
+            className="text-slate-400 hover:text-slate-600 p-2 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {errorMsg && (
-          <div className="mx-6 mt-4 p-3.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-2xl flex items-center gap-2">
+          <div className="mx-6 mt-4 p-3.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-2xl flex items-center gap-2 shrink-0">
             <span className="w-2 h-2 rounded-full bg-rose-500" />
             {errorMsg}
           </div>
         )}
 
-        <form onSubmit={handleSaveEdit} className="p-6 max-h-[75vh] overflow-y-auto space-y-6">
+        <form onSubmit={handleSaveEdit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <div className="flex-1 p-6 overflow-y-auto space-y-6">
           {/* Section 1: Identificação */}
           <div className="space-y-4">
             <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-slate-100">
               <FolderGit2 className="w-4 h-4 text-blue-600" /> Identificação do Projeto
             </h4>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              <div className="sm:col-span-2">
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                  Título do Projeto *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  placeholder="Ex: Residência Alphaville ou Escritório Advocacia"
-                  className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Título do Projeto *
+              </label>
+              <input
+                type="text"
+                required
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Ex: Residência Alphaville ou Escritório Advocacia"
+                className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              />
+            </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                  Status do Projeto
-                </label>
-                <select
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Status do Projeto
+              </label>
+              <div className="pt-0.5 overflow-x-auto pb-1 scrollbar-none">
+                <JellyRadio
+                  items={PROJECT_STATUS_JELLY_ITEMS}
                   value={editStatus}
-                  onChange={(e) => setEditStatus(e.target.value)}
-                  className="block w-full px-3.5 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 cursor-pointer"
-                >
-                  <option value="ativo">🟢 Ativo</option>
-                  <option value="em_producao">⚡ Em Andamento</option>
-                  <option value="pausado">🟡 Pausado</option>
-                  <option value="concluido">✅ Concluído</option>
-                  <option value="cancelado">🔴 Cancelado</option>
-                </select>
+                  onChange={(val) => setEditStatus(val)}
+                  size="md"
+                  gap={8}
+                  radius={12}
+                  swell={0.16}
+                  barge={4}
+                />
               </div>
             </div>
 
@@ -1101,25 +1309,27 @@ export default function EditProjectModal({
               />
             </div>
           </div>
+          </div>
 
-          {/* Footer */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+          {/* Sticky Footer */}
+          <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-3 shrink-0">
             <button
               type="button"
-              onClick={onClose}
-              className="px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              disabled={loading}
+              onClick={handleAttemptClose}
+              className="px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading || !editTitle.trim() || editClientIds.length === 0}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-sm hover:shadow-md transition-all disabled:opacity-50 cursor-pointer"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Salvando...</span>
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  <span>Salvando Alterações...</span>
                 </>
               ) : (
                 <span>Salvar Alterações</span>

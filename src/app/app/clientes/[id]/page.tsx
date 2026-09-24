@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { requireOrgAccess, hasPermission } from '@/lib/server/guard'
+import { getActiveOrganization } from '@/lib/server/active-org'
 import AccessDenied from '@/components/ui/AccessDenied'
 import { getClientByIdAction } from '@/lib/actions/clients'
 import ClientDetailClient from '@/components/clients/ClientDetailClient'
@@ -32,6 +33,8 @@ export default async function ClientDetailPage({
     )
   }
 
+  const { activeOrg } = await getActiveOrganization()
+
   return (
     <>
       <BreadcrumbSetter
@@ -45,6 +48,7 @@ export default async function ClientDetailPage({
         client={res.client}
         projects={res.projects || []}
         organizationId={res.client.organization_id}
+        orgSlug={activeOrg?.slug}
         isOwner={isOwner}
         userPermissions={permissions}
       />

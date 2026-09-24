@@ -5,14 +5,63 @@ import { cookies } from 'next/headers'
 import { requireAuth, requireOrgAccess, requirePermission } from '@/lib/server/guard'
 import { sanitizeText } from '@/lib/server/sanitize'
 import { Database } from '@/types/database.types'
-import { cleanDigits, maskCPFOrCNPJ, validateCPF, validateCNPJ } from '@/lib/formatters-and-validators'
+import { cleanDigits, maskCPFOrCNPJ, validateCPF, validateCNPJ, slugify } from '@/lib/formatters-and-validators'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sendUserInvitationEmail } from '@/lib/server/email'
 import { ACTIVE_ORG_COOKIE } from '@/types/organization'
 import { getAppBaseUrl, getRequestBaseUrl } from '@/lib/app-url'
 
-
 type OrganizationUpdate = Database['public']['Tables']['organizations']['Update']
+
+/**
+ * Gera um identificador (slug) único para um novo escritório.
+ * Converte o nome para minúsculas, sem acentuação e espaços em hífens (-).
+ * Caso já exista escritório com esse mesmo slug, acrescenta um sufixo incremental (-2, -3, etc.).
+ */
+export async function generateUniqueOrganizationSlug(
+  supabase: any,
+  officeName: string,
+  excludeOrgId?: string
+): Promise<string> {
+  const baseSlug = slugify(officeName) || 'escritorio'
+
+  // 1. Tenta o slug base limpo
+  let query = supabase
+    .from('organizations')
+    .select('id')
+    .eq('slug', baseSlug)
+
+  if (excludeOrgId) {
+    query = query.neq('id', excludeOrgId)
+  }
+
+  const { data: existing } = await query.maybeSingle()
+  if (!existing) {
+    return baseSlug
+  }
+
+  // 2. Se já existe, tenta sufixos numéricos sequenciais
+  let counter = 2
+  while (counter < 100) {
+    const candidate = `${baseSlug}-${counter}`
+    let cQuery = supabase
+      .from('organizations')
+      .select('id')
+      .eq('slug', candidate)
+
+    if (excludeOrgId) {
+      cQuery = cQuery.neq('id', excludeOrgId)
+    }
+
+    const { data: cExisting } = await cQuery.maybeSingle()
+    if (!cExisting) {
+      return candidate
+    }
+    counter++
+  }
+
+  return `${baseSlug}-${Date.now().toString(36)}`
+}
 
 /**
  * Atualiza os dados cadastrais do escritório / organização
@@ -27,10 +76,8 @@ export async function updateOrganizationAction(
   await requirePermission(orgId, 'settings_office')
 
   const name = sanitizeText(formData.get('name') as string)
-  const slug = sanitizeText(formData.get('slug') as string)
-    ?.toLowerCase()
-    .replace(/[^a-z0-9-]/g, '-')
-    .replace(/-+/g, '-')
+  const rawSlug = formData.get('slug') as string
+  const cleanSlug = slugify(rawSlug)
   const professional_council_id = sanitizeText(
     (formData.get('professional_council_id') || formData.get('cau_caubr')) as string
   )
@@ -44,8 +91,8 @@ export async function updateOrganizationAction(
     return { success: false, error: 'O nome do escritório é obrigatório.' }
   }
 
-  if (!slug) {
-    return { success: false, error: 'O identificador (slug) é obrigatório.' }
+  if (!cleanSlug || cleanSlug.length < 2) {
+    return { success: false, error: 'O identificador (slug) deve ter pelo menos 2 caracteres alfanuméricos.' }
   }
 
   if (cnpj) {
@@ -63,11 +110,20 @@ export async function updateOrganizationAction(
     }
   }
 
+  // Busca dados anteriores da organização para checar se o slug mudou
+  const { data: currentOrg } = await supabase
+    .from('organizations')
+    .select('slug')
+    .eq('id', orgId)
+    .single()
+
+  const oldSlug = currentOrg?.slug
+
   // Verifica se o slug já está em uso por outro escritório
   const { data: existingSlug } = await supabase
     .from('organizations')
     .select('id')
-    .eq('slug', slug)
+    .eq('slug', cleanSlug)
     .neq('id', orgId)
     .maybeSingle()
 
@@ -77,7 +133,7 @@ export async function updateOrganizationAction(
 
   const updatePayload: Record<string, any> = {
     name,
-    slug,
+    slug: cleanSlug,
     professional_council_id: professional_council_id || null,
     cnpj: cnpj ? maskCPFOrCNPJ(cnpj) : null,
     phone: phone || null,
@@ -104,6 +160,10 @@ export async function updateOrganizationAction(
 
   revalidatePath('/app/configuracoes/escritorio')
   revalidatePath('/app', 'layout')
+  if (oldSlug) {
+    revalidatePath(`/portal/${oldSlug}`)
+  }
+  revalidatePath(`/portal/${cleanSlug}`)
   return { success: true }
 }
 

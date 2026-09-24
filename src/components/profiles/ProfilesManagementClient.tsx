@@ -92,6 +92,7 @@ export default function ProfilesManagementClient({
       projects_edit: true,
       projects_delete: false,
       tasks_manage: true,
+      tasks_override_approval: false,
       module_clients: true,
       clients_create_edit: false,
       clients_delete: false,

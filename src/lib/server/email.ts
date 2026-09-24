@@ -869,7 +869,8 @@ export async function sendReauthenticationEmail(
 export interface ClientPortalAccessEmailParams {
   clientName: string
   clientEmail: string
-  portalToken: string
+  portalToken?: string
+  officeSlug?: string
   accessCode: string
   officeName: string
   officeLogo?: string | null
@@ -887,6 +888,7 @@ export async function sendClientPortalAccessDetailsEmail(
     clientName,
     clientEmail,
     portalToken,
+    officeSlug,
     accessCode,
     officeName,
     officePhone,
@@ -894,7 +896,9 @@ export async function sendClientPortalAccessDetailsEmail(
   } = params
 
   const baseUrl = getAppBaseUrl()
-  const portalUrl = `${baseUrl}/portal/${portalToken}`
+  const portalUrl = officeSlug
+    ? `${baseUrl}/portal/${officeSlug}`
+    : `${baseUrl}/portal/${portalToken || ''}`
   const emailSubject = `Seu Acesso ao Portal do Cliente - ${officeName}`
 
   const emailHtml = `

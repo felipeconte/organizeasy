@@ -56,6 +56,7 @@ import {
   deleteStageAction,
   createStageAction,
   unlinkSubtaskAction,
+  manualApproveStageOverrideAction,
   ChecklistItem,
   StageComment,
   StageAttachment
@@ -75,6 +76,8 @@ import {
   canMoveToFinalStage,
   getFinalStage
 } from '@/lib/workflow-stages'
+import { usePermissions } from '@/contexts/PermissionsContext'
+import { ManualApprovalModal } from '@/components/projects/ManualApprovalModal'
 
 export interface MemberOption {
   id: string
@@ -143,6 +146,12 @@ export default function TaskDetailDrawer({
   const confirm = useConfirm()
   const showAlert = useAlert()
   const promptSaveOrDiscard = usePromptSaveOrDiscard()
+  const { can, isOwner } = usePermissions()
+  const canOverrideApproval = isOwner || can('tasks_override_approval')
+
+  const [manualApprovalModalOpen, setManualApprovalModalOpen] = useState(false)
+  const [pendingTargetStatus, setPendingTargetStatus] = useState<string | null>(null)
+  const [submittingManualApproval, setSubmittingManualApproval] = useState(false)
 
   const [deletingStage, setDeletingStage] = useState(false)
   const [formData, setFormData] = useState<{
@@ -663,6 +672,11 @@ export default function TaskDetailDrawer({
     if (targetCfg?.is_final_stage && newStatus !== stage.status) {
       const check = canMoveToFinalStage(getUpdatedTaskData({ status: newStatus }), workflowStages)
       if (!check.allowed) {
+        if (check.isClientApprovalBlocked && !check.hasChecklistPending && canOverrideApproval) {
+          setPendingTargetStatus(newStatus)
+          setManualApprovalModalOpen(true)
+          return
+        }
         await showAlert({
           title: 'Etapa Conclusiva Bloqueada',
           message: 'Esta tarefa não pode ser colocada na etapa finalizada:',
@@ -699,6 +713,34 @@ export default function TaskDetailDrawer({
     }
 
     setFormData({ ...formData, status: newStatus })
+  }
+
+  const handleConfirmManualApproval = async (justification: string) => {
+    if (!stage) return
+    setSubmittingManualApproval(true)
+    const target = pendingTargetStatus || getFinalStage(workflowStages)?.id || 'concluido'
+    const res = await manualApproveStageOverrideAction(projectId, stage.id, justification, target)
+    setSubmittingManualApproval(false)
+    if (res.error) {
+      throw new Error(res.error)
+    }
+    if (res.comments) {
+      setComments(res.comments)
+    }
+    setFormData((prev) => ({ ...prev, status: res.status || target }))
+    if (onUpdateStage) {
+      onUpdateStage({
+        ...stage,
+        status: res.status || target,
+        comments: res.comments || comments,
+      })
+    }
+    await showAlert({
+      title: 'Etapa Aprovada Manualmente',
+      message: 'A aprovação manual foi registrada com sucesso!',
+      description: 'A justificativa foi salva e ficará visível no portal do cliente.',
+      variant: 'success',
+    })
   }
 
   // Delete Stage Action
@@ -1253,7 +1295,31 @@ export default function TaskDetailDrawer({
             {isTaskFinalized && (
               <div className="p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-200/80 text-indigo-900 flex items-center gap-2.5 text-sm font-semibold shadow-2xs">
                 <Flag className="w-4 h-4 text-indigo-600 shrink-0" />
-                <span>Esta tarefa está na <strong>Etapa Finalizada (Serviço Concluído)</strong> com todos os requisitos atendidos.</span>
+                <span>Esta tarefa está na etapa <strong>Finalizada</strong></span>
+              </div>
+            )}
+
+            {/* Banner / Ação de Aprovação do Cliente e Override */}
+            {formData.is_client_approval_required && !isTaskFinalized && (
+              <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/80 text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>
+                    Esta tarefa <strong>exige aprovação do cliente</strong> para ser concluída.
+                  </span>
+                </div>
+                {canOverrideApproval && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPendingTargetStatus(getFinalStage(workflowStages)?.id || 'concluido')
+                      setManualApprovalModalOpen(true)
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold transition-all shadow-xs cursor-pointer self-start sm:self-auto shrink-0"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" /> Aprovar Manualmente
+                  </button>
+                )}
               </div>
             )}
 
@@ -1440,9 +1506,8 @@ export default function TaskDetailDrawer({
                       </span>
                       <div className="w-20 bg-slate-200 h-1.5 rounded-full overflow-hidden">
                         <div
-                          className={`h-full rounded-full transition-all duration-300 ${
-                            subtaskProgressPercent === 100 ? 'bg-emerald-500' : 'bg-blue-600'
-                          }`}
+                          className={`h-full rounded-full transition-all duration-300 ${subtaskProgressPercent === 100 ? 'bg-emerald-500' : 'bg-blue-600'
+                            }`}
                           style={{ width: `${subtaskProgressPercent}%` }}
                         />
                       </div>
@@ -1992,14 +2057,12 @@ export default function TaskDetailDrawer({
                         <button
                           type="button"
                           onClick={() => setNewAttachmentVisibleToClient(!newAttachmentVisibleToClient)}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                            newAttachmentVisibleToClient ? 'bg-blue-600' : 'bg-slate-300'
-                          }`}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${newAttachmentVisibleToClient ? 'bg-blue-600' : 'bg-slate-300'
+                            }`}
                         >
                           <span
-                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
-                              newAttachmentVisibleToClient ? 'translate-x-4' : 'translate-x-0'
-                            }`}
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${newAttachmentVisibleToClient ? 'translate-x-4' : 'translate-x-0'
+                              }`}
                           />
                         </button>
                       </div>
@@ -2070,14 +2133,12 @@ export default function TaskDetailDrawer({
                         <button
                           type="button"
                           onClick={() => setNewAttachmentVisibleToClient(!newAttachmentVisibleToClient)}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                            newAttachmentVisibleToClient ? 'bg-blue-600' : 'bg-slate-300'
-                          }`}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${newAttachmentVisibleToClient ? 'bg-blue-600' : 'bg-slate-300'
+                            }`}
                         >
                           <span
-                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
-                              newAttachmentVisibleToClient ? 'translate-x-4' : 'translate-x-0'
-                            }`}
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${newAttachmentVisibleToClient ? 'translate-x-4' : 'translate-x-0'
+                              }`}
                           />
                         </button>
                       </div>
@@ -2216,11 +2277,10 @@ export default function TaskDetailDrawer({
                             type="button"
                             onClick={() => handleToggleAttachmentVisibility(att)}
                             disabled={togglingVisibilityId === att.id}
-                            className={`p-1 rounded-lg transition-colors cursor-pointer ${
-                              isVisibleToClient
-                                ? 'text-emerald-600 hover:bg-emerald-50'
-                                : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200'
-                            }`}
+                            className={`p-1 rounded-lg transition-colors cursor-pointer ${isVisibleToClient
+                              ? 'text-emerald-600 hover:bg-emerald-50'
+                              : 'text-slate-400 hover:text-slate-700 hover:bg-slate-200'
+                              }`}
                             title={
                               isVisibleToClient
                                 ? 'Visível no Portal do Cliente (clique para ocultar)'
@@ -2316,8 +2376,8 @@ export default function TaskDetailDrawer({
                     <div
                       key={cmt.id}
                       className={`p-3.5 rounded-xl border space-y-2 transition-all group ${isAudit
-                          ? 'bg-emerald-50/70 border-emerald-200/90 shadow-2xs'
-                          : 'bg-slate-50 border-slate-100 hover:border-slate-200'
+                        ? 'bg-emerald-50/70 border-emerald-200/90 shadow-2xs'
+                        : 'bg-slate-50 border-slate-100 hover:border-slate-200'
                         }`}
                     >
                       <div className="flex items-center justify-between text-xs text-slate-400">
@@ -2488,6 +2548,15 @@ export default function TaskDetailDrawer({
           </div>
         </div>
       )}
+
+      {/* Modal de Aprovação Manual com Justificativa */}
+      <ManualApprovalModal
+        isOpen={manualApprovalModalOpen}
+        onClose={() => setManualApprovalModalOpen(false)}
+        taskTitle={formData.name || stage?.name || 'Tarefa'}
+        onConfirm={handleConfirmManualApproval}
+        isSubmitting={submittingManualApproval}
+      />
     </div>
   )
 }

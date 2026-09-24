@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { requireProjectAccess } from '@/lib/server/guard'
 import { sanitizeText } from '@/lib/server/sanitize'
 import {
@@ -61,7 +61,7 @@ export async function getOrCreatePortalTokenAction(projectId: string) {
  * Não exige código de segurança — já vem autenticado!
  */
 export async function getPortalDataAction(token: string) {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   // 1. Valida token
   const { data: tokenRecord } = await supabase
@@ -110,7 +110,7 @@ export async function getPortalDataAction(token: string) {
   // 2. Busca todos os clientes vinculados ao projeto
   const { data: pcRows } = await supabase
     .from('project_clients')
-    .select('client_id, clients(id, name, email, phone, person_type, portal_token)')
+    .select('client_id, clients(id, name, email, phone, person_type, portal_token, access_code)')
     .eq('project_id', project.id)
 
   let linkedClients: {
@@ -120,6 +120,7 @@ export async function getPortalDataAction(token: string) {
     phone: string | null
     person_type: string
     portal_token?: string | null
+    access_code?: string | null
   }[] = []
 
   if (pcRows && pcRows.length > 0) {
@@ -133,7 +134,7 @@ export async function getPortalDataAction(token: string) {
     if (project.client_id) {
       const { data: singleClient } = await supabase
         .from('clients')
-        .select('id, name, email, phone, person_type, portal_token')
+        .select('id, name, email, phone, person_type, portal_token, access_code')
         .eq('id', project.client_id)
         .maybeSingle()
       if (singleClient) linkedClients.push(singleClient)
@@ -183,13 +184,14 @@ export async function getPortalDataAction(token: string) {
   const enrichedStages = (stages || []).map((s: any) => {
     const stageApprovals = stageApprovalsMap.get(s.id) || []
     const approvedRecords = stageApprovals.filter((a) => a.action === 'approved')
+    const manualApprovalRecord = approvedRecords.find((a) => !a.client_id)
 
     // Identifica clientes únicos que aprovaram
     const uniqueApprovedKeys = new Set(
       approvedRecords.map((a) => a.client_id || a.approver_name.toLowerCase())
     )
     const currentApprovedCount = uniqueApprovedKeys.size
-    const isFullyApproved = currentApprovedCount >= totalRequired
+    const isFullyApproved = Boolean(manualApprovalRecord) || currentApprovedCount >= totalRequired
 
     const approvedClientsList = approvedRecords.map((a) => ({
       clientId: a.client_id,
@@ -204,6 +206,14 @@ export async function getPortalDataAction(token: string) {
       ...s,
       attachments: visibleAttachments,
       approvals: stageApprovals,
+      manualApproval: manualApprovalRecord
+        ? {
+            approverName: manualApprovalRecord.approver_name,
+            approverEmail: manualApprovalRecord.approver_email,
+            feedbackMessage: manualApprovalRecord.feedback_message,
+            approvedAt: manualApprovalRecord.created_at,
+          }
+        : null,
       approvalProgress: {
         totalRequired,
         currentApprovedCount,
@@ -260,7 +270,7 @@ export async function sendStageApprovalOtpAction(
   error?: string
 }> {
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     // 1. Valida token
     const { data: tokenRecord } = await supabase
@@ -388,7 +398,7 @@ export async function submitClientApprovalAction(
     return { error: 'Por favor, informe o código de confirmação de 6 dígitos recebido por e-mail.' }
   }
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   // 1. Valida token e obtém project_id
   const { data: tokenRecord } = await supabase

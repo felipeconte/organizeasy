@@ -12,6 +12,7 @@ export type PermissionKey =
   | 'projects_edit'
   | 'projects_delete'
   | 'tasks_manage'
+  | 'tasks_override_approval'
   // Empresas e Fornecedores
   | 'module_companies'
   | 'companies_manage'
@@ -89,6 +90,11 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         key: 'tasks_manage',
         label: 'Gerenciar Tarefas',
         description: 'Permite criar, mover, atribuir e concluir tarefas dentro das etapas.',
+      },
+      {
+        key: 'tasks_override_approval',
+        label: 'Aprovação Manual de Etapas',
+        description: 'Permite aprovar manualmente etapas do projeto sem a validação do cliente, com justificativa obrigatória.',
       },
     ],
   },

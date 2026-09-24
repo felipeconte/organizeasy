@@ -10,9 +10,12 @@ import {
   CircleDollarSign,
   Pencil,
   Edit2,
+  Globe,
 } from 'lucide-react'
 import BackButton from '@/components/ui/BackButton'
 import EditProjectModal from '@/components/projects/EditProjectModal'
+import ProjectClientPortalModal from '@/components/projects/ProjectClientPortalModal'
+import { ProjectClientInfo } from '@/components/projects/ProjectClientPortalSection'
 import { ClientData } from '@/lib/actions/clients'
 import { ProjectItem } from '@/components/projects/ProjectsManagerClient'
 import { formatProjectClientDisplay, formatNumberBRL } from '@/lib/formatters-and-validators'
@@ -26,6 +29,10 @@ export interface ProjectDetailHeaderProps {
   projectId: string
   isOwner?: boolean
   userPermissions?: ProfilePermissions
+  projectCode?: string
+  orgSlug?: string
+  portalToken?: string
+  linkedClients?: ProjectClientInfo[]
 }
 
 export default function ProjectDetailHeader({
@@ -35,6 +42,10 @@ export default function ProjectDetailHeader({
   projectId,
   isOwner: propIsOwner,
   userPermissions: propPermissions,
+  projectCode,
+  orgSlug,
+  portalToken,
+  linkedClients = [],
 }: ProjectDetailHeaderProps) {
   const router = useRouter()
   const { can, isOwner: contextIsOwner } = usePermissions()
@@ -44,6 +55,7 @@ export default function ProjectDetailHeader({
   const canCompanies = effectiveIsOwner || can('module_companies')
 
   const [isEditOpen, setIsEditOpen] = useState(false)
+  const [isPortalOpen, setIsPortalOpen] = useState(false)
   const [currentProject, setCurrentProject] = useState<ProjectItem>(project)
 
   const handleProjectSaved = (updated: ProjectItem) => {
@@ -139,6 +151,15 @@ export default function ProjectDetailHeader({
           >
             <ShieldCheck className="w-3.5 h-3.5" /> Auditoria de Aprovações
           </Link>
+
+          <button
+            type="button"
+            onClick={() => setIsPortalOpen(true)}
+            className="inline-flex items-center gap-1.5 py-2 px-3.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:text-blue-600 hover:bg-slate-50 text-xs font-bold transition-all shadow-xs cursor-pointer"
+            title="Portal do Cliente e Links de Acesso"
+          >
+            <Globe className="w-3.5 h-3.5 text-blue-600" /> Portal do Cliente
+          </button>
         </div>
       </div>
 
@@ -149,6 +170,16 @@ export default function ProjectDetailHeader({
         clients={clients}
         organizationId={organizationId}
         onSaved={handleProjectSaved}
+      />
+
+      <ProjectClientPortalModal
+        isOpen={isPortalOpen}
+        onClose={() => setIsPortalOpen(false)}
+        projectId={projectId}
+        projectCode={projectCode || currentProject.code}
+        orgSlug={orgSlug}
+        portalToken={portalToken}
+        linkedClients={linkedClients}
       />
     </>
   )

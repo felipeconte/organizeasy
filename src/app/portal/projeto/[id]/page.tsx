@@ -1,8 +1,14 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
+import { cookies } from 'next/headers'
 import { ArrowLeft } from 'lucide-react'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getPortalDataAction } from '@/lib/actions/portal'
+import {
+  verifyClientPortalAccessCookie,
+  verifyProjectPortalAccessCookie,
+  hashAccessCode,
+} from '@/lib/server/client-auth-crypto'
 import PortalClient, { PortalData } from '@/components/portal/PortalClient'
 
 export default async function CustomerProjectViewPage({
@@ -11,7 +17,7 @@ export default async function CustomerProjectViewPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   // 1. Busca token ativo de acesso a este projeto
   const { data: tokenRecord } = await supabase
@@ -42,10 +48,77 @@ export default async function CustomerProjectViewPage({
   }
 
   const portalData = res.data as unknown as PortalData
-  const clientWithPortal = (portalData.clients || []).find((c: any) => Boolean(c.portal_token))
+  const cookieStore = await cookies()
+
+  // 2. Identifica qual cliente está autenticado para este projeto
+  let activeClientId: string | undefined
+  let activeClientName: string | undefined
+  let activePortalToken: string | undefined
+  let sessionExpiresAt: number | undefined
+
+  // Verifica se há cookie de projeto válido
+  const projCookieVal = cookieStore.get(`organizeasy_proj_${token}`)?.value
+  if (projCookieVal) {
+    const projSession = verifyProjectPortalAccessCookie(projCookieVal, token)
+    if (projSession?.clientId) {
+      const matchedClient = (portalData.clients || []).find((c: any) => c.id === projSession.clientId)
+      const currentCodeHash = hashAccessCode((matchedClient as any)?.access_code || '')
+      if (!matchedClient || (projSession.codeHash && projSession.codeHash !== currentCodeHash)) {
+        cookieStore.delete(`organizeasy_proj_${token}`)
+      } else {
+        activeClientId = projSession.clientId
+        activeClientName = projSession.clientName
+        sessionExpiresAt = projSession.exp
+      }
+    }
+  }
+
+  // Se não achou no cookie de projeto, verifica se algum cliente vinculado tem sessão aberta de portal geral
+  if (!activeClientId && portalData.clients && portalData.clients.length > 0) {
+    for (const c of portalData.clients) {
+      if (c.portal_token) {
+        const cpCookie =
+          cookieStore.get(`organizeasy_cp_${c.portal_token}`)?.value ||
+          cookieStore.get(`orgarq_cp_${c.portal_token}`)?.value
+        if (cpCookie) {
+          const cpSession = verifyClientPortalAccessCookie(cpCookie, c.portal_token)
+          if (cpSession?.clientId === c.id) {
+            const currentCodeHash = hashAccessCode((c as any)?.access_code || '')
+            if (cpSession.codeHash && cpSession.codeHash !== currentCodeHash) {
+              cookieStore.delete(`organizeasy_cp_${c.portal_token}`)
+              cookieStore.delete(`orgarq_cp_${c.portal_token}`)
+            } else {
+              activeClientId = c.id
+              activeClientName = c.name
+              activePortalToken = c.portal_token
+              sessionExpiresAt = cpSession.exp
+              break
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Se não houver nenhum cliente autenticado, redireciona para o link direto do projeto com desafio de código
+  if (!activeClientId) {
+    redirect(`/portal/${token}`)
+  }
+
+  const clientWithPortal = (portalData.clients || []).find(
+    (c: any) => c.id === activeClientId && Boolean(c.portal_token)
+  )
   const backHref = clientWithPortal?.portal_token
     ? `/portal/${clientWithPortal.portal_token}`
-    : '/portal'
+    : activePortalToken
+      ? `/portal/${activePortalToken}`
+      : '/portal'
+
+  // Remove access_code antes de enviar ao cliente por segurança
+  portalData.clients = (portalData.clients || []).map((c: any) => {
+    const { access_code, ...rest } = c
+    return rest
+  })
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
@@ -66,7 +139,13 @@ export default async function CustomerProjectViewPage({
       </div>
 
       {/* Render Portal Client Timeline & Approvals */}
-      <PortalClient token={token} data={portalData} />
+      <PortalClient
+        token={token}
+        data={portalData}
+        activeClientId={activeClientId}
+        activeClientName={activeClientName}
+        sessionExpiresAt={sessionExpiresAt}
+      />
     </div>
   )
 }

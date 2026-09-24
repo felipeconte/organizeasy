@@ -526,5 +526,23 @@ export function formatAreaOnlyNumbers(
   return { display, raw: isNaN(raw) ? null : raw }
 }
 
+/**
+ * Converte um texto para formato slug: minúsculo, sem acentos e com hífens nos espaços.
+ * Ex: "Studio & Design de Interiores!" -> "studio-design-de-interiores"
+ */
+export function slugify(text: string | null | undefined): string {
+  if (!text) return ''
+  return text
+    .toString()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove marcas diacríticas / acentos
+    .replace(/[^a-z0-9\s-]/g, '') // remove caracteres especiais exceto espaços e hífens
+    .trim()
+    .replace(/\s+/g, '-') // substitui espaços por hífens
+    .replace(/-+/g, '-') // substitui múltiplos hífens consecutivos por um só
+    .replace(/^-+|-+$/g, '') // remove hífens das extremidades
+}
+
 
 

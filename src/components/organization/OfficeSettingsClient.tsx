@@ -29,6 +29,7 @@ import {
   Send,
   RefreshCw,
   Camera,
+  ExternalLink,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import {
@@ -49,7 +50,8 @@ import {
   maskCPFOrCNPJ,
   maskPhone,
   validateCPF,
-  validateCNPJ
+  validateCNPJ,
+  slugify,
 } from '@/lib/formatters-and-validators'
 import ImageCropperModal from './ImageCropperModal'
 
@@ -203,6 +205,19 @@ export default function OfficeSettingsClient({
     setTimeout(() => setFeedback(null), 3000)
   }
 
+  const [copiedPortalLink, setCopiedPortalLink] = useState(false)
+
+  const handleCopyOfficePortalLink = () => {
+    const portalUrl =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/portal/${org.slug}`
+        : `/portal/${org.slug}`
+    navigator.clipboard.writeText(portalUrl)
+    setCopiedPortalLink(true)
+    showToast('Link do Portal do Cliente copiado!')
+    setTimeout(() => setCopiedPortalLink(false), 2500)
+  }
+
   // Handle Image File Select
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -261,10 +276,12 @@ export default function OfficeSettingsClient({
       }
     }
 
+    const cleanSlug = slugify(formData.slug) || slugify(formData.name) || 'escritorio'
+
     setSavingOrg(true)
     const data = new FormData()
     data.append('name', formData.name.trim())
-    data.append('slug', formData.slug.trim())
+    data.append('slug', cleanSlug)
     data.append('professional_council_id', formData.professional_council_id.trim())
     data.append('cau_caubr', formData.professional_council_id.trim())
     data.append('cnpj', formData.cnpj.trim())
@@ -279,7 +296,7 @@ export default function OfficeSettingsClient({
       setOrg({
         ...org,
         name: formData.name.trim(),
-        slug: formData.slug.trim(),
+        slug: cleanSlug,
         professional_council_id: formData.professional_council_id.trim() || null,
         cau_caubr: formData.professional_council_id.trim() || null,
         cnpj: formData.cnpj.trim() ? maskCPFOrCNPJ(formData.cnpj) : null,
@@ -289,6 +306,7 @@ export default function OfficeSettingsClient({
       })
       setIsEditing(false)
       showToast('Dados do escritório atualizados com sucesso!')
+      router.refresh()
     } else {
       await showAlert({
         title: 'Erro ao atualizar dados',
@@ -684,15 +702,30 @@ export default function OfficeSettingsClient({
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">Identificador / Slug *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.slug}
-                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                  placeholder="Ex: meu-escritorio"
-                  className="w-full text-sm font-mono border border-slate-200 rounded-xl p-3 outline-hidden focus:border-blue-500 bg-white"
-                />
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                    Identificador / Slug (URL) *
+                  </label>
+                  <span className="text-[10px] text-slate-400">
+                    Minúsculo, sem acentos, com hífen
+                  </span>
+                </div>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs font-mono">
+                    /portal/
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={formData.slug}
+                    onChange={(e) => setFormData({ ...formData, slug: slugify(e.target.value) })}
+                    placeholder="meu-escritorio"
+                    className="w-full text-sm font-mono pl-16 border border-slate-200 rounded-xl p-3 outline-hidden focus:border-blue-500 bg-white"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Link do portal: <span className="font-mono text-blue-600 font-bold">/portal/{formData.slug || 'slug-do-escritorio'}</span>
+                </p>
               </div>
 
               <div>
@@ -892,7 +925,41 @@ export default function OfficeSettingsClient({
               </div>
               <div>
                 <h3 className="text-xl font-bold text-slate-900">{org.name}</h3>
-                <span className="font-mono text-xs font-bold text-blue-600">{org.slug}</span>
+                <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200/80 text-blue-700 text-xs font-semibold">
+                    <Globe className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Portal:</span>
+                    <span className="font-mono font-bold">https://www.organizeasy.com.br/portal/{org.slug}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyOfficePortalLink}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition-colors cursor-pointer"
+                    title="Copiar link do Portal do Cliente"
+                  >
+                    {copiedPortalLink ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="text-emerald-700 font-bold">Copiado!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Copiar Link</span>
+                      </>
+                    )}
+                  </button>
+                  <a
+                    href={`/portal/${org.slug}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 text-xs font-medium transition-colors cursor-pointer"
+                    title="Abrir Portal do Cliente em nova aba"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Abrir Portal</span>
+                  </a>
+                </div>
               </div>
             </div>
 

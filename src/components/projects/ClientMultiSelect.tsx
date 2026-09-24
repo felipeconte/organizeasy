@@ -204,13 +204,12 @@ export default function ClientMultiSelect({
       {/* Search and Dropdown Trigger */}
       <div className="relative">
         <div
-          className={`flex items-center gap-2 px-3.5 py-2.5 bg-slate-50/50 border rounded-xl transition-all cursor-text ${
-            isOpen
-              ? 'bg-white ring-2 ring-blue-500/20 border-blue-600'
-              : error
+          className={`flex items-center gap-2 px-3.5 py-2.5 bg-slate-50/50 border rounded-xl transition-all cursor-text ${isOpen
+            ? 'bg-white ring-2 ring-blue-500/20 border-blue-600'
+            : error
               ? 'border-rose-300 ring-2 ring-rose-500/20'
               : 'border-slate-200 hover:border-slate-300'
-          }`}
+            }`}
           onClick={() => setIsOpen(true)}
         >
           <Search className="w-4 h-4 text-slate-400 shrink-0" />
@@ -258,15 +257,13 @@ export default function ClientMultiSelect({
                       key={client.id}
                       type="button"
                       onClick={() => handleToggleClient(client.id)}
-                      className={`w-full text-left p-2.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer ${
-                        isSelected ? 'bg-blue-50/80 text-blue-950 font-semibold' : 'hover:bg-slate-50 text-slate-800'
-                      }`}
+                      className={`w-full text-left p-2.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer ${isSelected ? 'bg-blue-50/80 text-blue-950 font-semibold' : 'hover:bg-slate-50 text-slate-800'
+                        }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
-                            isPJ ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
-                          }`}
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${isPJ ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+                            }`}
                         >
                           {isPJ ? 'PJ' : 'PF'}
                         </div>
@@ -280,9 +277,8 @@ export default function ClientMultiSelect({
 
                       <div className="shrink-0 ml-2">
                         <div
-                          className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
-                            isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300'
-                          }`}
+                          className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300'
+                            }`}
                         >
                           {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                         </div>
@@ -327,7 +323,7 @@ export default function ClientMultiSelect({
       </div>
 
       <p className="text-sm text-slate-500">
-        Selecione um ou mais clientes cadastrados. Se houver mais de um cliente, todos deverão aprovar as tarefas marcadas para validação do cliente.
+        Selecione um ou mais clientes. Todos deverão aprovar as tarefas marcadas para validação.
       </p>
 
       {/* Selected Clients Cards / Chips */}
@@ -342,9 +338,8 @@ export default function ClientMultiSelect({
               >
                 <div className="flex items-start gap-2.5 min-w-0">
                   <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
-                      isPJ ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-blue-50 text-blue-700 border border-blue-200'
-                    }`}
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${isPJ ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-blue-50 text-blue-700 border border-blue-200'
+                      }`}
                   >
                     {isPJ ? <Building className="w-4 h-4" /> : <User className="w-4 h-4" />}
                   </div>
@@ -396,9 +391,8 @@ export default function ClientMultiSelect({
         </div>
       ) : (
         <div
-          className={`p-4 rounded-xl border border-dashed text-center ${
-            error ? 'border-rose-300 bg-rose-50/50' : 'border-slate-300 bg-slate-50/50'
-          }`}
+          className={`p-4 rounded-xl border border-dashed text-center ${error ? 'border-rose-300 bg-rose-50/50' : 'border-slate-300 bg-slate-50/50'
+            }`}
         >
           <Users className="w-6 h-6 text-slate-400 mx-auto mb-1.5" />
           <p className="text-sm font-semibold text-slate-700">

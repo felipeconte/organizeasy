@@ -1202,7 +1202,6 @@ export default function Home() {
               <ul className="space-y-2 text-slate-600">
                 <li><Link href="/cadastro" className="hover:text-blue-600 transition-colors">Criar Escritório</Link></li>
                 <li><Link href="/login" className="hover:text-blue-600 transition-colors">Área do Escritório</Link></li>
-                <li><Link href="/portal/login" className="hover:text-blue-600 transition-colors">Acompanhar meu Projeto</Link></li>
                 <li><Link href="/recuperar-senha" className="hover:text-blue-600 transition-colors">Recuperar Senha</Link></li>
               </ul>
             </div>

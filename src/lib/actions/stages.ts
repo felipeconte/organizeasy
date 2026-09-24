@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { requireProjectAccess, requirePermission } from '@/lib/server/guard'
 import { sanitizeText } from '@/lib/server/sanitize'
-import { normalizeWorkflowStages, canMoveToFinalStage } from '@/lib/workflow-stages'
+import { normalizeWorkflowStages, canMoveToFinalStage, getFinalStage } from '@/lib/workflow-stages'
 
 export interface ChecklistItem {
   id: string
@@ -36,10 +36,15 @@ export interface StageAttachment {
 export async function updateStageStatusAction(
   projectId: string,
   stageId: string,
-  newStatus: string
+  newStatus: string,
+  overrideJustification?: string
 ) {
   const { supabase, user, project } = await requireProjectAccess(projectId)
   await requirePermission(project.organization_id, 'tasks_manage')
+
+  if (overrideJustification?.trim()) {
+    await requirePermission(project.organization_id, 'tasks_override_approval')
+  }
 
   // 1. Busca etapa atual e workflow_stages da organização para validação de integridade
   const { data: stageRecord } = await supabase
@@ -56,7 +61,9 @@ export async function updateStageStatusAction(
 
   // 2. Se a etapa de destino for conclusiva/final, valida checklists e aprovação do cliente
   if (targetStageCfg?.is_final_stage) {
-    const check = canMoveToFinalStage(stageRecord || {}, normalizedStages)
+    const check = canMoveToFinalStage(stageRecord || {}, normalizedStages, {
+      allowClientApprovalOverride: Boolean(overrideJustification?.trim()),
+    })
     if (!check.allowed) {
       return { error: `Não é possível mover para a etapa finalizada: ${check.reasons.join(' ')}` }
     }
@@ -91,6 +98,7 @@ export async function updateStageStatusAction(
       (user.email ? user.email.split('@')[0] : 'Membro da Equipe')
     const approverEmail = user.email || null
 
+    const justificationText = overrideJustification?.trim() || 'Aprovação manual realizada pela equipe interna.'
     try {
       await (supabase.from('stage_approvals') as any).insert({
         project_id: projectId,
@@ -98,7 +106,8 @@ export async function updateStageStatusAction(
         action: 'approved',
         approver_name: approverName,
         approver_email: approverEmail,
-        feedback_message: 'Aprovação manual realizada pela equipe interna.',
+        client_id: null,
+        feedback_message: justificationText,
       })
     } catch {
       // safe fallback
@@ -110,7 +119,9 @@ export async function updateStageStatusAction(
       user_id: user.id,
       user_name: approverName,
       user_email: approverEmail,
-      text: `✅ [Aprovação Manual] Tarefa aprovada manualmente por ${approverName}.`,
+      text: overrideJustification?.trim()
+        ? `⚠️ [Aprovação Manual da Equipe] Tarefa aprovada manualmente por ${approverName} sem validação direta do cliente.\nJustificativa: "${overrideJustification.trim()}"`
+        : `✅ [Aprovação Manual] Tarefa aprovada manualmente por ${approverName}.`,
       created_at: new Date().toISOString(),
     }
     updatePayload.comments = [...currentComments, auditComment]
@@ -241,6 +252,7 @@ export async function updateStageFullDetailsAction(
     status?: string
     is_client_approval_required?: boolean
     parent_stage_id?: string | null
+    overrideJustification?: string
   }
 ) {
   const { supabase, user, project } = await requireProjectAccess(projectId)
@@ -268,8 +280,14 @@ export async function updateStageFullDetailsAction(
     const normalizedStages = normalizeWorkflowStages(rawStages)
     const targetStageCfg = normalizedStages.find((s) => s.id === data.status)
 
+    if (data.overrideJustification?.trim()) {
+      await requirePermission(project.organization_id, 'tasks_override_approval')
+    }
+
     if (targetStageCfg?.is_final_stage) {
-      const check = canMoveToFinalStage(stageRecord || {}, normalizedStages)
+      const check = canMoveToFinalStage(stageRecord || {}, normalizedStages, {
+        allowClientApprovalOverride: Boolean(data.overrideJustification?.trim()),
+      })
       if (!check.allowed) {
         return { error: `Não é possível mover para a etapa finalizada: ${check.reasons.join(' ')}` }
       }
@@ -300,6 +318,7 @@ export async function updateStageFullDetailsAction(
         (user.email ? user.email.split('@')[0] : 'Membro da Equipe')
       const approverEmail = user.email || null
 
+      const justificationText = data.overrideJustification?.trim() || 'Aprovação manual realizada pela equipe interna.'
       try {
         await (supabase.from('stage_approvals') as any).insert({
           project_id: projectId,
@@ -307,7 +326,8 @@ export async function updateStageFullDetailsAction(
           action: 'approved',
           approver_name: approverName,
           approver_email: approverEmail,
-          feedback_message: 'Aprovação manual realizada pela equipe interna.',
+          client_id: null,
+          feedback_message: justificationText,
         })
       } catch {
         // safe fallback
@@ -319,7 +339,9 @@ export async function updateStageFullDetailsAction(
         user_id: user.id,
         user_name: approverName,
         user_email: approverEmail,
-        text: `✅ [Aprovação Manual] Tarefa aprovada manualmente por ${approverName}.`,
+        text: data.overrideJustification?.trim()
+          ? `⚠️ [Aprovação Manual da Equipe] Tarefa aprovada manualmente por ${approverName} sem validação direta do cliente.\nJustificativa: "${data.overrideJustification.trim()}"`
+          : `✅ [Aprovação Manual] Tarefa aprovada manualmente por ${approverName}.`,
         created_at: new Date().toISOString(),
       }
       updatePayload.comments = [...currentComments, auditComment]
@@ -1217,3 +1239,111 @@ export async function unlockStageForEditAction(
   revalidatePath(`/app/projetos/${projectId}`)
   return { success: true }
 }
+
+export async function manualApproveStageOverrideAction(
+  projectId: string,
+  stageId: string,
+  justification: string,
+  targetStatus?: string
+) {
+  const { supabase, user, project } = await requireProjectAccess(projectId)
+  await requirePermission(project.organization_id, 'tasks_override_approval')
+
+  const trimmedJustification = justification?.trim()
+  if (!trimmedJustification || trimmedJustification.length < 5) {
+    return { error: 'Por favor, informe uma justificativa válida com no mínimo 5 caracteres.' }
+  }
+
+  // 1. Busca dados da etapa e workflow da organização
+  const { data: stageRecord, error: stageErr } = await supabase
+    .from('project_stages')
+    .select('id, name, checklist, comments, is_client_approval_required, status, project_id, projects(organization_id, organizations(workflow_stages))')
+    .eq('id', stageId)
+    .eq('project_id', projectId)
+    .single()
+
+  if (stageErr || !stageRecord) {
+    return { error: 'Tarefa não encontrada.' }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rawStages = (stageRecord?.projects as any)?.organizations?.workflow_stages
+  const normalizedStages = normalizeWorkflowStages(rawStages)
+  const finalStage = getFinalStage(normalizedStages)
+  const resolvedTargetStatus = targetStatus || finalStage?.id || 'concluido'
+  const targetStageCfg = normalizedStages.find((s) => s.id === resolvedTargetStatus)
+
+  // 2. Valida pendências de checklist
+  const check = canMoveToFinalStage(stageRecord || {}, normalizedStages, { allowClientApprovalOverride: true })
+  if (!check.allowed) {
+    return { error: `Não é possível concluir a tarefa: ${check.reasons.join(' ')}` }
+  }
+
+  // 3. Obtém nome e e-mail do aprovador
+  const { data: profile } = await (supabase
+    .from('user_profiles') as any)
+    .select('display_name, full_name')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  const approverName =
+    profile?.display_name ||
+    profile?.full_name ||
+    (user.user_metadata as any)?.full_name ||
+    (user.email ? user.email.split('@')[0] : 'Gestor')
+  const approverEmail = user.email || null
+
+  // 4. Insere na tabela stage_approvals com client_id null e a justificativa
+  try {
+    await (supabase.from('stage_approvals') as any).insert({
+      project_id: projectId,
+      stage_id: stageId,
+      action: 'approved',
+      approver_name: approverName,
+      approver_email: approverEmail,
+      client_id: null,
+      feedback_message: trimmedJustification,
+    })
+  } catch (err: any) {
+    console.error('Erro ao registrar stage_approval override:', err)
+  }
+
+  // 5. Adiciona comentário de auditoria
+  const currentComments = Array.isArray(stageRecord?.comments) ? (stageRecord.comments as any[]) : []
+  const auditComment: StageComment = {
+    id: `cmt-appr-override-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    user_id: user.id,
+    user_name: approverName,
+    user_email: approverEmail,
+    text: `⚠️ [Aprovação Manual da Equipe] Tarefa aprovada manualmente por ${approverName} sem validação direta do cliente.\nJustificativa: "${trimmedJustification}"`,
+    created_at: new Date().toISOString(),
+  }
+
+  const progressPercent = targetStageCfg?.is_final_stage || resolvedTargetStatus === 'concluido' ? 100 : 50
+
+  const updatePayload: Record<string, any> = {
+    status: resolvedTargetStatus,
+    progress_percent: progressPercent,
+    is_locked_for_client: Boolean(targetStageCfg?.is_final_stage),
+    comments: [...currentComments, auditComment],
+  }
+
+  const { error: updateErr } = await supabase
+    .from('project_stages')
+    .update(updatePayload as any)
+    .eq('id', stageId)
+    .eq('project_id', projectId)
+
+  if (updateErr) {
+    return { error: updateErr.message }
+  }
+
+  revalidatePath(`/app/projetos/${projectId}`)
+  revalidatePath(`/app/projetos/${projectId}/auditoria`)
+  return {
+    success: true,
+    comments: updatePayload.comments as StageComment[],
+    status: resolvedTargetStatus,
+  }
+}
+

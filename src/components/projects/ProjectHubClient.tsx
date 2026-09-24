@@ -47,8 +47,10 @@ import {
   reorderKanbanStagesAction,
   toggleStageClientApprovalAction,
   DeletedStageInfo,
-  restoreStageAction
+  restoreStageAction,
+  manualApproveStageOverrideAction
 } from '@/lib/actions/stages'
+import { ManualApprovalModal } from '@/components/projects/ManualApprovalModal'
 import {
   formatDateBR,
   formatDateRangeBR,
@@ -92,6 +94,7 @@ import {
 import DeleteWorkflowStageModal from '@/components/workflow/DeleteWorkflowStageModal'
 import { usePermissions } from '@/contexts/PermissionsContext'
 import { ProfilePermissions } from '@/types/profiles'
+import type { ProjectClientInfo } from '@/components/projects/ProjectClientPortalSection'
 
 const COLOR_OPTIONS: WorkflowStageColor[] = [
   'slate',
@@ -108,9 +111,12 @@ const COLOR_OPTIONS: WorkflowStageColor[] = [
 
 export interface ProjectHubClientProps {
   projectId: string
+  projectCode?: string
+  orgSlug?: string
   organizationId?: string
   stages: TaskDetailData[]
   portalToken: string
+  linkedClients?: ProjectClientInfo[]
   members?: MemberOption[]
   initialWorkflowStages?: WorkflowStage[]
   initialView?: 'lista' | 'kanban' | 'gantt'
@@ -121,9 +127,12 @@ export interface ProjectHubClientProps {
 
 export default function ProjectHubClient({
   projectId,
+  projectCode,
+  orgSlug,
   organizationId,
   stages: initialStages,
   portalToken,
+  linkedClients = [],
   members = [],
   initialWorkflowStages,
   initialView = 'lista',
@@ -137,6 +146,14 @@ export default function ProjectHubClient({
   const effectiveIsOwner = propIsOwner !== undefined ? propIsOwner : contextIsOwner
   const canManageTasks = effectiveIsOwner || can('tasks_manage')
   const canConfigureStages = effectiveIsOwner || can('settings_stages')
+  const canOverrideApproval = effectiveIsOwner || can('tasks_override_approval')
+
+  const [manualApprovalStage, setManualApprovalStage] = useState<{
+    stageId: string
+    taskTitle: string
+    targetStatus: string
+  } | null>(null)
+  const [submittingManualApproval, setSubmittingManualApproval] = useState(false)
 
   const [stages, setStages] = useState<TaskDetailData[]>(initialStages)
   const [deletedStages, setDeletedStages] = useState<DeletedStageInfo[]>(initialDeletedStages)
@@ -746,6 +763,14 @@ export default function ProjectHubClient({
     if (targetStageCfg?.is_final_stage && currentTask) {
       const check = canMoveToFinalStage(currentTask, workflowStages)
       if (!check.allowed) {
+        if (check.isClientApprovalBlocked && !check.hasChecklistPending && canOverrideApproval) {
+          setManualApprovalStage({
+            stageId,
+            taskTitle: currentTask.name,
+            targetStatus: newStatus,
+          })
+          return
+        }
         await showAlert({
           title: 'Etapa Conclusiva Bloqueada',
           message: 'Esta tarefa não pode ser movida para a etapa finalizada:',
@@ -1296,6 +1321,14 @@ export default function ProjectHubClient({
       if (targetStageCfg?.is_final_stage) {
         const check = canMoveToFinalStage(draggedCard, workflowStages)
         if (!check.allowed) {
+          if (check.isClientApprovalBlocked && !check.hasChecklistPending && canOverrideApproval) {
+            setManualApprovalStage({
+              stageId: draggedId,
+              taskTitle: draggedCard.name,
+              targetStatus: targetColStatus,
+            })
+            return
+          }
           await showAlert({
             title: 'Etapa Conclusiva Bloqueada',
             message: 'Esta tarefa não pode ser movida para a etapa finalizada:',
@@ -1442,6 +1475,14 @@ export default function ProjectHubClient({
       if (targetStageCfg?.is_final_stage) {
         const check = canMoveToFinalStage(draggedCard, workflowStages)
         if (!check.allowed) {
+          if (check.isClientApprovalBlocked && !check.hasChecklistPending && canOverrideApproval) {
+            setManualApprovalStage({
+              stageId: draggedCard.id,
+              taskTitle: draggedCard.name,
+              targetStatus: targetColStatus,
+            })
+            return
+          }
           await showAlert({
             title: 'Etapa Conclusiva Bloqueada',
             message: 'Esta tarefa não pode ser movida para a etapa finalizada:',
@@ -1792,43 +1833,6 @@ export default function ProjectHubClient({
 
   return (
     <div className="space-y-6 antialiased">
-      {/* Portal Bar Banner */}
-      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 p-5 rounded-2xl text-white shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <span className="text-xs font-bold uppercase tracking-wider text-blue-200 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" /> Portal do Cliente
-          </span>
-          <p className="text-sm font-semibold text-white">
-            O cliente acessa este link sem senha para aprovar pranchas e acompanhar o cronograma.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleCopyLink}
-            className="inline-flex items-center gap-1.5 py-2.5 px-4 rounded-xl bg-white/15 hover:bg-white/25 text-white text-sm font-semibold transition-all border border-white/20 cursor-pointer"
-          >
-            {copied ? (
-              <>
-                <Check className="w-4 h-4 text-emerald-300" /> Link Copiado!
-              </>
-            ) : (
-              <>
-                <Copy className="w-4 h-4" /> Copiar Magic Link
-              </>
-            )}
-          </button>
-
-          <a
-            href={`/portal/${portalToken}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 py-2.5 px-4 rounded-xl bg-white text-blue-600 hover:bg-blue-50 text-sm font-bold transition-all shadow-xs cursor-pointer"
-          >
-            Visualizar Portal <ExternalLink className="w-4 h-4" />
-          </a>
-        </div>
-      </div>
 
       {/* PANORAMA GERAL DO PROJETO & CRONOGRAMA */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
@@ -3650,6 +3654,48 @@ export default function ProjectHubClient({
           </div>
         </div>
       )}
+
+      {/* Modal de Aprovação Manual com Justificativa */}
+      <ManualApprovalModal
+        isOpen={Boolean(manualApprovalStage)}
+        onClose={() => setManualApprovalStage(null)}
+        taskTitle={manualApprovalStage?.taskTitle || 'Tarefa'}
+        onConfirm={async (justification) => {
+          if (!manualApprovalStage) return
+          setSubmittingManualApproval(true)
+          const res = await manualApproveStageOverrideAction(
+            projectId,
+            manualApprovalStage.stageId,
+            justification,
+            manualApprovalStage.targetStatus
+          )
+          setSubmittingManualApproval(false)
+          if (res.error) {
+            throw new Error(res.error)
+          }
+
+          setStages((prev) =>
+            prev.map((s) =>
+              s.id === manualApprovalStage.stageId
+                ? {
+                    ...s,
+                    status: res.status || manualApprovalStage.targetStatus,
+                    progress_percent: 100,
+                    comments: (res.comments as any) || s.comments,
+                  }
+                : s
+            )
+          )
+
+          await showAlert({
+            title: 'Etapa Aprovada Manualmente',
+            message: 'A aprovação manual foi registrada com sucesso!',
+            description: 'A justificativa foi salva e ficará visível no portal do cliente.',
+            variant: 'success',
+          })
+        }}
+        isSubmitting={submittingManualApproval}
+      />
     </div>
   )
 }

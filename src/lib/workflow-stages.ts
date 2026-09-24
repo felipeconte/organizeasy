@@ -282,14 +282,18 @@ export function canMoveToFinalStage(
     is_client_approval_required?: boolean
     status?: string
   },
-  customStages?: WorkflowStage[] | null
-): { allowed: boolean; reasons: string[] } {
+  customStages?: WorkflowStage[] | null,
+  options?: { allowClientApprovalOverride?: boolean }
+): { allowed: boolean; reasons: string[]; isClientApprovalBlocked: boolean; hasChecklistPending: boolean } {
   const reasons: string[] = []
+  let isClientApprovalBlocked = false
+  let hasChecklistPending = false
 
   // 1. Verifica itens pendentes de checklist
   if (Array.isArray(stage.checklist) && stage.checklist.length > 0) {
     const pendingCount = stage.checklist.filter((item) => !item.completed).length
     if (pendingCount > 0) {
+      hasChecklistPending = true
       reasons.push(`Existem ${pendingCount} item(ns) de checklist ainda não concluído(s).`)
     }
   }
@@ -298,13 +302,18 @@ export function canMoveToFinalStage(
   if (stage.is_client_approval_required) {
     const approvalStage = getClientApprovalStage(customStages)
     if (approvalStage && stage.status === approvalStage.id) {
-      reasons.push('A tarefa está aguardando validação do cliente e ainda não foi aprovada.')
+      isClientApprovalBlocked = true
+      if (!options?.allowClientApprovalOverride) {
+        reasons.push('A tarefa está aguardando validação do cliente e ainda não foi aprovada.')
+      }
     }
   }
 
   return {
     allowed: reasons.length === 0,
     reasons,
+    isClientApprovalBlocked,
+    hasChecklistPending,
   }
 }
 

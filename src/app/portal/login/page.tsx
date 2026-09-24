@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 
 export default function ClientPortalLoginPage() {
-  redirect('/portal')
+  redirect('/')
 }
+

@@ -14,6 +14,7 @@ import {
   ProfilePermissions,
   OrganizationInvite,
 } from '@/types/profiles'
+import { generateUniqueOrganizationSlug } from '@/lib/actions/organization'
 
 /**
  * Lista todos os perfis de acesso do escritório com contagem de membros vinculados
@@ -513,15 +514,7 @@ export async function createOfficeWithDefaultProfilesAction(officeName: string):
       return { success: false, error: 'O nome do escritório deve ter no mínimo 2 caracteres.' }
     }
 
-    const slug =
-      cleanName
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)+/g, '') +
-      '-' +
-      Math.floor(1000 + Math.random() * 9000)
+    const slug = await generateUniqueOrganizationSlug(supabase, cleanName)
 
     // Cria a organização
     // Os triggers do banco (trigger_new_organization_profiles e trigger_create_organization_defaults)

@@ -258,7 +258,15 @@ export async function updateProjectAction(projectId: string, formData: FormData)
   const startDate = formData.get('startDate') as string
   const deadline = formData.get('deadline') as string
   const description = sanitizeText(formData.get('description') as string)
-  const status = formData.get('status') as 'ativo' | 'em_producao' | 'pausado' | 'concluido' | 'cancelado'
+  const rawStatus = formData.get('status') as string | null
+  const validStatuses = ['ativo', 'pausado', 'concluido', 'cancelado'] as const
+  type ProjectStatus = (typeof validStatuses)[number]
+  const status: ProjectStatus | undefined =
+    rawStatus === 'em_producao' || rawStatus === 'em_andamento'
+      ? 'ativo'
+      : validStatuses.includes(rawStatus as ProjectStatus)
+        ? (rawStatus as ProjectStatus)
+        : undefined
 
   // Support multi-client update
   const hasClientIds = formData.has('clientIds') || formData.has('clientId')
@@ -275,7 +283,7 @@ export async function updateProjectAction(projectId: string, formData: FormData)
   if (startDate !== undefined) updatePayload.start_date = startDate || null
   if (deadline !== undefined) updatePayload.deadline = deadline || null
   if (description !== undefined) updatePayload.description = description || null
-  if (status) updatePayload.status = status as any
+  if (status) updatePayload.status = status
 
   if (clientIds !== null) {
     let linkedClients: { id: string; name: string; email: string | null; phone: string | null }[] = []

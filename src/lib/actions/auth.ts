@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { sanitizeText } from '@/lib/server/sanitize'
 import { sendPasswordResetEmail, sendSignupConfirmationEmail, sendMagicLinkEmail } from '@/lib/server/email'
 import { getAppBaseUrl, getRequestBaseUrl } from '@/lib/app-url'
+import { generateUniqueOrganizationSlug } from '@/lib/actions/organization'
 
 
 export async function loginAction(formData: FormData) {
@@ -145,17 +146,8 @@ export async function registerAction(formData: FormData) {
 
   // 3. Se o usuário já informou nome do escritório diretamente, cria a Organização
   if (officeName && userId) {
-    const slug =
-      officeName
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)+/g, '') +
-      '-' +
-      Math.floor(1000 + Math.random() * 9000)
-
     const dbClient = serviceRoleKey ? createAdminClient() : supabase
+    const slug = await generateUniqueOrganizationSlug(dbClient, officeName)
     const { error: orgError } = await dbClient
       .from('organizations')
       .insert({

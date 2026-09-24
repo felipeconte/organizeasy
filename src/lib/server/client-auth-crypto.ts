@@ -149,22 +149,36 @@ export interface ClientPortalAccessCookieData {
   portalToken: string
   clientId: string
   organizationId: string
+  codeHash?: string
   exp: number
 }
 
 /**
+ * Gera um hash curto e seguro do código de acesso para validar a integridade da sessão
+ */
+export function hashAccessCode(code: string): string {
+  if (!code) return ''
+  return crypto.createHmac('sha256', SECRET_KEY).update(code.trim().toUpperCase()).digest('hex').slice(0, 16)
+}
+
+/**
  * Assina e cria um cookie seguro autorizando o acesso ao portal geral de um cliente
+ * Padrão: 30 minutos de validade
  */
 export function signClientPortalAccessCookie(data: {
   portalToken: string
   clientId: string
   organizationId: string
+  codeHash?: string
+  durationMinutes?: number
 }): string {
+  const duration = (data.durationMinutes ?? 30) * 60 * 1000
   const payload: ClientPortalAccessCookieData = {
     portalToken: data.portalToken,
     clientId: data.clientId,
     organizationId: data.organizationId,
-    exp: Date.now() + 1000 * 60 * 60 * 24 * 30, // 30 dias
+    codeHash: data.codeHash,
+    exp: Date.now() + duration,
   }
 
   const payloadBase64 = Buffer.from(JSON.stringify(payload)).toString('base64url')
@@ -213,4 +227,161 @@ export function verifyClientPortalAccessCookie(
     return null
   }
 }
+
+export interface ProjectPortalAccessCookieData {
+  projectToken: string
+  clientId: string
+  organizationId: string
+  clientName?: string
+  codeHash?: string
+  exp: number
+}
+
+/**
+ * Assina e cria um cookie seguro autorizando o acesso ao projeto específico para um cliente
+ * Padrão: 30 minutos de validade
+ */
+export function signProjectPortalAccessCookie(data: {
+  projectToken: string
+  clientId: string
+  organizationId: string
+  clientName?: string
+  codeHash?: string
+  durationMinutes?: number
+}): string {
+  const duration = (data.durationMinutes ?? 30) * 60 * 1000
+  const payload: ProjectPortalAccessCookieData = {
+    projectToken: data.projectToken,
+    clientId: data.clientId,
+    organizationId: data.organizationId,
+    clientName: data.clientName,
+    codeHash: data.codeHash,
+    exp: Date.now() + duration,
+  }
+
+  const payloadBase64 = Buffer.from(JSON.stringify(payload)).toString('base64url')
+  const signature = crypto
+    .createHmac('sha256', SECRET_KEY)
+    .update(payloadBase64)
+    .digest('base64url')
+
+  return `${payloadBase64}.${signature}`
+}
+
+/**
+ * Valida o cookie de acesso do projeto e confirma se corresponde ao projectToken esperado
+ */
+export function verifyProjectPortalAccessCookie(
+  token: string,
+  expectedProjectToken: string
+): ProjectPortalAccessCookieData | null {
+  if (!token || !token.includes('.')) return null
+  const [payloadBase64, signature] = token.split('.')
+  if (!payloadBase64 || !signature) return null
+
+  const expectedSignature = crypto
+    .createHmac('sha256', SECRET_KEY)
+    .update(payloadBase64)
+    .digest('base64url')
+
+  if (signature !== expectedSignature) {
+    return null
+  }
+
+  try {
+    const json = Buffer.from(payloadBase64, 'base64url').toString('utf-8')
+    const payload = JSON.parse(json) as ProjectPortalAccessCookieData
+
+    if (!payload.exp || Date.now() > payload.exp) {
+      return null
+    }
+
+    if (payload.projectToken !== expectedProjectToken) {
+      return null
+    }
+
+    return payload
+  } catch {
+    return null
+  }
+}
+
+export interface OfficePortalSessionData {
+  orgSlug: string
+  orgId: string
+  clientId: string
+  clientName: string
+  codeHash?: string
+  exp: number
+}
+
+/**
+ * Assina e cria um cookie seguro autorizando a sessão do cliente no portal de um escritório específico
+ * Padrão: 30 minutos de validade
+ */
+export function signOfficePortalCookie(data: {
+  orgSlug: string
+  orgId: string
+  clientId: string
+  clientName: string
+  codeHash?: string
+  durationMinutes?: number
+}): string {
+  const duration = (data.durationMinutes ?? 30) * 60 * 1000
+  const payload: OfficePortalSessionData = {
+    orgSlug: data.orgSlug,
+    orgId: data.orgId,
+    clientId: data.clientId,
+    clientName: data.clientName,
+    codeHash: data.codeHash,
+    exp: Date.now() + duration,
+  }
+
+  const payloadBase64 = Buffer.from(JSON.stringify(payload)).toString('base64url')
+  const signature = crypto
+    .createHmac('sha256', SECRET_KEY)
+    .update(payloadBase64)
+    .digest('base64url')
+
+  return `${payloadBase64}.${signature}`
+}
+
+/**
+ * Valida o cookie de acesso do portal do escritório
+ */
+export function verifyOfficePortalCookie(
+  token: string,
+  expectedOrgSlug: string
+): OfficePortalSessionData | null {
+  if (!token || !token.includes('.')) return null
+  const [payloadBase64, signature] = token.split('.')
+  if (!payloadBase64 || !signature) return null
+
+  const expectedSignature = crypto
+    .createHmac('sha256', SECRET_KEY)
+    .update(payloadBase64)
+    .digest('base64url')
+
+  if (signature !== expectedSignature) {
+    return null
+  }
+
+  try {
+    const json = Buffer.from(payloadBase64, 'base64url').toString('utf-8')
+    const payload = JSON.parse(json) as OfficePortalSessionData
+
+    if (!payload.exp || Date.now() > payload.exp) {
+      return null
+    }
+
+    if (payload.orgSlug.toLowerCase() !== expectedOrgSlug.toLowerCase()) {
+      return null
+    }
+
+    return payload
+  } catch {
+    return null
+  }
+}
+
 

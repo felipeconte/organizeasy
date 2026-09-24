@@ -571,17 +571,18 @@ export async function resendClientPortalAccessAction(clientId: string): Promise<
 
     const { data: orgData } = await supabase
       .from('organizations')
-      .select('name, phone, email, logo_url')
+      .select('name, phone, email, logo_url, slug')
       .eq('id', client.organization_id)
       .single()
 
     const officeName = orgData?.name || 'Meu Escritório'
 
-    // Envia o e-mail diretamente ao cliente com o magic link e código de acesso
+    // Envia o e-mail diretamente ao cliente com o link do escritório e código de acesso
     await sendClientPortalAccessDetailsEmail({
       clientName: client.name,
       clientEmail: client.email,
       portalToken,
+      officeSlug: orgData?.slug,
       accessCode,
       officeName,
       officeLogo: orgData?.logo_url,
@@ -638,6 +639,83 @@ export async function regenerateClientAccessCodeAction(clientId: string): Promis
   } catch (err: any) {
     console.error('regenerateClientAccessCodeAction error:', err)
     return { success: false, error: err?.message || 'Erro ao gerar código de acesso.' }
+  }
+}
+
+/**
+ * 8. GERAR NOVO CÓDIGO DE ACESSO E ENVIAR POR E-MAIL PARA O CLIENTE (SIGILO TOTAL)
+ */
+export async function regenerateAndSendClientAccessCodeAction(clientId: string): Promise<{
+  success: boolean
+  message?: string
+  error?: string
+}> {
+  try {
+    const { supabase } = await requireAuth()
+
+    const { data: client, error: fetchErr } = await supabase
+      .from('clients')
+      .select('id, name, email, organization_id, portal_token')
+      .eq('id', clientId)
+      .single()
+
+    if (fetchErr || !client) {
+      return { success: false, error: 'Cliente não encontrado.' }
+    }
+
+    await requirePermission(client.organization_id, 'clients_portal')
+
+    if (!client.email) {
+      return {
+        success: false,
+        error: 'O cliente precisa ter um e-mail cadastrado para receber o novo código de acesso.',
+      }
+    }
+
+    const newCode = generateClientAccessCode()
+    const portalToken = client.portal_token || generateClientPortalToken()
+
+    const { error: updateErr } = await supabase
+      .from('clients')
+      .update({
+        access_code: newCode,
+        portal_token: portalToken,
+      })
+      .eq('id', clientId)
+
+    if (updateErr) {
+      return { success: false, error: 'Erro ao gerar novo código de acesso.' }
+    }
+
+    const { data: orgData } = await supabase
+      .from('organizations')
+      .select('name, phone, email, logo_url, slug')
+      .eq('id', client.organization_id)
+      .single()
+
+    const officeName = orgData?.name || 'Meu Escritório'
+
+    // Envia o e-mail com o novo código gerado
+    await sendClientPortalAccessDetailsEmail({
+      clientName: client.name,
+      clientEmail: client.email,
+      portalToken,
+      officeSlug: orgData?.slug,
+      accessCode: newCode,
+      officeName,
+      officeLogo: orgData?.logo_url,
+      officePhone: orgData?.phone,
+      officeEmail: orgData?.email,
+    })
+
+    revalidatePath(`/app/clientes/${clientId}`)
+    return {
+      success: true,
+      message: `Novo código de acesso gerado e enviado com sucesso para ${client.email}.`,
+    }
+  } catch (err: any) {
+    console.error('regenerateAndSendClientAccessCodeAction error:', err)
+    return { success: false, error: err?.message || 'Erro ao gerar e enviar código.' }
   }
 }
 

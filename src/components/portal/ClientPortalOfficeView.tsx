@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Building2,
-  Calendar,
   Clock,
   ArrowRight,
   FileCheck,
@@ -14,6 +13,7 @@ import {
   User,
   MapPin,
   Lock,
+  LogOut,
   Loader2,
   CheckCircle2,
   AlertCircle,
@@ -22,24 +22,34 @@ import {
 import {
   ClientPortalOfficeData,
   clientPortalLogoutAction,
+  officePortalLogoutAction,
+  extendPortalSessionAction,
 } from '@/lib/actions/client-portal-auth'
 import { maskCPFOrCNPJ, maskPhone } from '@/lib/formatters-and-validators'
-import { formatDateBR } from '@/lib/date-utils'
+import PortalSessionTimeoutModal from '@/components/portal/PortalSessionTimeoutModal'
 
 export default function ClientPortalOfficeView({
   portalToken,
+  orgSlug,
   data,
+  sessionExpiresAt,
 }: {
-  portalToken: string
+  portalToken?: string
+  orgSlug?: string
   data: ClientPortalOfficeData
+  sessionExpiresAt?: number
 }) {
   const router = useRouter()
   const [loggingOut, setLoggingOut] = useState(false)
   const { client, office, projects } = data
 
-  const handleLock = async () => {
+  const handleLogout = async () => {
     setLoggingOut(true)
-    await clientPortalLogoutAction(portalToken)
+    if (orgSlug) {
+      await officePortalLogoutAction(orgSlug)
+    } else if (portalToken) {
+      await clientPortalLogoutAction(portalToken)
+    }
     router.refresh()
   }
 
@@ -48,18 +58,18 @@ export default function ClientPortalOfficeView({
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-16 antialiased">
-      {/* 1. TOP HEADER DO ESCRITÓRIO */}
-      <header className="bg-slate-900 text-white border-b border-slate-800 shadow-md sticky top-0 z-20">
+      {/* 1. TOP HEADER DO ESCRITÓRIO (TEMA CLARO) */}
+      <header className="bg-white border-b border-slate-200/80 sticky top-0 z-20 shadow-xs">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             {office.logo_url ? (
               <img
                 src={office.logo_url}
                 alt={office.name}
-                className="w-10 h-10 object-contain rounded-xl bg-white p-1 shrink-0 border border-slate-700"
+                className="w-10 h-10 object-contain rounded-xl bg-white p-1 shrink-0 border border-slate-200"
               />
             ) : (
-              <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shrink-0 shadow-xs border border-slate-700">
+              <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shrink-0 shadow-xs border border-slate-200">
                 <img
                   src="/logos/logo-organizeasy-quadrado.webp"
                   alt={office.name}
@@ -68,44 +78,52 @@ export default function ClientPortalOfficeView({
               </div>
             )}
             <div className="min-w-0">
-              <h1 className="text-base sm:text-lg font-bold truncate text-white leading-tight">
+              <h1 className="text-base sm:text-lg font-bold truncate text-slate-900 leading-tight">
                 {office.name}
               </h1>
-              <p className="text-xs text-slate-400 truncate">
+              <p className="text-xs text-slate-500 truncate">
                 Portal do Cliente • {(office.professional_council_id || office.cau_caubr) ? `Registro: ${office.professional_council_id || office.cau_caubr}` : 'Acompanhamento de Projetos'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             {officeWhatsapp && (
               <a
                 href={officeWhatsapp}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold hover:bg-emerald-600/30 transition-all"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-xs font-bold hover:bg-emerald-100/70 transition-all shadow-xs"
               >
-                <Phone className="w-3.5 h-3.5" /> WhatsApp
+                <Phone className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp
               </a>
             )}
 
             <button
               type="button"
-              onClick={handleLock}
+              onClick={handleLogout}
               disabled={loggingOut}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-semibold transition-all cursor-pointer"
-              title="Bloquear sessão neste dispositivo"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 border border-slate-200 hover:border-rose-200 text-xs font-semibold transition-all cursor-pointer shadow-xs"
+              title="Sair do portal e encerrar sessão"
             >
               {loggingOut ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <Lock className="w-3.5 h-3.5" />
+                <LogOut className="w-3.5 h-3.5" />
               )}
-              <span className="hidden sm:inline">Bloquear</span>
+              <span className="hidden sm:inline">Sair</span>
             </button>
           </div>
         </div>
       </header>
+
+      {/* Modal de aviso de expiração de sessão aos 5 minutos restantes */}
+      <PortalSessionTimeoutModal
+        sessionExpiresAt={sessionExpiresAt}
+        warningThresholdMinutes={5}
+        onExtendSession={() => extendPortalSessionAction({ orgSlug, portalToken })}
+        onLogout={handleLogout}
+      />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-8 space-y-8">
         {/* 2. RESUMO DAS INFORMAÇÕES DO CLIENTE */}
@@ -197,9 +215,6 @@ export default function ClientPortalOfficeView({
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <span className="text-[11px] font-mono font-bold text-blue-600 uppercase tracking-wider block">
-                          {project.code}
-                        </span>
                         <h4 className="text-base font-bold text-slate-900 leading-snug mt-0.5">
                           {project.title}
                         </h4>
@@ -213,9 +228,11 @@ export default function ClientPortalOfficeView({
                       <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
                         {project.status === 'concluido'
                           ? 'Concluído'
-                          : project.status === 'em_andamento'
-                            ? 'Em Andamento'
-                            : 'Ativo'}
+                          : project.status === 'pausado'
+                            ? 'Pausado'
+                            : project.status === 'cancelado'
+                              ? 'Cancelado'
+                              : 'Ativo'}
                       </span>
                     </div>
 
@@ -230,7 +247,7 @@ export default function ClientPortalOfficeView({
                     {/* Barra de Progresso */}
                     <div className="space-y-1.5 pt-1">
                       <div className="flex items-center justify-between text-xs text-slate-600">
-                        <span className="font-semibold">Progresso das Etapas</span>
+                        <span className="font-semibold">Progresso</span>
                         <span className="font-bold text-slate-900 font-mono">{project.progress_percent}%</span>
                       </div>
                       <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
@@ -239,19 +256,11 @@ export default function ClientPortalOfficeView({
                           style={{ width: `${project.progress_percent}%` }}
                         />
                       </div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-400">
-                        <span>{project.completed_stages} de {project.total_stages} etapas concluídas</span>
-                        {project.deadline && (
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" /> Previsão: {formatDateBR(project.deadline)}
-                          </span>
-                        )}
-                      </div>
                     </div>
                   </div>
 
                   <Link
-                    href={`/portal/projeto/${project.id}`}
+                    href={orgSlug ? `/portal/${orgSlug}/projeto/${project.portal_token || project.id}` : `/portal/projeto/${project.id}`}
                     className="w-full py-3 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm shadow-blue-500/20 flex items-center justify-center gap-2 cursor-pointer"
                   >
                     Acompanhar Linha do Tempo <ArrowRight className="w-3.5 h-3.5" />

@@ -87,9 +87,13 @@ export default async function ProjectDetailPage({
     .select('client_id')
     .eq('project_id', id)
 
+  const linkedClientIds: string[] = (pcData && pcData.length > 0)
+    ? pcData.map((pc) => pc.client_id)
+    : (project.client_id ? [project.client_id] : [])
+
   const projectWithClientIds = {
     ...project,
-    client_ids: pcData?.map((pc) => pc.client_id) || (project.client_id ? [project.client_id] : []),
+    client_ids: linkedClientIds,
   } as unknown as ProjectItem
 
   // 1. Busca membros da organização para delegação/responsáveis
@@ -170,6 +174,17 @@ export default async function ProjectDetailPage({
 
   const projectStages = (stages || []) as any[]
 
+  const projectLinkedClients = (clientsData || [])
+    .filter((c: any) => linkedClientIds.includes(c.id))
+    .map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      email: c.email || null,
+      phone: c.phone || null,
+      portal_token: c.portal_token || null,
+      person_type: c.person_type,
+    }))
+
   return (
     <div className="space-y-6 antialiased">
       <BreadcrumbSetter
@@ -187,15 +202,22 @@ export default async function ProjectDetailPage({
         projectId={id}
         isOwner={isOwner}
         userPermissions={userPermissions}
+        projectCode={project.code}
+        orgSlug={activeOrg?.slug}
+        portalToken={portalToken}
+        linkedClients={projectLinkedClients}
       />
 
 
       {/* Interactive Project Hub (List / Kanban Drag & Drop / Gantt + Task Drawer) */}
       <ProjectHubClient
         projectId={id}
+        projectCode={project.code}
+        orgSlug={activeOrg?.slug}
         organizationId={project.organization_id}
         stages={projectStages}
         portalToken={portalToken}
+        linkedClients={projectLinkedClients}
         members={membersList}
         initialWorkflowStages={workflowStages}
         initialView={initialView}

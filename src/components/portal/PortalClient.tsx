@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Building2,
   CheckCircle2,
@@ -10,7 +12,6 @@ import {
   Loader2,
   Paperclip,
   ExternalLink,
-  Calendar,
   Check,
   AlertCircle,
   User,
@@ -20,12 +21,20 @@ import {
   ArrowRight,
   ArrowLeft,
   RotateCcw,
+  LogOut,
+  LayoutDashboard,
 } from 'lucide-react'
 import {
   submitClientApprovalAction,
   sendStageApprovalOtpAction,
 } from '@/lib/actions/portal'
-import { formatDateRangeBR } from '@/lib/date-utils'
+import {
+  projectPortalLogoutAction,
+  clientPortalLogoutAction,
+  officePortalLogoutAction,
+  extendPortalSessionAction,
+} from '@/lib/actions/client-portal-auth'
+import PortalSessionTimeoutModal from '@/components/portal/PortalSessionTimeoutModal'
 import {
   WorkflowStage,
   STAGE_COLOR_CONFIG,
@@ -73,6 +82,13 @@ export interface PortalData {
     is_client_approval_required: boolean
     is_locked_for_client: boolean
     attachments?: Array<{ id: string; name: string; url: string; size?: string }>
+    manualApproval?: {
+      approverName: string
+      approverEmail?: string | null
+      feedbackMessage: string | null
+      approvedAt: string
+    } | null
+    comments?: any
     approvalProgress?: {
       totalRequired: number
       currentApprovedCount: number
@@ -86,11 +102,21 @@ export interface PortalData {
 export interface PortalClientProps {
   token: string
   data: PortalData
+  activeClientId?: string
+  activeClientName?: string
+  orgSlug?: string
+  backHref?: string
+  sessionExpiresAt?: number
 }
 
 export default function PortalClient({
   token,
   data,
+  activeClientId,
+  activeClientName,
+  orgSlug,
+  backHref,
+  sessionExpiresAt,
 }: PortalClientProps) {
   const { project, organization } = data
   const workflowStages = data.workflowStages && data.workflowStages.length > 0
@@ -122,10 +148,22 @@ export default function PortalClient({
     ]
   }, [data.clients, project.client_name, project.client_email])
 
+  const router = useRouter()
+  const [loggingOut, setLoggingOut] = useState(false)
+
+  // Identifica o cliente ativo autenticado
+  const activeClient = useMemo(() => {
+    if (activeClientId) {
+      const found = projectClients.find((c) => c.id === activeClientId)
+      if (found) return found
+    }
+    return projectClients[0]
+  }, [projectClients, activeClientId])
+
   // Estados do modal de validação (Aprovação / Solicitação de Ajustes)
   const [selectedStage, setSelectedStage] = useState<PortalData['stages'][0] | null>(null)
   const [modalAction, setModalAction] = useState<'approved' | 'changes_requested' | null>(null)
-  const [selectedClientId, setSelectedClientId] = useState<string>('')
+  const [selectedClientId, setSelectedClientId] = useState<string>(activeClient?.id || '')
   const [feedbackText, setFeedbackText] = useState('')
 
   // Estados do fluxo OTP
@@ -139,7 +177,21 @@ export default function PortalClient({
   const [feedbackSuccess, setFeedbackSuccess] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  // Atualiza cliente selecionado ao abrir modal
+  const handleLogout = async () => {
+    setLoggingOut(true)
+    if (orgSlug) {
+      await officePortalLogoutAction(orgSlug)
+      router.push(`/portal/${orgSlug}`)
+    } else {
+      await projectPortalLogoutAction(token)
+      if (activeClient?.portal_token) {
+        await clientPortalLogoutAction(activeClient.portal_token)
+      }
+      router.refresh()
+    }
+  }
+
+  // Atualiza cliente selecionado ao abrir modal — sempre o usuário autenticado!
   const openActionModal = (stage: PortalData['stages'][0], action: 'approved' | 'changes_requested') => {
     setSelectedStage(stage)
     setModalAction(action)
@@ -148,11 +200,7 @@ export default function PortalClient({
     setOtpCode('')
     setMaskedEmail(null)
     setErrorMessage(null)
-
-    // Identifica o primeiro cliente pendente de aprovação
-    const approvedIds = new Set((stage.approvalProgress?.approvedClients || []).map((a) => a.clientId))
-    const firstPending = projectClients.find((c) => !approvedIds.has(c.id) && Boolean(c.email)) || projectClients[0]
-    setSelectedClientId(firstPending?.id || '')
+    setSelectedClientId(activeClient?.id || '')
   }
 
   // Timer de cooldown de reenvio de OTP
@@ -211,8 +259,8 @@ export default function PortalClient({
     } else {
       const actionDesc = modalAction === 'approved'
         ? (res.isFullyApproved
-            ? `Etapa "${selectedStage.name}" aprovada com sucesso! Todas as validações foram concluídas.`
-            : `Sua aprovação para "${selectedStage.name}" foi registrada com sucesso! Aguardando aprovação dos demais clientes.`)
+          ? `Etapa "${selectedStage.name}" aprovada com sucesso! Todas as validações foram concluídas.`
+          : `Sua aprovação para "${selectedStage.name}" foi registrada com sucesso! Aguardando aprovação dos demais clientes.`)
         : `Solicitação de ajustes para "${selectedStage.name}" enviada para o escritório!`
 
       setFeedbackSuccess(actionDesc)
@@ -247,9 +295,23 @@ export default function PortalClient({
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col antialiased">
+      {/* Modal de aviso de expiração de sessão aos 5 minutos restantes */}
+      <PortalSessionTimeoutModal
+        sessionExpiresAt={sessionExpiresAt}
+        warningThresholdMinutes={5}
+        onExtendSession={() =>
+          extendPortalSessionAction({
+            orgSlug,
+            portalToken: activeClient?.portal_token || undefined,
+            projectToken: token,
+          })
+        }
+        onLogout={handleLogout}
+      />
+
       {/* Header do Escritório */}
-      <header className="bg-white border-b border-slate-200/80 sticky top-10 sm:top-11 z-10">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+      <header className="bg-white border-b border-slate-200/80 sticky top-0 z-20 shadow-xs">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {organization.logo_url ? (
               <img
@@ -273,11 +335,42 @@ export default function PortalClient({
               </span>
             </div>
           </div>
+
+          {/* Usuário Autenticado, Link Meus Projetos e Botão Sair */}
+          <div className="flex items-center gap-2.5">
+            {(backHref || orgSlug || activeClient?.portal_token) && (
+              <Link
+                href={backHref || (orgSlug ? `/portal/${orgSlug}` : `/portal/${activeClient?.portal_token}`)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                title="Ver todos os meus projetos vinculados a este escritório"
+              >
+                <LayoutDashboard className="w-3.5 h-3.5 text-blue-600" />
+                <span className="hidden sm:inline">Meus Projetos</span>
+              </Link>
+            )}
+
+            <div className="flex items-center gap-2 sm:pl-2 sm:border-l sm:border-slate-200">
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={loggingOut}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 border border-slate-200 hover:border-rose-200 text-xs font-semibold transition-all cursor-pointer"
+                title="Sair desta sessão e retornar para tela de identificação"
+              >
+                {loggingOut ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <LogOut className="w-3.5 h-3.5" />
+                )}
+                <span className="hidden sm:inline">Sair</span>
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
       {/* Conteúdo Principal */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8 flex-1 w-full">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8 flex-1 w-full">
         {/* Alerta de Sucesso */}
         {feedbackSuccess && (
           <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center justify-between shadow-xs animate-in fade-in slide-in-from-top-2 duration-200">
@@ -296,22 +389,12 @@ export default function PortalClient({
         )}
 
         {/* Banner do Projeto */}
-        <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+        <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-2.5 py-0.5 rounded-lg bg-blue-50 text-blue-700 font-mono text-xs font-bold border border-blue-100">
-                  {project.code}
-                </span>
-                <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-                  {project.title}
-                </h1>
-              </div>
-              {project.area_sqm && (
-                <p className="text-xs text-slate-500">
-                  Área: <strong className="text-slate-700 font-semibold">{project.area_sqm} m²</strong>
-                </p>
-              )}
+            <div>
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
+                {project.title}
+              </h1>
             </div>
 
             {/* Progresso Geral */}
@@ -355,21 +438,45 @@ export default function PortalClient({
                 const stepNumber = index + 1
                 const stageConfig = getStageConfig(st.status, workflowStages)
                 const colStyle = STAGE_COLOR_CONFIG[stageConfig.color] || STAGE_COLOR_CONFIG.blue
-                const isApproved = st.status === 'concluido' || stageConfig.id === 'concluido' || stageConfig.id === 'aprovado'
-                const isPendingApproval = Boolean(clientApprovalStage && st.status === clientApprovalStage.id)
-                const hasDates = !!(st.start_date || st.due_date)
+
+                const manualApprovalData = st.manualApproval || (() => {
+                  const overrideComment = (st.comments as any[])?.find(
+                    (c) => c?.text?.includes('⚠️ [Aprovação Manual') || c?.is_override
+                  )
+                  if (!overrideComment) return null
+                  return {
+                    approverName: overrideComment.user_name || 'Equipe do Escritório',
+                    feedbackMessage:
+                      overrideComment.justification ||
+                      overrideComment.text?.split('Justificativa: ')?.[1]?.replace(/^"|"$/g, '') ||
+                      null,
+                    approvedAt: overrideComment.created_at,
+                  }
+                })()
+
+                const isApproved =
+                  st.status === 'concluido' ||
+                  stageConfig.id === 'concluido' ||
+                  stageConfig.id === 'aprovado' ||
+                  Boolean(manualApprovalData)
+
+                const isPendingApproval = Boolean(
+                  clientApprovalStage &&
+                  st.status === clientApprovalStage.id &&
+                  !st.approvalProgress?.isFullyApproved &&
+                  !manualApprovalData
+                )
 
                 return (
                   <div key={st.id} className="relative group">
                     {/* Timeline Node Marker */}
                     <div
-                      className={`absolute -left-6 sm:-left-8 top-1.5 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                        isApproved
-                          ? 'bg-emerald-500 text-white ring-4 ring-emerald-100 shadow-xs'
-                          : isPendingApproval
-                            ? 'bg-amber-500 text-white ring-4 ring-amber-100 shadow-xs animate-pulse'
-                            : `${colStyle.badge} ring-4 ring-slate-100 shadow-xs`
-                      }`}
+                      className={`absolute -left-6 sm:-left-8 top-1.5 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${isApproved
+                        ? 'bg-emerald-500 text-white ring-4 ring-emerald-100 shadow-xs'
+                        : isPendingApproval
+                          ? 'bg-amber-500 text-white ring-4 ring-amber-100 shadow-xs animate-pulse'
+                          : `${colStyle.badge} ring-4 ring-slate-100 shadow-xs`
+                        }`}
                     >
                       {isApproved ? (
                         <Check className="w-3.5 h-3.5 stroke-[3]" />
@@ -380,13 +487,12 @@ export default function PortalClient({
 
                     {/* Timeline Card */}
                     <div
-                      className={`p-5 sm:p-6 rounded-2xl border transition-all space-y-4 ${
-                        isPendingApproval
-                          ? 'bg-amber-50/40 border-amber-300/90 shadow-md ring-2 ring-amber-500/10'
-                          : isApproved
-                            ? 'bg-emerald-50/20 border-emerald-200/80 hover:border-emerald-300 shadow-xs'
-                            : 'bg-white border-slate-200/80 hover:border-slate-300 shadow-xs'
-                      }`}
+                      className={`p-5 sm:p-6 rounded-2xl border transition-all space-y-4 ${isPendingApproval
+                        ? 'bg-amber-50/40 border-amber-300/90 shadow-md ring-2 ring-amber-500/10'
+                        : isApproved
+                          ? 'bg-emerald-50/20 border-emerald-200/80 hover:border-emerald-300 shadow-xs'
+                          : 'bg-white border-slate-200/80 hover:border-slate-300 shadow-xs'
+                        }`}
                     >
                       {/* Top Row: Task Name & Dynamic Status Badge */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
@@ -404,26 +510,11 @@ export default function PortalClient({
                         </div>
                       </div>
 
-                      {/* Datas Previstas */}
-                      {hasDates && (
-                        <div className="inline-flex items-center gap-2 text-xs text-slate-600 font-medium bg-slate-50 border border-slate-200/80 px-3 py-1.5 rounded-xl">
-                          <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="font-mono">{formatDateRangeBR(st.start_date, st.due_date)}</span>
-                        </div>
-                      )}
-
-                      {/* Descrição */}
-                      {st.description && (
-                        <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line bg-slate-50/50 p-3.5 rounded-xl border border-slate-100">
-                          {st.description}
-                        </p>
-                      )}
-
                       {/* Anexos e Pranchas para Validação */}
                       {st.attachments && st.attachments.length > 0 && (
                         <div className="space-y-2 pt-2">
                           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                            <Paperclip className="w-3.5 h-3.5" /> Arquivos & Pranchas para Validação ({st.attachments.length})
+                            <Paperclip className="w-3.5 h-3.5" /> Arquivos ({st.attachments.length})
                           </span>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                             {st.attachments.map((att) => (
@@ -461,11 +552,10 @@ export default function PortalClient({
                               return (
                                 <span
                                   key={c.id}
-                                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold border ${
-                                    hasApproved
-                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                      : 'bg-amber-50 text-amber-800 border-amber-200'
-                                  }`}
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold border ${hasApproved
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                                    }`}
                                 >
                                   {hasApproved ? (
                                     <Check className="w-3 h-3 text-emerald-600 stroke-[3]" />
@@ -477,6 +567,32 @@ export default function PortalClient({
                               )
                             })}
                           </div>
+                        </div>
+                      )}
+
+                      {/* Registro de Aprovação Manual com Justificativa */}
+                      {manualApprovalData && (
+                        <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/90 space-y-2.5 text-xs animate-in fade-in">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300/70">
+                              <ShieldCheck className="w-3.5 h-3.5 text-amber-700" />
+                              Aprovação Manual pela Equipe
+                            </span>
+                            <span className="text-slate-500 font-medium text-[11px]">
+                              Aprovador: <strong className="text-slate-800 font-semibold">{manualApprovalData.approverName}</strong>
+                            </span>
+                          </div>
+
+                          {manualApprovalData.feedbackMessage && (
+                            <div className="p-3 bg-white rounded-xl border border-amber-200/60 text-slate-700 space-y-1 shadow-2xs">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                                Justificativa da Aprovação:
+                              </span>
+                              <p className="text-xs leading-relaxed text-slate-800 italic">
+                                "{manualApprovalData.feedbackMessage}"
+                              </p>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -533,9 +649,8 @@ export default function PortalClient({
             <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold shadow-xs shrink-0 ${
-                    modalAction === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                  }`}
+                  className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold shadow-xs shrink-0 ${modalAction === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                    }`}
                 >
                   {modalAction === 'approved' ? <ShieldCheck className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
                 </div>
@@ -555,66 +670,35 @@ export default function PortalClient({
               </div>
             )}
 
-            {/* PASSO 1: SELEÇÃO DE QUEM ESTÁ APROVANDO */}
+            {/* PASSO 1: IDENTIFICAÇÃO DO APROVADOR AUTENTICADO (SEM ESCOLHA MANUAL) */}
             {!otpSent ? (
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Selecione quem está validando esta etapa:
-                  </label>
+                  <span className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                    Aprovador Identificado:
+                  </span>
 
-                  <div className="space-y-2">
-                    {projectClients.map((client) => {
-                      const isAlreadyApproved = (selectedStage.approvalProgress?.approvedClients || []).some(
-                        (a) => a.clientId === client.id
-                      )
-                      const isSelected = selectedClientId === client.id
-                      const hasEmail = Boolean(client.email)
+                  <div className="p-3.5 bg-blue-50/80 rounded-2xl border border-blue-200/80 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
+                        <User className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">
+                          Assinatura Digital Vinculada
+                        </span>
+                        <p className="text-xs font-bold text-slate-900 truncate">
+                          {activeClient?.name || 'Cliente'}
+                        </p>
+                        <p className="text-[11px] text-slate-500 truncate font-mono">
+                          {activeClient?.email || 'Sem e-mail cadastrado'}
+                        </p>
+                      </div>
+                    </div>
 
-                      return (
-                        <div
-                          key={client.id}
-                          onClick={() => {
-                            if (!isAlreadyApproved && hasEmail) {
-                              setSelectedClientId(client.id)
-                            }
-                          }}
-                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                            isAlreadyApproved
-                              ? 'bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed'
-                              : isSelected
-                                ? 'bg-blue-50/70 border-blue-500 ring-2 ring-blue-500/10'
-                                : 'bg-white border-slate-200 hover:border-slate-300'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div
-                              className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                                isSelected ? 'border-blue-600 bg-blue-600' : 'border-slate-300'
-                              }`}
-                            >
-                              {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-bold text-slate-900 truncate">{client.name}</p>
-                              <p className="text-[11px] text-slate-500 truncate font-mono">
-                                {client.email || 'Sem e-mail cadastrado'}
-                              </p>
-                            </div>
-                          </div>
-
-                          {isAlreadyApproved ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 shrink-0">
-                              <Check className="w-3 h-3 stroke-[3]" /> Já aprovou
-                            </span>
-                          ) : !hasEmail ? (
-                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 shrink-0">
-                              E-mail necessário
-                            </span>
-                          ) : null}
-                        </div>
-                      )
-                    })}
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200 shrink-0">
+                      <Check className="w-3 h-3 stroke-[3]" /> Autenticado
+                    </span>
                   </div>
                 </div>
 
@@ -739,11 +823,10 @@ export default function PortalClient({
                   <button
                     type="submit"
                     disabled={submittingApproval || otpCode.trim().length !== 6}
-                    className={`py-2.5 px-5 rounded-xl text-xs font-bold text-white transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
-                      modalAction === 'approved'
-                        ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20'
-                        : 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/20'
-                    }`}
+                    className={`py-2.5 px-5 rounded-xl text-xs font-bold text-white transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${modalAction === 'approved'
+                      ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20'
+                      : 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/20'
+                      }`}
                   >
                     {submittingApproval ? (
                       <>
