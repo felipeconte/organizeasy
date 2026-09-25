@@ -168,6 +168,102 @@ export default function ProjectsManagerClient({
     }
   }
 
+  const renderProjectCard = (proj: (typeof filteredProjects)[0]) => {
+    const statusConfig = STATUS_COLORS[proj.status] || STATUS_COLORS.ativo
+
+    return (
+      <div
+        key={proj.id}
+        className="p-5 rounded-2xl bg-white border border-slate-200/80 hover:border-blue-300 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 group relative"
+      >
+        <div className="space-y-3">
+          {/* Top Bar: Code, Status & Quick Action Buttons */}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-mono font-medium text-slate-400">
+              {proj.code}
+            </span>
+
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}
+              >
+                {statusConfig.label}
+              </span>
+
+              {/* Edit & Delete Action Buttons */}
+              {canEdit && (
+                <button
+                  onClick={() => handleOpenEdit(proj)}
+                  className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                  title="Editar Informações do Projeto"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+              )}
+
+              {canDelete && (
+                <button
+                  onClick={() => setDeletingProject(proj)}
+                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                  title="Excluir Projeto"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Project Title & Client */}
+          <div>
+            <Link
+              href={`/app/projetos/${proj.id}`}
+              className="text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors block line-clamp-1 cursor-pointer"
+            >
+              {proj.title}
+            </Link>
+            {(() => {
+              const { label, names } = formatProjectClientDisplay(proj.client_name, proj.client_ids)
+              return (
+                <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-1">
+                  <User className="w-4 h-4 text-slate-400 shrink-0" />
+                  <span className="truncate">
+                    {label}: <strong className="text-slate-700">{names}</strong>
+                  </span>
+                </p>
+              )
+            })()}
+          </div>
+
+          {/* Metadata Chips */}
+          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-sm text-slate-600">
+            <div className="flex items-center gap-1.5 truncate">
+              <Compass className="w-4 h-4 text-slate-400 shrink-0" />
+              <span>{proj.area_sqm ? `${formatNumberBRL(proj.area_sqm)} m²` : 'Área não definida'}</span>
+            </div>
+            <div className="flex items-center gap-1.5 truncate">
+              <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+              <span>{proj.deadline ? proj.deadline : 'Sem prazo'}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Action: Open Project Hub */}
+        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+          <span className="text-xs font-semibold text-slate-500">
+            {proj.typology || 'Residencial'}
+          </span>
+
+          <Link
+            href={`/app/projetos/${proj.id}`}
+            className="inline-flex items-center gap-1.5 py-2 px-3.5 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white text-sm font-semibold transition-all cursor-pointer shadow-2xs"
+          >
+            Ver detalhes <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6 antialiased">
       {/* Toast Notification */}
@@ -238,7 +334,7 @@ export default function ProjectsManagerClient({
             </select>
           </div>
 
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/60">
+          <div className="hidden xl:flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/60">
             <button
               onClick={() => setViewMode('grid')}
               className={`p-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${viewMode === 'grid' ? 'bg-white text-blue-600 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
@@ -297,105 +393,12 @@ export default function ProjectsManagerClient({
       ) : viewMode === 'grid' ? (
         /* GRID VIEW */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredProjects.map((proj) => {
-            const statusConfig = STATUS_COLORS[proj.status] || STATUS_COLORS.ativo
-
-            return (
-              <div
-                key={proj.id}
-                className="p-5 rounded-2xl bg-white border border-slate-200/80 hover:border-blue-300 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 group relative"
-              >
-                <div className="space-y-3">
-                  {/* Top Bar: Code, Status & Quick Action Buttons */}
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-mono font-medium text-slate-400">
-                      {proj.code}
-                    </span>
-
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}
-                      >
-                        {statusConfig.label}
-                      </span>
-
-                      {/* Edit & Delete Action Buttons */}
-                      {canEdit && (
-                        <button
-                          onClick={() => handleOpenEdit(proj)}
-                          className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                          title="Editar Informações do Projeto"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                      )}
-
-                      {canDelete && (
-                        <button
-                          onClick={() => setDeletingProject(proj)}
-                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                          title="Excluir Projeto"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Project Title & Client */}
-                  <div>
-                    <Link
-                      href={`/app/projetos/${proj.id}`}
-                      className="text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors block line-clamp-1 cursor-pointer"
-                    >
-                      {proj.title}
-                    </Link>
-                    {(() => {
-                      const { label, names } = formatProjectClientDisplay(proj.client_name, proj.client_ids)
-                      return (
-                        <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-1">
-                          <User className="w-4 h-4 text-slate-400 shrink-0" />
-                          <span className="truncate">
-                            {label}: <strong className="text-slate-700">{names}</strong>
-                          </span>
-                        </p>
-                      )
-                    })()}
-                  </div>
-
-                  {/* Metadata Chips */}
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-sm text-slate-600">
-                    <div className="flex items-center gap-1.5 truncate">
-                      <Compass className="w-4 h-4 text-slate-400 shrink-0" />
-                      <span>{proj.area_sqm ? `${formatNumberBRL(proj.area_sqm)} m²` : 'Área não definida'}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 truncate">
-                      <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
-                      <span>{proj.deadline ? proj.deadline : 'Sem prazo'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bottom Action: Open Project Hub */}
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-500">
-                    {proj.typology || 'Residencial'}
-                  </span>
-
-                  <Link
-                    href={`/app/projetos/${proj.id}`}
-                    className="inline-flex items-center gap-1.5 py-2 px-3.5 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white text-sm font-semibold transition-all cursor-pointer shadow-2xs"
-                  >
-                    Ver detalhes <ArrowRight className="w-4 h-4" />
-                  </Link>
-                </div>
-              </div>
-            )
-          })}
+          {filteredProjects.map(renderProjectCard)}
         </div>
       ) : (
-        /* TABLE VIEW */
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <>
+          {/* TABLE VIEW */}
+          <div className="hidden xl:block bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-xs">
@@ -484,7 +487,13 @@ export default function ProjectsManagerClient({
             </table>
           </div>
         </div>
-      )}
+
+        {/* Fallback to Cards on Mobile/Tablet (< 1280px) */}
+        <div className="grid xl:hidden grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filteredProjects.map(renderProjectCard)}
+        </div>
+      </>
+    )}
 
       {/* MODAL: EDITAR PROJETO */}
       <EditProjectModal

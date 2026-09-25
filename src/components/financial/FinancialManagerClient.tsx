@@ -813,7 +813,8 @@ export default function FinancialManagerClient({
                 )}
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <>
+                <div className="hidden xl:block overflow-x-auto">
                 <table className="w-full text-left border-collapse text-sm">
                   <thead>
                     <tr className="bg-slate-50/70 border-b border-slate-200/80 text-slate-500 font-bold uppercase tracking-wider text-xs">
@@ -977,7 +978,132 @@ export default function FinancialManagerClient({
                   </tbody>
                 </table>
               </div>
-            )}
+
+              {/* Mobile / Tablet Responsive Cards (< 1280px) */}
+              <div className="block xl:hidden divide-y divide-slate-100">
+                {filteredTransactions.map((tx) => {
+                  const isIncome = tx.type === 'income'
+                  const isPaid = tx.status === 'paid'
+                  const catDef = FINANCIAL_CATEGORIES.find(
+                    (c) => c.id === tx.category || c.label === tx.category
+                  )
+
+                  return (
+                    <div
+                      key={tx.id}
+                      className="p-4 space-y-3 hover:bg-slate-50/60 transition-colors"
+                    >
+                      {/* Topo do Card: Status + Categoria + Valor */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1.5 min-w-0 flex-1">
+                          <div className="flex items-center flex-wrap gap-1.5">
+                            {canCreateEdit ? (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleStatus(tx)}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                                  isPaid
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : tx.status === 'overdue'
+                                      ? 'bg-rose-100 text-rose-800'
+                                      : 'bg-amber-100 text-amber-800'
+                                }`}
+                              >
+                                {isPaid ? (
+                                  <>
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span>Pago</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                    <span>{tx.status === 'overdue' ? 'Atrasado' : 'Pendente'}</span>
+                                  </>
+                                )}
+                              </button>
+                            ) : (
+                              <span
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-xs ${
+                                  isPaid
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-amber-100 text-amber-800'
+                                }`}
+                              >
+                                {isPaid ? 'Pago' : 'Pendente'}
+                              </span>
+                            )}
+
+                            <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600">
+                              {catDef?.label || tx.category}
+                            </span>
+
+                            {tx.recurring_expense_id && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                <Repeat className="w-3 h-3 text-indigo-600" /> Recorrente
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="font-bold text-sm text-slate-800 leading-snug pt-0.5">
+                            {tx.title}
+                          </p>
+                        </div>
+
+                        {/* Valor em destaque */}
+                        <div className="text-right shrink-0">
+                          <span
+                            className={`text-base font-mono font-extrabold block ${
+                              isIncome ? 'text-emerald-600' : 'text-rose-600'
+                            }`}
+                          >
+                            {isIncome ? '+' : '-'} {formatBRL(tx.amount)}
+                          </span>
+                          {canCreateEdit && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditTransaction(tx)}
+                              className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700 cursor-pointer"
+                            >
+                              <Edit2 className="w-3 h-3" /> Editar
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Metadados / Projeto / Vencimento */}
+                      <div className="pt-2 border-t border-slate-100/80 flex flex-wrap items-center justify-between gap-y-1.5 text-xs text-slate-500">
+                        <div className="flex items-center gap-2">
+                          {tx.projects ? (
+                            <Link
+                              href={`/app/projetos/${tx.projects.id}/financeiro`}
+                              className="font-semibold text-blue-600 hover:underline"
+                            >
+                              {tx.projects.title}
+                            </Link>
+                          ) : (
+                            <span>Geral do Escritório</span>
+                          )}
+                          {tx.companies && (
+                            <>
+                              <span>•</span>
+                              <span className="text-slate-600 font-medium">Parceiro: {tx.companies.name}</span>
+                            </>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-3 font-mono text-slate-600 text-[11px]">
+                          <span>Venc: <strong>{formatDateBR(tx.due_date)}</strong></span>
+                          {tx.payment_method && (
+                            <span className="text-slate-400">({tx.payment_method})</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
           </div>
         </div>
       )}
@@ -1023,7 +1149,7 @@ export default function FinancialManagerClient({
 
           {/* Profitability Table */}
           <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="hidden xl:block overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-50/70 border-b border-slate-200/80 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
@@ -1120,6 +1246,92 @@ export default function FinancialManagerClient({
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile / Tablet Responsive Cards (< 1280px) */}
+            <div className="block xl:hidden divide-y divide-slate-100">
+              {profitability.map((p) => (
+                <div key={p.projectId} className="p-4.5 space-y-3.5 hover:bg-slate-50/50 transition-colors">
+                  {/* Topo: Título + Margem e Lucro */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        href={`/app/projetos/${p.projectId}/financeiro`}
+                        className="font-bold text-sm text-slate-900 hover:text-blue-600 transition-colors block truncate"
+                      >
+                        {p.projectTitle}
+                      </Link>
+                      <span className="text-xs text-slate-500 block truncate mt-0.5">
+                        {p.clientName}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <span
+                        className={`text-xs font-mono font-extrabold px-2 py-0.5 rounded-lg ${
+                          p.netProfit >= 0
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                            : 'bg-rose-50 text-rose-700 border border-rose-100'
+                        }`}
+                      >
+                        {formatBRL(p.netProfit)}
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.2 rounded-full ${
+                          p.profitMarginPercent >= 50
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : p.profitMarginPercent > 0
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-rose-100 text-rose-800'
+                        }`}
+                      >
+                        Margem: {p.profitMarginPercent.toFixed(1)}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Grid de Métricas */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-100 text-xs">
+                    <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Honorários</span>
+                      <span className="font-mono font-semibold text-slate-700 mt-0.5 block">
+                        {formatBRL(p.directContractIncome)}
+                      </span>
+                    </div>
+
+                    <div className="p-2 rounded-xl bg-blue-50/50 border border-blue-100/60">
+                      <span className="text-[10px] uppercase font-bold text-blue-400 block">Comissões RT</span>
+                      <span className="font-mono font-semibold text-blue-700 mt-0.5 block">
+                        {formatBRL(p.commissionsIncome)}
+                      </span>
+                    </div>
+
+                    <div className="p-2 rounded-xl bg-emerald-50/50 border border-emerald-100/60">
+                      <span className="text-[10px] uppercase font-bold text-emerald-500 block">Faturamento</span>
+                      <span className="font-mono font-extrabold text-emerald-700 mt-0.5 block">
+                        {formatBRL(p.totalRevenue)}
+                      </span>
+                    </div>
+
+                    <div className="p-2 rounded-xl bg-rose-50/50 border border-rose-100/60">
+                      <span className="text-[10px] uppercase font-bold text-rose-400 block">Custos</span>
+                      <span className="font-mono font-semibold text-rose-700 mt-0.5 block">
+                        {formatBRL(p.expensesTotal)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Rodapé CTA */}
+                  <div className="pt-2 flex justify-end">
+                    <Link
+                      href={`/app/projetos/${p.projectId}/financeiro`}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700"
+                    >
+                      Ver detalhes do projeto <ChevronRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
