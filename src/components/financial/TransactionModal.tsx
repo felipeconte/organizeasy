@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -395,8 +396,8 @@ export default function TransactionModal({
         onSuccess(res.transaction)
         onClose()
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Erro inesperado.')
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Erro inesperado.')
     } finally {
       setIsLoading(false)
     }
@@ -424,55 +425,58 @@ export default function TransactionModal({
       setDeleteConfirmScope(null)
       onSuccess(initialTransaction, true, scope)
       onClose()
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Erro ao excluir lançamento.')
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Erro ao excluir lançamento.')
     } finally {
       setIsDeleting(false)
     }
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs antialiased animate-in fade-in duration-200 overflow-y-auto">
-      <div className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[calc(100dvh-2rem)] my-auto">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs antialiased animate-in fade-in duration-200">
+      <div className="relative w-full max-w-4xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-auto max-h-[92dvh] sm:max-h-[calc(100dvh-2.5rem)] my-auto">
         {/* Header */}
-        <div className="px-7 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
-          <div className="flex items-center gap-3">
+        <div className="px-4 py-3.5 sm:px-7 sm:py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70 shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <div
-              className={`w-11 h-11 rounded-2xl flex items-center justify-center text-white shadow-xs ${type === 'income' ? 'bg-emerald-600 shadow-emerald-500/20' : 'bg-rose-600 shadow-rose-500/20'
-                }`}
+              className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0 ${
+                type === 'income' ? 'bg-emerald-600 shadow-emerald-500/20' : 'bg-rose-600 shadow-rose-500/20'
+              }`}
             >
-              {type === 'income' ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+              {type === 'income' ? <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" /> : <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5" />}
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900">
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
                 {isEditing ? 'Editar Lançamento' : type === 'income' ? 'Nova Entrada (Receita)' : 'Nova Saída (Despesa)'}
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
                 {isEditing ? 'Atualize as informações do registro financeiro.' : 'Preencha os dados do fluxo de caixa.'}
               </p>
             </div>
           </div>
 
           <button
+            type="button"
             onClick={onClose}
-            className="p-2.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="p-2 sm:p-2.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6 overflow-y-auto flex-1 text-sm">
-          {errorMsg && (
-            <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-700 flex items-center gap-2.5">
-              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
+        {/* Form: Wraps Scrollable Body + Sticky Footer */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          {/* Scrollable Form Body */}
+          <div className="p-4 sm:p-7 space-y-4 sm:space-y-5 overflow-y-auto flex-1 min-h-0 text-xs sm:text-sm">
+            {errorMsg && (
+              <div className="p-3 sm:p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-700 flex items-center gap-2.5 text-xs sm:text-sm">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
 
-
-          {/* Type Selector (Receita vs Despesa) */}
-          <div className="flex p-1.5 bg-slate-100/90 rounded-2xl">
+            {/* Type Selector (Receita vs Despesa) */}
+            <div className="flex p-1 sm:p-1.5 bg-slate-100/90 rounded-xl sm:rounded-2xl">
             <button
               type="button"
               onClick={() => handleTypeChange('income')}
@@ -996,10 +1000,12 @@ export default function TransactionModal({
             </div>
           )}
 
-          {/* Footer Actions */}
-          <div className="pt-5 border-t border-slate-100 flex items-center justify-between gap-3">
+          </div>
+
+          {/* Sticky Footer Actions */}
+          <div className="shrink-0 px-4 py-3 sm:px-7 sm:py-4 border-t border-slate-100 bg-slate-50/90 backdrop-blur-xs flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
             {isEditing && canDelete ? (
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap w-full sm:w-auto">
                 {initialTransaction?.recurring_expense_id ? (
                   <>
                     <button
@@ -1009,7 +1015,7 @@ export default function TransactionModal({
                         setDeleteConfirmScope('single')
                       }}
                       disabled={isDeleting || isLoading}
-                      className="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 font-bold transition-colors text-xs cursor-pointer flex items-center gap-1.5"
+                      className="px-2.5 sm:px-3 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 font-bold transition-colors text-[11px] sm:text-xs cursor-pointer flex items-center justify-center gap-1.5 flex-1 sm:flex-initial"
                       title="Exclui apenas este lançamento específico"
                     >
                       <Trash2 className="w-3.5 h-3.5 text-slate-500" />
@@ -1023,7 +1029,7 @@ export default function TransactionModal({
                         setDeleteConfirmScope('future')
                       }}
                       disabled={isDeleting || isLoading}
-                      className="px-3 py-2 rounded-xl border border-rose-200 bg-rose-50/50 text-rose-700 hover:bg-rose-100 font-bold transition-colors text-xs cursor-pointer flex items-center gap-1.5"
+                      className="px-2.5 sm:px-3 py-2 rounded-xl border border-rose-200 bg-rose-50/50 text-rose-700 hover:bg-rose-100 font-bold transition-colors text-[11px] sm:text-xs cursor-pointer flex items-center justify-center gap-1.5 flex-1 sm:flex-initial"
                       title="Exclui este lançamento e todos os posteriores desta recorrência"
                     >
                       Excluir Este e Futuros
@@ -1036,7 +1042,7 @@ export default function TransactionModal({
                         setDeleteConfirmScope('all')
                       }}
                       disabled={isDeleting || isLoading}
-                      className="px-3 py-2 rounded-xl bg-rose-600 text-white hover:bg-rose-700 font-bold transition-colors text-xs cursor-pointer flex items-center gap-1.5"
+                      className="px-2.5 sm:px-3 py-2 rounded-xl bg-rose-600 text-white hover:bg-rose-700 font-bold transition-colors text-[11px] sm:text-xs cursor-pointer flex items-center justify-center gap-1.5 flex-1 sm:flex-initial"
                       title="Exclui a regra inteira e todos os lançamentos vinculados"
                     >
                       Excluir Toda a Série
@@ -1050,23 +1056,23 @@ export default function TransactionModal({
                       setDeleteConfirmScope('single')
                     }}
                     disabled={isDeleting || isLoading}
-                    className="px-4 py-2.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 font-bold transition-colors flex items-center gap-1.5 cursor-pointer text-sm"
+                    className="w-full sm:w-auto px-4 py-2 sm:py-2.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer text-xs sm:text-sm"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     Excluir
                   </button>
                 )}
               </div>
             ) : (
-              <div />
+              <div className="hidden sm:block" />
             )}
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={onClose}
                 disabled={isLoading || isDeleting}
-                className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold transition-colors cursor-pointer text-sm"
+                className="flex-1 sm:flex-initial px-4 sm:px-5 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold transition-colors cursor-pointer text-xs sm:text-sm text-center"
               >
                 Cancelar
               </button>
@@ -1074,12 +1080,13 @@ export default function TransactionModal({
               <button
                 type="submit"
                 disabled={isLoading || isDeleting}
-                className={`px-6 py-2.5 rounded-xl text-white font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer text-sm ${type === 'income'
+                className={`flex-1 sm:flex-initial px-5 sm:px-6 py-2.5 rounded-xl text-white font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer text-xs sm:text-sm text-center ${
+                  type === 'income'
                     ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
                     : 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20'
-                  }`}
+                }`}
               >
-                {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isLoading && <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />}
                 {isEditing ? 'Salvar Alterações' : 'Confirmar Lançamento'}
               </button>
             </div>
@@ -1089,8 +1096,8 @@ export default function TransactionModal({
 
       {/* Modal Customizado de Confirmação de Exclusão */}
       {deleteConfirmScope && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs antialiased animate-in fade-in duration-150 overflow-y-auto">
-          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col p-6 animate-in zoom-in-95 duration-150 my-auto max-h-[calc(100dvh-2rem)]">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-xs antialiased animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col p-5 sm:p-6 animate-in zoom-in-95 duration-150 my-auto max-h-[92dvh] sm:max-h-[calc(100dvh-2rem)]">
             <div className="flex items-start gap-4">
               <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shrink-0 shadow-xs">
                 <Trash2 className="w-6 h-6" />

@@ -116,10 +116,22 @@ export function getFallbackBreadcrumbs(pathname: string): BreadcrumbItem[] {
 
   // 6. Financeiro
   if (pathname.startsWith('/app/financeiro')) {
-    return [
-      { label: 'Escritório' },
-      { label: 'Financeiro' },
-    ]
+    const root: BreadcrumbItem = { label: 'Escritório' }
+    const financeiroRoot: BreadcrumbItem = { label: 'Financeiro', href: '/app/financeiro' }
+
+    if (pathname === '/app/financeiro') {
+      return [root, { label: 'Financeiro' }, { label: 'Visão Geral' }]
+    }
+    if (pathname === '/app/financeiro/lancamentos') {
+      return [root, financeiroRoot, { label: 'Lançamentos' }]
+    }
+    if (pathname === '/app/financeiro/lucratividade') {
+      return [root, financeiroRoot, { label: 'Lucratividade por Projeto' }]
+    }
+    if (pathname === '/app/financeiro/projecao') {
+      return [root, financeiroRoot, { label: 'Passado, Presente e Futuro' }]
+    }
+    return [root, { label: 'Financeiro' }]
   }
 
   // Fallback genérico para qualquer outra rota sob /app
@@ -143,9 +155,11 @@ export function BreadcrumbProvider({ children }: { children: React.ReactNode }) 
   const [customBreadcrumbs, setCustomBreadcrumbs] = useState<BreadcrumbItem[] | null>(null)
 
   // Reseta custom breadcrumbs sempre que a URL base mudar
-  useEffect(() => {
+  const [prevPathname, setPrevPathname] = useState(pathname)
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname)
     setCustomBreadcrumbs(null)
-  }, [pathname])
+  }
 
   const breadcrumbs = useMemo(() => {
     if (customBreadcrumbs && customBreadcrumbs.length > 0) {

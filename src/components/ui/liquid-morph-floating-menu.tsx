@@ -21,12 +21,20 @@ import { logoutAction } from '@/lib/actions/auth'
 import { switchActiveOrganizationAction } from '@/lib/actions/organization'
 import type { UserOrganizationItem } from '@/types/organization'
 
+export interface FloatingSubNavItem {
+  href: string
+  label: string
+  icon?: LucideIcon
+  exact?: boolean
+}
+
 export interface FloatingNavItem {
   href: string
   label: string
   icon: LucideIcon
   exact?: boolean
   badge?: number
+  subItems?: FloatingSubNavItem[]
 }
 
 export interface FloatingConfigNavItem {
@@ -82,13 +90,19 @@ export default function LiquidMorphFloatingMenu({
 
   const pathname = usePathname()
   const menuRef = useRef<HTMLDivElement>(null)
+  const [expandedSubMenu, setExpandedSubMenu] = useState<string | null>(() =>
+    pathname.startsWith('/app/financeiro') ? '/app/financeiro' : null
+  )
 
-  // Fecha o menu quando a rota muda sem apagar a categoria salva
+  // Fecha o menu e sincroniza submenus quando a rota muda sem apagar a categoria salva
   const [prevPathname, setPrevPathname] = useState(pathname)
   if (prevPathname !== pathname) {
     setPrevPathname(pathname)
     setIsOpen(false)
     setShowOrgSwitcher(false)
+    if (pathname.startsWith('/app/financeiro')) {
+      setExpandedSubMenu('/app/financeiro')
+    }
   }
 
   const showOffice = !showOrgSwitcher && activeCategory === 'office'
@@ -421,6 +435,96 @@ export default function LiquidMorphFloatingMenu({
                         {mainNavItems.map((item) => {
                           const isActive = checkIsActive(item.href, item.exact)
                           const Icon = item.icon
+                          const hasSub = item.subItems && item.subItems.length > 0
+                          const isSubOpen = hasSub && expandedSubMenu === item.href
+                          const isParentActive = pathname.startsWith(item.href)
+
+                          if (hasSub) {
+                            return (
+                              <div key={item.href} className="space-y-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setExpandedSubMenu((prev) => (prev === item.href ? null : item.href))
+                                  }}
+                                  className={`w-full group relative flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 text-sm select-none cursor-pointer ${
+                                    isParentActive
+                                      ? 'bg-white text-blue-700 font-semibold shadow-xs border border-white/30'
+                                      : 'text-blue-50 hover:text-white hover:bg-white/15 font-medium'
+                                  }`}
+                                  aria-label={
+                                    isSubOpen
+                                      ? `Recolher submenus de ${item.label}`
+                                      : `Expandir submenus de ${item.label}`
+                                  }
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                    <div
+                                      className={`p-1.5 rounded-lg transition-colors shrink-0 ${
+                                        isParentActive
+                                          ? 'bg-blue-50 text-blue-600'
+                                          : 'bg-white/15 text-white group-hover:bg-white/25'
+                                      }`}
+                                    >
+                                      <Icon className="w-4 h-4" />
+                                    </div>
+                                    <span className="font-medium tracking-wide truncate">
+                                      {item.label}
+                                    </span>
+                                  </div>
+
+                                  <div className="p-1 rounded-lg text-blue-200 group-hover:text-white transition-colors shrink-0">
+                                    <ChevronDown
+                                      className={`w-4 h-4 transition-transform duration-200 ${
+                                        isSubOpen ? 'rotate-180 text-white' : ''
+                                      }`}
+                                    />
+                                  </div>
+                                </button>
+
+                                {/* Submenus no card mobile */}
+                                <AnimatePresence initial={false}>
+                                  {isSubOpen && (
+                                    <motion.div
+                                      initial={{ opacity: 0, height: 0 }}
+                                      animate={{ opacity: 1, height: 'auto' }}
+                                      exit={{ opacity: 0, height: 0 }}
+                                      className="ml-5 pl-3 border-l border-blue-400/50 space-y-1 py-1 overflow-hidden"
+                                    >
+                                      {item.subItems?.map((sub) => {
+                                        const isSubActive = sub.exact
+                                          ? pathname === sub.href
+                                          : pathname === sub.href || pathname.startsWith(sub.href + '/')
+                                        const SubIcon = sub.icon
+
+                                        return (
+                                          <Link
+                                            key={sub.href}
+                                            href={sub.href}
+                                            onClick={() => setIsOpen(false)}
+                                            className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all ${
+                                              isSubActive
+                                                ? 'bg-white text-blue-800 font-bold shadow-xs'
+                                                : 'text-blue-100 hover:text-white hover:bg-white/15 font-medium'
+                                            }`}
+                                          >
+                                            {SubIcon && (
+                                              <SubIcon
+                                                className={`w-4 h-4 shrink-0 ${
+                                                  isSubActive ? 'text-blue-600' : 'text-blue-200'
+                                                }`}
+                                              />
+                                            )}
+                                            <span className="truncate">{sub.label}</span>
+                                          </Link>
+                                        )
+                                      })}
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+                            )
+                          }
 
                           return (
                             <Link

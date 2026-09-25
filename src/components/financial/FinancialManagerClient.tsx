@@ -1,13 +1,12 @@
 'use client'
 
-import { useState, useMemo, useTransition } from 'react'
+import { useState, useMemo, useTransition, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import {
   TrendingUp,
   TrendingDown,
   CircleDollarSign,
   Plus,
-  Filter,
   Search,
   Calendar,
   Building2,
@@ -19,21 +18,17 @@ import {
   ArrowDownRight,
   Repeat,
   Sparkles,
-  PieChart,
   Layers,
   ChevronRight,
+  ChevronLeft,
   Edit2,
-  Trash2,
-  ExternalLink,
   ChevronDown,
-  Info,
   SlidersHorizontal,
-  DollarSign,
   Briefcase,
-  Users,
   Check,
   X,
-  User
+  LayoutGrid,
+  List
 } from 'lucide-react'
 import {
   FinancialTransaction,
@@ -88,9 +83,71 @@ interface FinancialManagerClientProps {
   clients?: ClientOption[]
   isOwner?: boolean
   userPermissions?: ProfilePermissions
+  currentSubPage?: 'visao_geral' | 'lancamentos' | 'lucratividade' | 'projecao'
 }
 
-type TabType = 'visao_geral' | 'extrato' | 'projetos' | 'projecao'
+export type PeriodGranularity = 'day' | 'week' | 'month' | 'year' | 'custom' | 'all'
+export type DateFilterBasis = 'due_date' | 'payment_date'
+
+const MONTH_NAMES_PT = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+]
+
+const WEEKDAY_NAMES_PT = [
+  'Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira',
+  'Quinta-feira', 'Sexta-feira', 'Sábado'
+]
+
+function toISODateString(d: Date): string {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function getMondayToSundayWeek(refDate: Date): { start: Date; end: Date; startStr: string; endStr: string } {
+  const d = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate())
+  const day = d.getDay() // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+  const diffToMonday = day === 0 ? -6 : 1 - day
+  const monday = new Date(d)
+  monday.setDate(d.getDate() + diffToMonday)
+
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+
+  return {
+    start: monday,
+    end: sunday,
+    startStr: toISODateString(monday),
+    endStr: toISODateString(sunday)
+  }
+}
+
+function getMonthRange(refDate: Date): { start: Date; end: Date; startStr: string; endStr: string } {
+  const year = refDate.getFullYear()
+  const month = refDate.getMonth()
+  const start = new Date(year, month, 1)
+  const lastDay = new Date(year, month + 1, 0).getDate()
+  const end = new Date(year, month, lastDay)
+
+  return {
+    start,
+    end,
+    startStr: toISODateString(start),
+    endStr: toISODateString(end)
+  }
+}
+
+function getYearRange(refDate: Date): { start: Date; end: Date; startStr: string; endStr: string } {
+  const year = refDate.getFullYear()
+  return {
+    start: new Date(year, 0, 1),
+    end: new Date(year, 11, 31),
+    startStr: `${year}-01-01`,
+    endStr: `${year}-12-31`
+  }
+}
 
 export default function FinancialManagerClient({
   organizationId,
@@ -101,19 +158,16 @@ export default function FinancialManagerClient({
   initialProjection,
   projects,
   companies,
-  clients = [],
   isOwner,
-  userPermissions
+  userPermissions,
+  currentSubPage = 'visao_geral'
 }: FinancialManagerClientProps) {
   const permContext = usePermissions()
   const effectiveIsOwner = isOwner ?? permContext.isOwner
   const effectivePermissions = userPermissions ?? permContext.permissions
 
   const canCreateEdit = hasPermission(effectiveIsOwner, effectivePermissions, 'financial_create_edit')
-  const canDelete = hasPermission(effectiveIsOwner, effectivePermissions, 'financial_delete')
   const canViewSensitive = hasPermission(effectiveIsOwner, effectivePermissions, 'financial_view_sensitive')
-
-  const [activeTab, setActiveTab] = useState<TabType>('visao_geral')
 
   // Estado dos dados
   const [transactions, setTransactions] = useState<FinancialTransaction[]>(initialTransactions)
@@ -129,14 +183,40 @@ export default function FinancialManagerClient({
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [selectedRecurrence, setSelectedRecurrence] = useState<'all' | 'recurring_only' | 'single_only'>('all')
-  const [dateRangeMode, setDateRangeMode] = useState<'current_month' | 'last_month' | 'next_month' | 'year' | 'all'>('current_month')
+
+  // Navegação de Período & Visualização (Inspirado no padrão de Projetos)
+  const [periodMode, setPeriodMode] = useState<PeriodGranularity>('month')
+  const [selectedRefDate, setSelectedRefDate] = useState<Date>(() => new Date())
+  const [customStartDate, setCustomStartDate] = useState<string>('')
+  const [customEndDate, setCustomEndDate] = useState<string>('')
+  const [dateBasis, setDateBasis] = useState<DateFilterBasis>('due_date')
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table')
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false)
+
+  // Estados para o Popover do Calendário Integrado
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
+  const [calendarViewDate, setCalendarViewDate] = useState<Date>(() => new Date())
+  const calendarRef = useRef<HTMLDivElement>(null)
+
+  // Fecha o calendário ao clicar fora
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
+        setIsCalendarOpen(false)
+      }
+    }
+    if (isCalendarOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isCalendarOpen])
 
   // Modais
   const [isTxModalOpen, setIsTxModalOpen] = useState(false)
   const [selectedTx, setSelectedTx] = useState<FinancialTransaction | null>(null)
   const [modalDefaultType, setModalDefaultType] = useState<TransactionType>('income')
 
-  const [isPendingStatus, startTransition] = useTransition()
+  const [, startTransition] = useTransition()
 
   // Formatador de Moeda BRL
   const formatBRL = (val: number) => {
@@ -310,44 +390,266 @@ export default function FinancialManagerClient({
         if (!isMatch) return false
       }
 
-      // Período
-      if (dateRangeMode !== 'all') {
-        const now = new Date()
-        const currentYear = now.getFullYear()
-        const currentMonth = now.getMonth() + 1
-        const currentMonthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`
+      // Período de visualização dinâmico
+      if (periodMode !== 'all') {
+        let startBound = ''
+        let endBound = ''
 
-        const txDate = tx.due_date || tx.payment_date || ''
-
-        if (dateRangeMode === 'current_month') {
-          if (!txDate.startsWith(currentMonthKey)) return false
-        } else if (dateRangeMode === 'last_month') {
-          const lastMonthDate = new Date(currentYear, now.getMonth() - 1, 1)
-          const lastMonthKey = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`
-          if (!txDate.startsWith(lastMonthKey)) return false
-        } else if (dateRangeMode === 'next_month') {
-          const nextMonthDate = new Date(currentYear, now.getMonth() + 1, 1)
-          const nextMonthKey = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}`
-          if (!txDate.startsWith(nextMonthKey)) return false
-        } else if (dateRangeMode === 'year') {
-          if (!txDate.startsWith(String(currentYear))) return false
+        if (periodMode === 'day') {
+          startBound = toISODateString(selectedRefDate)
+          endBound = startBound
+        } else if (periodMode === 'week') {
+          const w = getMondayToSundayWeek(selectedRefDate)
+          startBound = w.startStr
+          endBound = w.endStr
+        } else if (periodMode === 'month') {
+          const m = getMonthRange(selectedRefDate)
+          startBound = m.startStr
+          endBound = m.endStr
+        } else if (periodMode === 'year') {
+          const y = getYearRange(selectedRefDate)
+          startBound = y.startStr
+          endBound = y.endStr
+        } else if (periodMode === 'custom') {
+          startBound = customStartDate
+          endBound = customEndDate
         }
+
+        // Determina data do registro conforme a base selecionada (Vencimento ou Data de Pagamento)
+        let txDate = ''
+        if (dateBasis === 'payment_date') {
+          txDate = tx.payment_date || (tx.status === 'paid' ? tx.due_date : '')
+        } else {
+          txDate = tx.due_date || tx.payment_date || ''
+        }
+
+        if (!txDate) return false
+        if (startBound && txDate < startBound) return false
+        if (endBound && txDate > endBound) return false
       }
 
       return true
     })
-  }, [transactions, searchTerm, selectedType, selectedStatus, selectedRecurrence, selectedProjectId, selectedCategory, dateRangeMode])
+  }, [
+    transactions,
+    searchTerm,
+    selectedType,
+    selectedStatus,
+    selectedRecurrence,
+    selectedProjectId,
+    selectedCategory,
+    periodMode,
+    selectedRefDate,
+    customStartDate,
+    customEndDate,
+    dateBasis
+  ])
+
+  // Contadores e manipuladores de filtros
+  const activeFiltersCount = useMemo(() => {
+    let count = 0
+    if (selectedType !== 'all') count++
+    if (selectedStatus !== 'all') count++
+    if (selectedRecurrence !== 'all') count++
+    if (selectedProjectId !== 'all') count++
+    if (selectedCategory !== 'all') count++
+    if (dateBasis !== 'due_date') count++
+    return count
+  }, [selectedType, selectedStatus, selectedRecurrence, selectedProjectId, selectedCategory, dateBasis])
+
+  const handleResetFilters = () => {
+    setSelectedType('all')
+    setSelectedStatus('all')
+    setSelectedRecurrence('all')
+    setSelectedProjectId('all')
+    setSelectedCategory('all')
+    setDateBasis('due_date')
+    setSearchTerm('')
+  }
+
+
+  // Descrição amigável e badges do período ativo
+  const periodLabelInfo = useMemo(() => {
+    const today = new Date()
+    const todayStr = toISODateString(today)
+    const refStr = toISODateString(selectedRefDate)
+
+    if (periodMode === 'day') {
+      const isToday = refStr === todayStr
+      const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1)
+      const isYesterday = refStr === toISODateString(yesterday)
+      const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
+      const isTomorrow = refStr === toISODateString(tomorrow)
+
+      let badge = ''
+      if (isToday) badge = 'Hoje'
+      else if (isYesterday) badge = 'Ontem'
+      else if (isTomorrow) badge = 'Amanhã'
+
+      const dayName = WEEKDAY_NAMES_PT[selectedRefDate.getDay()]
+      const text = `${dayName}, ${selectedRefDate.getDate()} de ${MONTH_NAMES_PT[selectedRefDate.getMonth()]} de ${selectedRefDate.getFullYear()}`
+
+      return { text, badge, isCurrent: isToday, resetText: 'Hoje' }
+    }
+
+    if (periodMode === 'week') {
+      const week = getMondayToSundayWeek(selectedRefDate)
+      const isCurrent = week.startStr <= todayStr && todayStr <= week.endStr
+      const text = `Semana de ${formatDateBR(week.startStr)} a ${formatDateBR(week.endStr)}`
+      return { text, badge: isCurrent ? 'Esta Semana' : '', isCurrent, resetText: 'Esta Semana' }
+    }
+
+    if (periodMode === 'month') {
+      const isCurrent = selectedRefDate.getFullYear() === today.getFullYear() && selectedRefDate.getMonth() === today.getMonth()
+      const text = `${MONTH_NAMES_PT[selectedRefDate.getMonth()]} de ${selectedRefDate.getFullYear()}`
+      return { text, badge: isCurrent ? 'Mês Atual' : '', isCurrent, resetText: 'Mês Atual' }
+    }
+
+    if (periodMode === 'year') {
+      const isCurrent = selectedRefDate.getFullYear() === today.getFullYear()
+      const text = `Ano de ${selectedRefDate.getFullYear()}`
+      return { text, badge: isCurrent ? 'Ano Atual' : '', isCurrent, resetText: 'Este Ano' }
+    }
+
+    if (periodMode === 'custom') {
+      let text = 'Intervalo Personalizado'
+      if (customStartDate && customEndDate) {
+        text = `${formatDateBR(customStartDate)} até ${formatDateBR(customEndDate)}`
+      } else if (customStartDate) {
+        text = `A partir de ${formatDateBR(customStartDate)}`
+      } else if (customEndDate) {
+        text = `Até ${formatDateBR(customEndDate)}`
+      }
+      return { text, badge: 'Personalizado', isCurrent: false, resetText: '' }
+    }
+
+    return { text: 'Todo o Histórico', badge: 'Completo', isCurrent: false, resetText: '' }
+  }, [periodMode, selectedRefDate, customStartDate, customEndDate])
+
+  // Semanas calculadas para o modo 'week' dentro do calendário
+  const monthWeeksList = useMemo(() => {
+    const year = calendarViewDate.getFullYear()
+    const month = calendarViewDate.getMonth()
+    const firstDay = new Date(year, month, 1)
+    const lastDay = new Date(year, month + 1, 0)
+
+    // Segunda-feira como início da semana (0 = Dom, 1 = Seg, ..., 6 = Sáb)
+    const firstDayOfWeek = firstDay.getDay()
+    const diffToMon = firstDayOfWeek === 0 ? -6 : 1 - firstDayOfWeek
+    const startDate = new Date(year, month, 1 + diffToMon)
+
+    const weeks: {
+      start: Date
+      end: Date
+      startStr: string
+      endStr: string
+      days: { date: Date; inCurrentMonth: boolean }[]
+    }[] = []
+    const curr = new Date(startDate)
+
+    while (curr <= lastDay || curr.getDay() !== 1) {
+      const weekDays: { date: Date; inCurrentMonth: boolean }[] = []
+      const weekStart = new Date(curr)
+      for (let i = 0; i < 7; i++) {
+        weekDays.push({
+          date: new Date(curr),
+          inCurrentMonth: curr.getMonth() === month
+        })
+        curr.setDate(curr.getDate() + 1)
+      }
+      const weekEnd = new Date(weekDays[6].date)
+      weeks.push({
+        start: weekStart,
+        end: weekEnd,
+        startStr: toISODateString(weekStart),
+        endStr: toISODateString(weekEnd),
+        days: weekDays
+      })
+      if (curr > lastDay && curr.getDay() === 1) break
+    }
+    return weeks
+  }, [calendarViewDate])
+
+  const firstDayOfWeekDayMode = useMemo(() => {
+    return new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth(), 1).getDay()
+  }, [calendarViewDate])
+
+  const daysInMonthDayMode = useMemo(() => {
+    return new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() + 1, 0).getDate()
+  }, [calendarViewDate])
+
+  // Mini-KPIs consolidados do período filtrado
+  const periodMetrics = useMemo(() => {
+    let paidIncome = 0
+    let pendingIncome = 0
+    let paidExpense = 0
+    let pendingExpense = 0
+
+    filteredTransactions.forEach((tx) => {
+      const amt = Number(tx.amount || 0)
+      if (tx.type === 'income') {
+        if (tx.status === 'paid') {
+          paidIncome += amt
+        } else {
+          pendingIncome += amt
+        }
+      } else {
+        if (tx.status === 'paid') {
+          paidExpense += amt
+        } else {
+          pendingExpense += amt
+        }
+      }
+    })
+
+    const netBalance = paidIncome - paidExpense
+    const totalCount = filteredTransactions.length
+    const paidCount = filteredTransactions.filter((t) => t.status === 'paid').length
+    const pendingCount = totalCount - paidCount
+
+    return {
+      paidIncome,
+      pendingIncome,
+      paidExpense,
+      pendingExpense,
+      netBalance,
+      totalCount,
+      paidCount,
+      pendingCount,
+    }
+  }, [filteredTransactions])
 
   // Contas vencidas ou a vencer nos próximos 7 dias
   const urgentBills = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0]
-    const next7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const today = new Date()
+    const next7Days = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 7).toISOString().split('T')[0]
 
     return transactions
       .filter((tx) => tx.type === 'expense' && tx.status !== 'paid' && tx.due_date <= next7Days)
       .sort((a, b) => a.due_date.localeCompare(b.due_date))
       .slice(0, 5)
   }, [transactions])
+
+  const subPageHeaders = {
+    visao_geral: {
+      title: 'Gestão Financeira do Escritório',
+      subtitle: 'Acompanhe receitas, despesas, recorrências e a rentabilidade individual de cada projeto.',
+    },
+    lancamentos: {
+      title: 'Lançamentos e Movimentações',
+      subtitle: 'Visualize, filtre e gerencie todas as receitas e despesas do escritório.',
+    },
+    lucratividade: {
+      title: 'Lucratividade por Projeto',
+      subtitle: 'Acompanhe a rentabilidade, receitas e custos dedicados de cada projeto.',
+    },
+    projecao: {
+      title: 'Passado, Presente e Futuro',
+      subtitle: 'Linha do tempo consolidada e estimativa de fluxo de caixa futuro.',
+    },
+  }
+
+  const headerInfo = subPageHeaders[currentSubPage] || subPageHeaders.visao_geral
 
   return (
     <div className="space-y-6 antialiased">
@@ -356,11 +658,11 @@ export default function FinancialManagerClient({
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-              Gestão Financeira do Escritório
+              {headerInfo.title}
             </h1>
           </div>
           <p className="text-sm text-slate-500 mt-1">
-            Acompanhe receitas, despesas, recorrências e a rentabilidade individual de cada projeto.
+            {headerInfo.subtitle}
           </p>
         </div>
 
@@ -385,63 +687,10 @@ export default function FinancialManagerClient({
         )}
       </div>
 
-      {/* Tabs Navigation */}
-      <div className="flex items-center gap-1.5 border-b border-slate-200 overflow-x-auto pb-px">
-        <button
-          onClick={() => setActiveTab('visao_geral')}
-          className={`px-4 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer ${activeTab === 'visao_geral'
-            ? 'border-emerald-600 text-emerald-700 bg-emerald-50/40 rounded-t-xl'
-            : 'border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300'
-            }`}
-        >
-          <PieChart className="w-4 h-4" />
-          Visão Geral
-        </button>
-
-        <button
-          onClick={() => setActiveTab('extrato')}
-          className={`px-4 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer ${activeTab === 'extrato'
-            ? 'border-emerald-600 text-emerald-700 bg-emerald-50/40 rounded-t-xl'
-            : 'border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300'
-            }`}
-        >
-          <CircleDollarSign className="w-4 h-4" />
-          Lançamentos
-          <span className="px-2 py-0.5 text-xs rounded-full bg-slate-100 text-slate-600 font-bold">
-            {transactions.length}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('projetos')}
-          className={`px-4 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer ${activeTab === 'projetos'
-            ? 'border-emerald-600 text-emerald-700 bg-emerald-50/40 rounded-t-xl'
-            : 'border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300'
-            }`}
-        >
-          <FolderGit2 className="w-4 h-4" />
-          Lucratividade por Projeto
-          <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 font-bold">
-            {profitability.length}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('projecao')}
-          className={`px-4 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer ${activeTab === 'projecao'
-            ? 'border-emerald-600 text-emerald-700 bg-emerald-50/40 rounded-t-xl'
-            : 'border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300'
-            }`}
-        >
-          <Sparkles className="w-4 h-4 text-amber-500" />
-          Passado, Presente e Futuro
-        </button>
-      </div>
-
       {/* ========================================================================= */}
-      {/* ABA 1: VISÃO GERAL (DASHBOARD) */}
+      {/* SEÇÃO 1: VISÃO GERAL (DASHBOARD) */}
       {/* ========================================================================= */}
-      {activeTab === 'visao_geral' && (
+      {currentSubPage === 'visao_geral' && (
         <div className="space-y-6">
           {/* Main KPI Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -658,460 +907,1514 @@ export default function FinancialManagerClient({
       )}
 
       {/* ========================================================================= */}
-      {/* ABA 2: LANÇAMENTOS */}
+      {/* SEÇÃO 2: LANÇAMENTOS */}
       {/* ========================================================================= */}
-      {activeTab === 'extrato' && (
+      {currentSubPage === 'lancamentos' && (
         <div className="space-y-4">
-          {/* Controls Bar */}
-          <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-            {/* Search */}
-            <div className="relative flex-1 max-w-md">
-              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Buscar por descrição, projeto, fornecedor, recorrente..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-xs"
-              />
+          {/* Mini-KPIs Resumo do Período Ativo */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            {/* Total Receitas */}
+            <div className="bg-white p-4.5 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Entradas Realizadas
+                </span>
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2.5">
+                <span className="text-xl font-extrabold text-emerald-600 font-mono tracking-tight">
+                  + {formatBRL(periodMetrics.paidIncome)}
+                </span>
+                <div className="text-[11px] text-slate-400 mt-1 font-medium truncate">
+                  {periodMetrics.pendingIncome > 0 ? (
+                    <span className="text-emerald-700 font-bold">
+                      + {formatBRL(periodMetrics.pendingIncome)} a receber
+                    </span>
+                  ) : (
+                    <span>Todas as receitas liquidadas</span>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Quick Filters */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 flex-wrap">
-              {/* Período */}
-              <select
-                value={dateRangeMode}
-                onChange={(e: any) => setDateRangeMode(e.target.value)}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold focus:outline-none"
-              >
-                <option value="current_month">Mês Atual</option>
-                <option value="last_month">Mês Passado</option>
-                <option value="next_month">Próximo Mês</option>
-                <option value="year">Ano Atual</option>
-                <option value="all">Todo o Período</option>
-              </select>
+            {/* Total Despesas */}
+            <div className="bg-white p-4.5 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Saídas Realizadas
+                </span>
+                <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                  <TrendingDown className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2.5">
+                <span className="text-xl font-extrabold text-rose-600 font-mono tracking-tight">
+                  - {formatBRL(periodMetrics.paidExpense)}
+                </span>
+                <div className="text-[11px] text-slate-400 mt-1 font-medium truncate">
+                  {periodMetrics.pendingExpense > 0 ? (
+                    <span className="text-rose-700 font-bold">
+                      + {formatBRL(periodMetrics.pendingExpense)} a pagar
+                    </span>
+                  ) : (
+                    <span>Todas as despesas liquidadas</span>
+                  )}
+                </div>
+              </div>
+            </div>
 
-              {/* Tipo */}
-              <select
-                value={selectedType}
-                onChange={(e: any) => setSelectedType(e.target.value)}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold focus:outline-none"
-              >
-                <option value="all">Tipo: Todos</option>
-                <option value="income">Receitas (+)</option>
-                <option value="expense">Despesas (-)</option>
-              </select>
-
-              {/* Filtro de Recorrência */}
-              <select
-                value={selectedRecurrence}
-                onChange={(e: any) => setSelectedRecurrence(e.target.value)}
-                className={`px-3 py-1.5 rounded-xl border font-semibold focus:outline-none transition-colors ${selectedRecurrence !== 'all'
-                  ? 'border-indigo-300 bg-indigo-50/70 text-indigo-800 ring-1 ring-indigo-300'
-                  : 'border-slate-200 bg-white text-slate-700'
+            {/* Saldo Líquido do Período */}
+            <div className="bg-white p-4.5 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Resultado no Período
+                </span>
+                <div
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                    periodMetrics.netBalance >= 0
+                      ? 'bg-emerald-50 text-emerald-600'
+                      : 'bg-rose-50 text-rose-600'
                   }`}
-              >
-                <option value="all">Recorrência: Todas</option>
-                <option value="recurring_only">🔁 Apenas Recorrentes ({transactions.filter(t => t.recurring_expense_id).length})</option>
-                <option value="single_only">📄 Apenas Avulsos ({transactions.filter(t => !t.recurring_expense_id).length})</option>
-              </select>
+                >
+                  <CircleDollarSign className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2.5">
+                <span
+                  className={`text-xl font-extrabold font-mono tracking-tight ${
+                    periodMetrics.netBalance >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                  }`}
+                >
+                  {formatBRL(periodMetrics.netBalance)}
+                </span>
+                <p className="text-[11px] text-slate-400 mt-1 font-medium truncate">
+                  {periodMetrics.netBalance >= 0 ? 'Superávit operacional' : 'Déficit no intervalo'}
+                </p>
+              </div>
+            </div>
 
-              {/* Status */}
-              <select
-                value={selectedStatus}
-                onChange={(e: any) => setSelectedStatus(e.target.value)}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold focus:outline-none"
-              >
-                <option value="all">Status: Todos</option>
-                <option value="paid">Pago / Liquidado</option>
-                <option value="pending">Pendente</option>
-                <option value="overdue">Vencido</option>
-              </select>
-
-              {/* Projeto */}
-              <select
-                value={selectedProjectId}
-                onChange={(e) => setSelectedProjectId(e.target.value)}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold focus:outline-none max-w-[160px] truncate"
-              >
-                <option value="all">Projetos: Todos</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.title}
-                  </option>
-                ))}
-              </select>
-
-              {/* Categoria */}
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold focus:outline-none"
-              >
-                <option value="all">Categorias: Todas</option>
-                {allCategoryOptions.map((catName) => (
-                  <option key={catName} value={catName}>
-                    {catName}
-                  </option>
-                ))}
-              </select>
+            {/* Volume de Lançamentos */}
+            <div className="bg-white p-4.5 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Volume de Lançamentos
+                </span>
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Layers className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="mt-2.5">
+                <span className="text-xl font-extrabold text-slate-900 font-mono tracking-tight">
+                  {periodMetrics.totalCount}{' '}
+                  <span className="text-xs font-sans text-slate-500 font-medium">itens</span>
+                </span>
+                <p className="text-[11px] text-slate-400 mt-1 font-medium truncate">
+                  <strong className="text-emerald-600">{periodMetrics.paidCount}</strong> pagos •{' '}
+                  <strong className="text-amber-600">{periodMetrics.pendingCount}</strong> pendentes
+                </p>
+              </div>
             </div>
           </div>
 
-          {/* Transactions Table / List */}
+          {/* Barra de Filtros & Navegador de Período Inspirada em Projetos */}
+          <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+            {/* Linha 1: Campo de Busca Compacto + Seletor de Período Integrado com Calendário + Modos de Visualização + Filtros */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              {/* Campo de Busca Compacto */}
+              <div className="relative w-full sm:w-60 lg:w-72 shrink-0">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar lançamentos..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium text-slate-800 transition-all"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Controles de Direita: Seletor de Granularidade com Popover + Contagem + Alternância Tabela/Cards + Botão Filtros */}
+              <div className="flex items-center gap-2 flex-wrap shrink-0">
+                {/* Seletor de Período com Calendário Popover Embaixo */}
+                <div className="relative" ref={calendarRef}>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {/* Segmented Control de Granularidade */}
+                    <div className="flex items-center bg-slate-100/90 p-1 rounded-xl border border-slate-200/70 text-xs font-semibold text-slate-600">
+                      {(['day', 'week', 'month', 'year', 'custom'] as const).map((mode) => {
+                        const labels = {
+                          day: 'Dia',
+                          week: 'Semana',
+                          month: 'Mês',
+                          year: 'Ano',
+                          custom: 'Período'
+                        }
+                        const isActive = periodMode === mode
+                        return (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => {
+                              setCalendarViewDate(new Date(selectedRefDate))
+                              if (periodMode === mode) {
+                                setIsCalendarOpen(!isCalendarOpen)
+                              } else {
+                                setPeriodMode(mode)
+                                setIsCalendarOpen(true)
+                              }
+                            }}
+                            className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                              isActive
+                                ? 'bg-white text-emerald-700 shadow-2xs font-bold'
+                                : 'hover:text-slate-900'
+                            }`}
+                          >
+                            {labels[mode]}
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {/* Badge Compacto do Período Ativo (com ícone e chevron para reabrir o calendário) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCalendarViewDate(new Date(selectedRefDate))
+                        setIsCalendarOpen(!isCalendarOpen)
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200/90 bg-slate-50 hover:bg-white hover:border-emerald-300 text-xs font-bold text-slate-700 transition-all shadow-2xs cursor-pointer group"
+                      title="Clique para abrir o calendário e selecionar outra data"
+                    >
+                      <Calendar className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span className="truncate max-w-[140px] sm:max-w-[200px]">
+                        {periodLabelInfo.text}
+                      </span>
+                      {periodLabelInfo.badge && (
+                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800">
+                          {periodLabelInfo.badge}
+                        </span>
+                      )}
+                      <ChevronDown
+                        className={`w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-700 transition-transform ${
+                          isCalendarOpen ? 'rotate-180 text-emerald-700' : ''
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Calendário Popover Suspenso Ancorado Diretamente Abaixo */}
+                  {isCalendarOpen && (
+                    <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-2 z-50 bg-white rounded-2xl border border-slate-200 shadow-xl p-4 w-[310px] sm:w-[340px] max-w-[calc(100vw-2rem)] animate-in fade-in zoom-in-95 duration-150">
+                      {/* Modo DIA */}
+                      {periodMode === 'day' && (
+                        <div>
+                          {/* Header do Mês e Navegação */}
+                          <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setCalendarViewDate(
+                                  (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1)
+                                )
+                              }
+                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
+                              title="Mês anterior"
+                            >
+                              <ChevronLeft className="w-4 h-4" />
+                            </button>
+                            <span className="text-xs font-bold text-slate-800 capitalize">
+                              {MONTH_NAMES_PT[calendarViewDate.getMonth()]} de {calendarViewDate.getFullYear()}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setCalendarViewDate(
+                                  (prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1)
+                                )
+                              }
+                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
+                              title="Próximo mês"
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          {/* Atalhos Rápidos */}
+                          <div className="flex items-center justify-center gap-1.5 pb-2.5 mb-2.5 border-b border-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const d = new Date()
+                                d.setDate(d.getDate() - 1)
+                                setSelectedRefDate(d)
+                                setCalendarViewDate(d)
+                                setIsCalendarOpen(false)
+                              }}
+                              className="px-2 py-1 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                            >
+                              Ontem
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const d = new Date()
+                                setSelectedRefDate(d)
+                                setCalendarViewDate(d)
+                                setIsCalendarOpen(false)
+                              }}
+                              className="px-2 py-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition-colors cursor-pointer"
+                            >
+                              Hoje
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const d = new Date()
+                                d.setDate(d.getDate() + 1)
+                                setSelectedRefDate(d)
+                                setCalendarViewDate(d)
+                                setIsCalendarOpen(false)
+                              }}
+                              className="px-2 py-1 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                            >
+                              Amanhã
+                            </button>
+                          </div>
+
+                          {/* Cabeçalho dos Dias da Semana */}
+                          <div className="grid grid-cols-7 gap-1 text-center mb-1">
+                            {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((dw, i) => (
+                              <span key={i} className="text-[10px] font-bold text-slate-400 uppercase">
+                                {dw}
+                              </span>
+                            ))}
+                          </div>
+
+                          {/* Grid de Dias */}
+                          <div className="grid grid-cols-7 gap-1">
+                            {Array.from({ length: firstDayOfWeekDayMode }).map((_, i) => (
+                              <div key={`empty-${i}`} className="h-8" />
+                            ))}
+                            {Array.from({ length: daysInMonthDayMode }).map((_, i) => {
+                              const dayNum = i + 1
+                              const isSelected =
+                                selectedRefDate.getFullYear() === calendarViewDate.getFullYear() &&
+                                selectedRefDate.getMonth() === calendarViewDate.getMonth() &&
+                                selectedRefDate.getDate() === dayNum
+                              const today = new Date()
+                              const isToday =
+                                today.getFullYear() === calendarViewDate.getFullYear() &&
+                                today.getMonth() === calendarViewDate.getMonth() &&
+                                today.getDate() === dayNum
+
+                              return (
+                                <button
+                                  key={dayNum}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedRefDate(
+                                      new Date(
+                                        calendarViewDate.getFullYear(),
+                                        calendarViewDate.getMonth(),
+                                        dayNum
+                                      )
+                                    )
+                                    setIsCalendarOpen(false)
+                                  }}
+                                  className={`h-8 rounded-xl text-xs font-semibold flex items-center justify-center transition-all cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-emerald-600 text-white font-extrabold shadow-2xs'
+                                      : isToday
+                                      ? 'border border-emerald-500 text-emerald-700 bg-emerald-50/50 hover:bg-emerald-100 font-bold'
+                                      : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                                  }`}
+                                >
+                                  {dayNum}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Modo SEMANA */}
+                      {periodMode === 'week' && (
+                        <div>
+                          {/* Header do Mês e Navegação */}
+                          <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setCalendarViewDate(
+                                  (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1)
+                                )
+                              }
+                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
+                              title="Mês anterior"
+                            >
+                              <ChevronLeft className="w-4 h-4" />
+                            </button>
+                            <span className="text-xs font-bold text-slate-800 capitalize">
+                              {MONTH_NAMES_PT[calendarViewDate.getMonth()]} de {calendarViewDate.getFullYear()}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setCalendarViewDate(
+                                  (prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1)
+                                )
+                              }
+                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
+                              title="Próximo mês"
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          {/* Atalhos Rápidos */}
+                          <div className="flex items-center justify-center gap-1.5 pb-2.5 mb-2.5 border-b border-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const d = new Date()
+                                d.setDate(d.getDate() - 7)
+                                setSelectedRefDate(d)
+                                setCalendarViewDate(d)
+                                setIsCalendarOpen(false)
+                              }}
+                              className="px-2 py-1 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                            >
+                              Semana Passada
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const d = new Date()
+                                setSelectedRefDate(d)
+                                setCalendarViewDate(d)
+                                setIsCalendarOpen(false)
+                              }}
+                              className="px-2 py-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition-colors cursor-pointer"
+                            >
+                              Esta Semana
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const d = new Date()
+                                d.setDate(d.getDate() + 7)
+                                setSelectedRefDate(d)
+                                setCalendarViewDate(d)
+                                setIsCalendarOpen(false)
+                              }}
+                              className="px-2 py-1 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                            >
+                              Próxima Semana
+                            </button>
+                          </div>
+
+                          {/* Cabeçalho Seg a Dom */}
+                          <div className="grid grid-cols-7 gap-1 text-center mb-1">
+                            {['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map((dw, i) => (
+                              <span key={i} className="text-[10px] font-bold text-slate-400 uppercase">
+                                {dw}
+                              </span>
+                            ))}
+                          </div>
+
+                          {/* Lista de Linhas de Semanas */}
+                          <div className="space-y-1">
+                            {monthWeeksList.map((week, idx) => {
+                              const selectedWeek = getMondayToSundayWeek(selectedRefDate)
+                              const isSelected = selectedWeek.startStr === week.startStr
+                              return (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedRefDate(week.start)
+                                    setIsCalendarOpen(false)
+                                  }}
+                                  className={`w-full grid grid-cols-7 gap-1 py-1.5 px-1 rounded-xl transition-all cursor-pointer group ${
+                                    isSelected
+                                      ? 'bg-emerald-100 border border-emerald-300 font-bold text-emerald-950 shadow-2xs'
+                                      : 'hover:bg-slate-100 text-slate-700'
+                                  }`}
+                                  title={`Semana de ${formatDateBR(week.startStr)} a ${formatDateBR(week.endStr)}`}
+                                >
+                                  {week.days.map((dayObj, dIdx) => (
+                                    <span
+                                      key={dIdx}
+                                      className={`text-xs flex items-center justify-center h-6 ${
+                                        dayObj.inCurrentMonth
+                                          ? isSelected
+                                            ? 'font-bold text-emerald-900'
+                                            : 'text-slate-800'
+                                          : 'text-slate-300'
+                                      }`}
+                                    >
+                                      {dayObj.date.getDate()}
+                                    </span>
+                                  ))}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Modo MÊS */}
+                      {periodMode === 'month' && (
+                        <div>
+                          {/* Header do Ano e Navegação */}
+                          <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setCalendarViewDate(
+                                  (prev) => new Date(prev.getFullYear() - 1, prev.getMonth(), 1)
+                                )
+                              }
+                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
+                              title="Ano anterior"
+                            >
+                              <ChevronLeft className="w-4 h-4" />
+                            </button>
+                            <span className="text-xs font-bold text-slate-800">
+                              Ano {calendarViewDate.getFullYear()}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setCalendarViewDate(
+                                  (prev) => new Date(prev.getFullYear() + 1, prev.getMonth(), 1)
+                                )
+                              }
+                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
+                              title="Próximo ano"
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          {/* Atalhos Rápidos */}
+                          <div className="flex items-center justify-center gap-1.5 pb-2.5 mb-2.5 border-b border-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const d = new Date()
+                                d.setMonth(d.getMonth() - 1)
+                                setSelectedRefDate(d)
+                                setCalendarViewDate(d)
+                                setIsCalendarOpen(false)
+                              }}
+                              className="px-2 py-1 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                            >
+                              Mês Anterior
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const d = new Date()
+                                setSelectedRefDate(d)
+                                setCalendarViewDate(d)
+                                setIsCalendarOpen(false)
+                              }}
+                              className="px-2 py-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition-colors cursor-pointer"
+                            >
+                              Mês Atual
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const d = new Date()
+                                d.setMonth(d.getMonth() + 1)
+                                setSelectedRefDate(d)
+                                setCalendarViewDate(d)
+                                setIsCalendarOpen(false)
+                              }}
+                              className="px-2 py-1 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                            >
+                              Próximo Mês
+                            </button>
+                          </div>
+
+                          {/* Grid dos 12 Meses */}
+                          <div className="grid grid-cols-3 gap-2">
+                            {MONTH_NAMES_PT.map((mName, mIdx) => {
+                              const isSelected =
+                                selectedRefDate.getFullYear() === calendarViewDate.getFullYear() &&
+                                selectedRefDate.getMonth() === mIdx
+                              const today = new Date()
+                              const isCurrentMonth =
+                                today.getFullYear() === calendarViewDate.getFullYear() &&
+                                today.getMonth() === mIdx
+
+                              return (
+                                <button
+                                  key={mIdx}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedRefDate(new Date(calendarViewDate.getFullYear(), mIdx, 1))
+                                    setIsCalendarOpen(false)
+                                  }}
+                                  className={`py-2 px-2.5 rounded-xl text-xs font-semibold text-center transition-all cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-emerald-600 text-white font-extrabold shadow-2xs'
+                                      : isCurrentMonth
+                                      ? 'border border-emerald-400 text-emerald-700 bg-emerald-50/60 hover:bg-emerald-100 font-bold'
+                                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700'
+                                  }`}
+                                >
+                                  {mName.slice(0, 3)}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Modo ANO */}
+                      {periodMode === 'year' && (
+                        <div>
+                          {/* Header e Navegação */}
+                          <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setCalendarViewDate(
+                                  (prev) => new Date(prev.getFullYear() - 6, prev.getMonth(), 1)
+                                )
+                              }
+                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
+                              title="Anos anteriores"
+                            >
+                              <ChevronLeft className="w-4 h-4" />
+                            </button>
+                            <span className="text-xs font-bold text-slate-800">
+                              Selecione o Ano
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setCalendarViewDate(
+                                  (prev) => new Date(prev.getFullYear() + 6, prev.getMonth(), 1)
+                                )
+                              }
+                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
+                              title="Próximos anos"
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          {/* Atalhos Rápidos */}
+                          <div className="flex items-center justify-center gap-1.5 pb-2.5 mb-2.5 border-b border-slate-100">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const d = new Date()
+                                d.setFullYear(d.getFullYear() - 1)
+                                setSelectedRefDate(d)
+                                setCalendarViewDate(d)
+                                setIsCalendarOpen(false)
+                              }}
+                              className="px-2 py-1 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                            >
+                              Ano Passado
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const d = new Date()
+                                setSelectedRefDate(d)
+                                setCalendarViewDate(d)
+                                setIsCalendarOpen(false)
+                              }}
+                              className="px-2 py-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition-colors cursor-pointer"
+                            >
+                              Ano Atual
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const d = new Date()
+                                d.setFullYear(d.getFullYear() + 1)
+                                setSelectedRefDate(d)
+                                setCalendarViewDate(d)
+                                setIsCalendarOpen(false)
+                              }}
+                              className="px-2 py-1 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                            >
+                              Próximo Ano
+                            </button>
+                          </div>
+
+                          {/* Grid de Anos */}
+                          <div className="grid grid-cols-3 gap-2">
+                            {Array.from({ length: 6 }).map((_, i) => {
+                              const yearVal = calendarViewDate.getFullYear() - 2 + i
+                              const isSelected = selectedRefDate.getFullYear() === yearVal
+                              const isCurrentYear = new Date().getFullYear() === yearVal
+
+                              return (
+                                <button
+                                  key={yearVal}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedRefDate(new Date(yearVal, 0, 1))
+                                    setIsCalendarOpen(false)
+                                  }}
+                                  className={`py-2 px-2.5 rounded-xl text-xs font-semibold text-center transition-all cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-emerald-600 text-white font-extrabold shadow-2xs'
+                                      : isCurrentYear
+                                      ? 'border border-emerald-400 text-emerald-700 bg-emerald-50/60 hover:bg-emerald-100 font-bold'
+                                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700'
+                                  }`}
+                                >
+                                  {yearVal}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Modo PERÍODO (Personalizado) */}
+                      {periodMode === 'custom' && (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                            <span className="text-xs font-bold text-slate-800">Intervalo de Datas</span>
+                            {(customStartDate || customEndDate) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCustomStartDate('')
+                                  setCustomEndDate('')
+                                }}
+                                className="text-[11px] text-rose-600 hover:text-rose-700 font-semibold cursor-pointer"
+                              >
+                                Limpar
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Atalhos Rápidos */}
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const today = new Date()
+                                const past = new Date(today)
+                                past.setDate(today.getDate() - 6)
+                                setCustomStartDate(toISODateString(past))
+                                setCustomEndDate(toISODateString(today))
+                              }}
+                              className="px-2 py-1 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer text-center"
+                            >
+                              Últimos 7 dias
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const today = new Date()
+                                const past = new Date(today)
+                                past.setDate(today.getDate() - 29)
+                                setCustomStartDate(toISODateString(past))
+                                setCustomEndDate(toISODateString(today))
+                              }}
+                              className="px-2 py-1 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer text-center"
+                            >
+                              Últimos 30 dias
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const today = new Date()
+                                const m = getMonthRange(today)
+                                setCustomStartDate(m.startStr)
+                                setCustomEndDate(m.endStr)
+                              }}
+                              className="px-2 py-1 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer text-center"
+                            >
+                              Este Mês
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const today = new Date()
+                                const y = getYearRange(today)
+                                setCustomStartDate(y.startStr)
+                                setCustomEndDate(y.endStr)
+                              }}
+                              className="px-2 py-1 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer text-center"
+                            >
+                              Este Ano
+                            </button>
+                          </div>
+
+                          {/* Inputs De / Até */}
+                          <div className="space-y-2">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                                Data Inicial (De):
+                              </label>
+                              <input
+                                type="date"
+                                value={customStartDate}
+                                onChange={(e) => setCustomStartDate(e.target.value)}
+                                className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:border-emerald-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                                Data Final (Até):
+                              </label>
+                              <input
+                                type="date"
+                                value={customEndDate}
+                                onChange={(e) => setCustomEndDate(e.target.value)}
+                                className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:border-emerald-500"
+                              />
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setIsCalendarOpen(false)}
+                            className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors shadow-2xs cursor-pointer mt-1"
+                          >
+                            Aplicar Intervalo
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Contador Resumido de Lançamentos */}
+                <div className="hidden 2xl:flex items-center text-xs text-slate-500 font-medium px-2.5 py-1.5 bg-slate-50 rounded-xl border border-slate-200/60">
+                  <span>
+                    <strong className="text-slate-800 font-mono">{filteredTransactions.length}</strong> de{' '}
+                    {transactions.length} lançamentos
+                  </span>
+                </div>
+
+                {/* Alternância Tabela / Cards */}
+                <div className="hidden sm:flex items-center bg-slate-100/90 p-1 rounded-xl border border-slate-200/70">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('table')}
+                    className={`p-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      viewMode === 'table'
+                        ? 'bg-white text-emerald-700 shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title="Visualização em Lista / Tabela"
+                  >
+                    <List className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('grid')}
+                    className={`p-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      viewMode === 'grid'
+                        ? 'bg-white text-emerald-700 shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title="Visualização em Cards"
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Botão Retrátil de Filtros Avançados */}
+                <button
+                  type="button"
+                  onClick={() => setIsFilterDrawerOpen(!isFilterDrawerOpen)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                    isFilterDrawerOpen || activeFiltersCount > 0
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800 shadow-2xs'
+                      : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
+                  }`}
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  <span>Filtros</span>
+                  {activeFiltersCount > 0 && (
+                    <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[10px] font-extrabold flex items-center justify-center">
+                      {activeFiltersCount}
+                    </span>
+                  )}
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 text-slate-400 transition-transform ${
+                      isFilterDrawerOpen ? 'rotate-180 text-emerald-700' : ''
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Linha 3: Gaveta Retrátil de Filtros Secundários */}
+            {isFilterDrawerOpen && (
+              <div className="pt-3 border-t border-slate-100/90 animate-in fade-in slide-in-from-top-1 duration-150">
+                <div className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
+                      Filtros Secundários & Parâmetros
+                    </span>
+
+                    {activeFiltersCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleResetFilters}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" /> Limpar filtros ({activeFiltersCount})
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 text-xs">
+                    {/* Critério de Data (Vencimento vs Pagamento) */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-500 mb-1">
+                        Critério de Data:
+                      </label>
+                      <select
+                        value={dateBasis}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setDateBasis(e.target.value as DateFilterBasis)}
+                        className={`w-full px-2.5 py-1.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors ${
+                          dateBasis !== 'due_date'
+                            ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                            : 'border-slate-200 bg-white text-slate-700'
+                        }`}
+                      >
+                        <option value="due_date">Por Vencimento</option>
+                        <option value="payment_date">Por Pagamento / Liquidação</option>
+                      </select>
+                    </div>
+
+                    {/* Tipo */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-500 mb-1">
+                        Tipo de Operação:
+                      </label>
+                      <select
+                        value={selectedType}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedType(e.target.value as TransactionType | 'all')}
+                        className={`w-full px-2.5 py-1.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors ${
+                          selectedType !== 'all'
+                            ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                            : 'border-slate-200 bg-white text-slate-700'
+                        }`}
+                      >
+                        <option value="all">Tipo: Todos</option>
+                        <option value="income">Receitas (+)</option>
+                        <option value="expense">Despesas (-)</option>
+                      </select>
+                    </div>
+
+                    {/* Status */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-500 mb-1">
+                        Status de Liquidação:
+                      </label>
+                      <select
+                        value={selectedStatus}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedStatus(e.target.value as TransactionStatus | 'all')}
+                        className={`w-full px-2.5 py-1.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors ${
+                          selectedStatus !== 'all'
+                            ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                            : 'border-slate-200 bg-white text-slate-700'
+                        }`}
+                      >
+                        <option value="all">Status: Todos</option>
+                        <option value="paid">Pago / Liquidado</option>
+                        <option value="pending">Pendente</option>
+                        <option value="overdue">Vencido</option>
+                      </select>
+                    </div>
+
+                    {/* Recorrência */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-500 mb-1">
+                        Recorrência:
+                      </label>
+                      <select
+                        value={selectedRecurrence}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedRecurrence(e.target.value as 'all' | 'recurring_only' | 'single_only')}
+                        className={`w-full px-2.5 py-1.5 rounded-xl border text-xs font-semibold focus:outline-none transition-colors ${
+                          selectedRecurrence !== 'all'
+                            ? 'border-indigo-300 bg-indigo-50 text-indigo-800'
+                            : 'border-slate-200 bg-white text-slate-700'
+                        }`}
+                      >
+                        <option value="all">Todas as Despesas</option>
+                        <option value="recurring_only">
+                          🔁 Apenas Recorrentes ({transactions.filter((t) => t.recurring_expense_id).length})
+                        </option>
+                        <option value="single_only">
+                          📄 Apenas Avulsos ({transactions.filter((t) => !t.recurring_expense_id).length})
+                        </option>
+                      </select>
+                    </div>
+
+                    {/* Projeto */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-500 mb-1">
+                        Projeto Vinculado:
+                      </label>
+                      <select
+                        value={selectedProjectId}
+                        onChange={(e) => setSelectedProjectId(e.target.value)}
+                        className={`w-full px-2.5 py-1.5 rounded-xl border text-xs font-semibold focus:outline-none truncate transition-colors ${
+                          selectedProjectId !== 'all'
+                            ? 'border-blue-300 bg-blue-50 text-blue-800'
+                            : 'border-slate-200 bg-white text-slate-700'
+                        }`}
+                      >
+                        <option value="all">Todos os Projetos</option>
+                        {projects.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Categoria */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-500 mb-1">
+                        Categoria de Conta:
+                      </label>
+                      <select
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className={`w-full px-2.5 py-1.5 rounded-xl border text-xs font-semibold focus:outline-none truncate transition-colors ${
+                          selectedCategory !== 'all'
+                            ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                            : 'border-slate-200 bg-white text-slate-700'
+                        }`}
+                      >
+                        <option value="all">Todas as Categorias</option>
+                        {allCategoryOptions.map((catName) => (
+                          <option key={catName} value={catName}>
+                            {catName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Transactions View: Cards ou Tabela */}
           <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
             {filteredTransactions.length === 0 ? (
               <div className="p-12 text-center text-slate-400">
                 <CircleDollarSign className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                <h3 className="text-sm font-bold text-slate-700">Nenhum lançamento encontrado</h3>
+                <h3 className="text-sm font-bold text-slate-700">
+                  Nenhum lançamento encontrado para {periodLabelInfo.text}
+                </h3>
+                <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                  Não há lançamentos registrados neste intervalo de datas que correspondam aos filtros ativos.
+                </p>
 
-                {selectedRecurrence === 'recurring_only' && transactions.some((t) => t.recurring_expense_id) && dateRangeMode !== 'all' ? (
-                  <div className="mt-3 max-w-md mx-auto p-4 rounded-2xl bg-indigo-50/80 border border-indigo-100 text-indigo-950 text-xs shadow-2xs">
-                    <p className="font-bold flex items-center justify-center gap-1.5 text-indigo-800">
-                      <Repeat className="w-4 h-4 text-indigo-600" />
-                      Existem {transactions.filter((t) => t.recurring_expense_id).length} lançamentos recorrentes cadastrados em outros períodos.
-                    </p>
-                    <p className="text-[11px] text-slate-600 mt-1">
-                      O filtro de período atual ({dateRangeMode === 'current_month' ? 'Mês Atual' : dateRangeMode}) está ocultando registros com vencimento em outros meses.
-                    </p>
-                    <div className="mt-3 flex items-center justify-center gap-2">
+                <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
+
+                  {activeFiltersCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleResetFilters}
+                      className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                    >
+                      Limpar Filtros ({activeFiltersCount})
+                    </button>
+                  )}
+                  {canCreateEdit && (
+                    <>
                       <button
-                        onClick={() => setDateRangeMode('all')}
-                        className="px-3.5 py-1.5 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 shadow-xs cursor-pointer"
+                        type="button"
+                        onClick={() => handleOpenNewTransaction('income')}
+                        className="px-3.5 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors shadow-xs cursor-pointer"
                       >
-                        Ver em Todo o Período
+                        + Nova Receita
                       </button>
                       <button
-                        onClick={() => setDateRangeMode('next_month')}
-                        className="px-3.5 py-1.5 rounded-xl bg-white border border-indigo-200 text-indigo-800 font-bold text-xs hover:bg-indigo-50 cursor-pointer"
+                        type="button"
+                        onClick={() => handleOpenNewTransaction('expense')}
+                        className="px-3.5 py-1.5 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors shadow-xs cursor-pointer"
                       >
-                        Ver no Próximo Mês
+                        + Nova Despesa
                       </button>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-                    Ajuste os filtros de busca ou cadastre novas receitas e despesas para alimentar o extrato.
-                  </p>
-                )}
-
-                {canCreateEdit && (
-                  <div className="mt-4 flex items-center justify-center gap-2">
-                    <button
-                      onClick={() => handleOpenNewTransaction('income')}
-                      className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors shadow-xs cursor-pointer"
-                    >
-                      + Nova Receita
-                    </button>
-                    <button
-                      onClick={() => handleOpenNewTransaction('expense')}
-                      className="px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors shadow-xs cursor-pointer"
-                    >
-                      + Nova Despesa
-                    </button>
-                  </div>
-                )}
+                    </>
+                  )}
+                </div>
               </div>
-            ) : (
-              <>
-                <div className="hidden xl:block overflow-x-auto">
-                <table className="w-full text-left border-collapse text-sm">
-                  <thead>
-                    <tr className="bg-slate-50/70 border-b border-slate-200/80 text-slate-500 font-bold uppercase tracking-wider text-xs">
-                      <th className="py-3.5 px-4">Status</th>
-                      <th className="py-3.5 px-4">Descrição / Categoria</th>
-                      <th className="py-3.5 px-4">Projeto / Parceiro</th>
-                      <th className="py-3.5 px-4">Vencimento</th>
-                      <th className="py-3.5 px-4">Forma</th>
-                      <th className="py-3.5 px-4 text-right">Valor</th>
-                      <th className="py-3.5 px-4 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredTransactions.map((tx) => {
-                      const isIncome = tx.type === 'income'
-                      const isPaid = tx.status === 'paid'
-                      const catDef = FINANCIAL_CATEGORIES.find(
-                        (c) => c.id === tx.category || c.label === tx.category
-                      )
+            ) : viewMode === 'grid' ? (
+              /* ========================================================================= */
+              /* MODO EM CARDS (INSPIRADO NA PÁGINA DE PROJETOS) */
+              /* ========================================================================= */
+              <div className="p-4 sm:p-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+                  {filteredTransactions.map((tx) => {
+                    const isIncome = tx.type === 'income'
+                    const isPaid = tx.status === 'paid'
+                    const catDef = FINANCIAL_CATEGORIES.find(
+                      (c) => c.id === tx.category || c.label === tx.category
+                    )
 
-                      return (
-                        <tr
-                          key={tx.id}
-                          className="hover:bg-slate-50/70 transition-colors group"
-                        >
-                          {/* Status Toggle */}
-                          <td className="py-4 px-4 whitespace-nowrap">
-                            {canCreateEdit ? (
-                              <button
-                                onClick={() => handleToggleStatus(tx)}
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${isPaid
-                                  ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                                  : tx.status === 'overdue'
-                                    ? 'bg-rose-100 text-rose-800 hover:bg-rose-200'
-                                    : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                    return (
+                      <div
+                        key={tx.id}
+                        className="p-4.5 rounded-2xl bg-white border border-slate-200/80 hover:border-slate-300 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between space-y-3.5 group relative"
+                      >
+                        <div className="space-y-2.5">
+                          {/* Topo do Card: Status Toggle + Categoria + Ações */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {canCreateEdit ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleStatus(tx)}
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                                    isPaid
+                                      ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                                      : tx.status === 'overdue'
+                                      ? 'bg-rose-100 text-rose-800 hover:bg-rose-200'
+                                      : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
                                   }`}
-                                title="Clique para alternar entre Pago e Pendente"
-                              >
-                                {isPaid ? (
-                                  <>
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                                    <span>Pago</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Clock className="w-4 h-4 text-amber-600" />
-                                    <span>Pendente</span>
-                                  </>
-                                )}
-                              </button>
-                            ) : (
-                              <span
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs cursor-default ${isPaid
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : tx.status === 'overdue'
-                                    ? 'bg-rose-100 text-rose-800'
-                                    : 'bg-amber-100 text-amber-800'
-                                  }`}
-                              >
-                                {isPaid ? (
-                                  <>
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                                    <span>Pago</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Clock className="w-4 h-4 text-amber-600" />
-                                    <span>Pendente</span>
-                                  </>
-                                )}
-                              </span>
-                            )}
-                          </td>
-
-                          {/* Title & Category & Recurrence Badge */}
-                          <td className="py-4 px-4 max-w-xs">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-bold text-slate-800 truncate group-hover:text-blue-600">
-                                {tx.title}
-                              </span>
-                              {tx.recurring_expense_id && (
-                                <span
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80 shrink-0 shadow-2xs"
-                                  title="Lançamento gerado automaticamente por regra recorrente"
+                                  title="Clique para alternar entre Pago e Pendente"
                                 >
-                                  <Repeat className="w-3.5 h-3.5 text-indigo-600" /> Recorrente
+                                  {isPaid ? (
+                                    <>
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                      <span>Pago</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                      <span>{tx.status === 'overdue' ? 'Vencido' : 'Pendente'}</span>
+                                    </>
+                                  )}
+                                </button>
+                              ) : (
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-xs ${
+                                    isPaid
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : 'bg-amber-100 text-amber-800'
+                                  }`}
+                                >
+                                  {isPaid ? 'Pago' : 'Pendente'}
+                                </span>
+                              )}
+
+                              {tx.recurring_expense_id && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/70">
+                                  <Repeat className="w-3 h-3 text-indigo-600" /> Recorrente
                                 </span>
                               )}
                             </div>
-                            <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-600">
-                              {catDef?.label || tx.category}
-                            </span>
-                          </td>
 
-                          {/* Project & Company */}
-                          <td className="py-4 px-4 max-w-xs">
-                            {tx.projects ? (
-                              <Link
-                                href={`/app/projetos/${tx.projects.id}/financeiro`}
-                                className="font-bold text-blue-600 hover:underline block truncate"
-                              >
-                                {tx.projects.title}
-                              </Link>
-                            ) : (
-                              <span className="text-slate-400 font-medium text-xs">
-                                Geral do Escritório
+                            <div className="flex items-center gap-1">
+                              <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 max-w-[120px] truncate">
+                                {catDef?.label || tx.category}
                               </span>
+                              {canCreateEdit && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditTransaction(tx)}
+                                  className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Editar Lançamento"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Título & Descrição */}
+                          <div>
+                            <h4 className="font-bold text-sm text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-2">
+                              {tx.title}
+                            </h4>
+                            {tx.description && tx.description !== tx.title && (
+                              <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                                {tx.description}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Projeto & Parceiro */}
+                          <div className="pt-2 border-t border-slate-100 space-y-1 text-xs text-slate-600">
+                            {tx.projects ? (
+                              <div className="flex items-center gap-1.5 truncate">
+                                <FolderGit2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                <Link
+                                  href={`/app/projetos/${tx.projects.id}/financeiro`}
+                                  className="font-bold text-blue-600 hover:underline truncate"
+                                >
+                                  {tx.projects.title}
+                                </Link>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 text-slate-400">
+                                <Briefcase className="w-3.5 h-3.5 shrink-0" />
+                                <span>Geral do Escritório</span>
+                              </div>
                             )}
 
                             {tx.companies && (
-                              <span className="text-xs text-slate-500 block truncate mt-0.5">
-                                Parceiro: {tx.companies.name}
-                              </span>
+                              <div className="flex items-center gap-1.5 text-slate-600 truncate">
+                                <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span className="truncate">Parceiro: {tx.companies.name}</span>
+                              </div>
                             )}
-                          </td>
+                          </div>
+                        </div>
 
-                          {/* Due Date & Payment Date */}
-                          <td className="py-4 px-4 whitespace-nowrap">
-                            <span className="font-bold text-slate-700 block">
-                              {formatDateBR(tx.due_date)}
+                        {/* Rodapé do Card: Datas, Forma de Pagamento e Valor */}
+                        <div className="pt-2.5 border-t border-slate-100 flex items-end justify-between gap-2">
+                          <div className="text-[11px] text-slate-500 space-y-0.5">
+                            <span className="block font-medium">
+                              Venc: <strong className="text-slate-700">{formatDateBR(tx.due_date)}</strong>
                             </span>
                             {isPaid && tx.payment_date && (
-                              <span className="text-xs text-emerald-600 font-medium block">
+                              <span className="block text-emerald-600 font-medium">
                                 Pago em: {formatDateBR(tx.payment_date)}
                               </span>
                             )}
-                          </td>
-
-                          {/* Payment Method */}
-                          <td className="py-4 px-4 whitespace-nowrap">
-                            <span className="text-xs font-semibold text-slate-600">
-                              {tx.payment_method || '-'}
-                            </span>
-                          </td>
-
-                          {/* Amount */}
-                          <td className="py-4 px-4 whitespace-nowrap text-right">
-                            <span
-                              className={`text-base font-mono font-extrabold ${isIncome ? 'text-emerald-600' : 'text-rose-600'
-                                }`}
-                            >
-                              {isIncome ? '+' : '-'} {formatBRL(tx.amount)}
-                            </span>
-                          </td>
-
-                          {/* Actions */}
-                          <td className="py-4 px-4 whitespace-nowrap text-right">
-                            {canCreateEdit && (
-                              <button
-                                onClick={() => handleOpenEditTransaction(tx)}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
-                                title="Editar Lançamento"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Mobile / Tablet Responsive Cards (< 1280px) */}
-              <div className="block xl:hidden divide-y divide-slate-100">
-                {filteredTransactions.map((tx) => {
-                  const isIncome = tx.type === 'income'
-                  const isPaid = tx.status === 'paid'
-                  const catDef = FINANCIAL_CATEGORIES.find(
-                    (c) => c.id === tx.category || c.label === tx.category
-                  )
-
-                  return (
-                    <div
-                      key={tx.id}
-                      className="p-4 space-y-3 hover:bg-slate-50/60 transition-colors"
-                    >
-                      {/* Topo do Card: Status + Categoria + Valor */}
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-1.5 min-w-0 flex-1">
-                          <div className="flex items-center flex-wrap gap-1.5">
-                            {canCreateEdit ? (
-                              <button
-                                type="button"
-                                onClick={() => handleToggleStatus(tx)}
-                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
-                                  isPaid
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : tx.status === 'overdue'
-                                      ? 'bg-rose-100 text-rose-800'
-                                      : 'bg-amber-100 text-amber-800'
-                                }`}
-                              >
-                                {isPaid ? (
-                                  <>
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                    <span>Pago</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Clock className="w-3.5 h-3.5 text-amber-600" />
-                                    <span>{tx.status === 'overdue' ? 'Atrasado' : 'Pendente'}</span>
-                                  </>
-                                )}
-                              </button>
-                            ) : (
-                              <span
-                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-xs ${
-                                  isPaid
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : 'bg-amber-100 text-amber-800'
-                                }`}
-                              >
-                                {isPaid ? 'Pago' : 'Pendente'}
-                              </span>
-                            )}
-
-                            <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600">
-                              {catDef?.label || tx.category}
-                            </span>
-
-                            {tx.recurring_expense_id && (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                                <Repeat className="w-3 h-3 text-indigo-600" /> Recorrente
+                            {tx.payment_method && (
+                              <span className="text-slate-400 block text-[10px]">
+                                {tx.payment_method}
                               </span>
                             )}
                           </div>
 
-                          <p className="font-bold text-sm text-slate-800 leading-snug pt-0.5">
-                            {tx.title}
-                          </p>
-                        </div>
-
-                        {/* Valor em destaque */}
-                        <div className="text-right shrink-0">
-                          <span
-                            className={`text-base font-mono font-extrabold block ${
-                              isIncome ? 'text-emerald-600' : 'text-rose-600'
-                            }`}
-                          >
-                            {isIncome ? '+' : '-'} {formatBRL(tx.amount)}
-                          </span>
-                          {canCreateEdit && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditTransaction(tx)}
-                              className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700 cursor-pointer"
+                          <div className="text-right shrink-0">
+                            <span
+                              className={`text-base font-mono font-extrabold block ${
+                                isIncome ? 'text-emerald-600' : 'text-rose-600'
+                              }`}
                             >
-                              <Edit2 className="w-3 h-3" /> Editar
-                            </button>
-                          )}
+                              {isIncome ? '+' : '-'} {formatBRL(tx.amount)}
+                            </span>
+                          </div>
                         </div>
                       </div>
-
-                      {/* Metadados / Projeto / Vencimento */}
-                      <div className="pt-2 border-t border-slate-100/80 flex flex-wrap items-center justify-between gap-y-1.5 text-xs text-slate-500">
-                        <div className="flex items-center gap-2">
-                          {tx.projects ? (
-                            <Link
-                              href={`/app/projetos/${tx.projects.id}/financeiro`}
-                              className="font-semibold text-blue-600 hover:underline"
-                            >
-                              {tx.projects.title}
-                            </Link>
-                          ) : (
-                            <span>Geral do Escritório</span>
-                          )}
-                          {tx.companies && (
-                            <>
-                              <span>•</span>
-                              <span className="text-slate-600 font-medium">Parceiro: {tx.companies.name}</span>
-                            </>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-3 font-mono text-slate-600 text-[11px]">
-                          <span>Venc: <strong>{formatDateBR(tx.due_date)}</strong></span>
-                          {tx.payment_method && (
-                            <span className="text-slate-400">({tx.payment_method})</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
               </div>
-            </>
-          )}
+            ) : (
+              /* ========================================================================= */
+              /* MODO EM TABELA (PADRÃO REESTRUTURADO) */
+              /* ========================================================================= */
+              <>
+                <div className="hidden xl:block overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-slate-50/70 border-b border-slate-200/80 text-slate-500 font-bold uppercase tracking-wider text-xs">
+                        <th className="py-3.5 px-4">Status</th>
+                        <th className="py-3.5 px-4">Descrição / Categoria</th>
+                        <th className="py-3.5 px-4">Projeto / Parceiro</th>
+                        <th className="py-3.5 px-4">Vencimento</th>
+                        <th className="py-3.5 px-4">Forma</th>
+                        <th className="py-3.5 px-4 text-right">Valor</th>
+                        <th className="py-3.5 px-4 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredTransactions.map((tx) => {
+                        const isIncome = tx.type === 'income'
+                        const isPaid = tx.status === 'paid'
+                        const catDef = FINANCIAL_CATEGORIES.find(
+                          (c) => c.id === tx.category || c.label === tx.category
+                        )
+
+                        return (
+                          <tr key={tx.id} className="hover:bg-slate-50/70 transition-colors group">
+                            {/* Status Toggle */}
+                            <td className="py-4 px-4 whitespace-nowrap">
+                              {canCreateEdit ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleStatus(tx)}
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                                    isPaid
+                                      ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                                      : tx.status === 'overdue'
+                                      ? 'bg-rose-100 text-rose-800 hover:bg-rose-200'
+                                      : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                                  }`}
+                                  title="Clique para alternar entre Pago e Pendente"
+                                >
+                                  {isPaid ? (
+                                    <>
+                                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                      <span>Pago</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Clock className="w-4 h-4 text-amber-600" />
+                                      <span>{tx.status === 'overdue' ? 'Vencido' : 'Pendente'}</span>
+                                    </>
+                                  )}
+                                </button>
+                              ) : (
+                                <span
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold text-xs cursor-default ${
+                                    isPaid
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : tx.status === 'overdue'
+                                      ? 'bg-rose-100 text-rose-800'
+                                      : 'bg-amber-100 text-amber-800'
+                                  }`}
+                                >
+                                  {isPaid ? 'Pago' : 'Pendente'}
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Título & Categoria */}
+                            <td className="py-4 px-4 max-w-xs">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-slate-800 truncate group-hover:text-blue-600">
+                                  {tx.title}
+                                </span>
+                                {tx.recurring_expense_id && (
+                                  <span
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80 shrink-0 shadow-2xs"
+                                    title="Lançamento gerado automaticamente por regra recorrente"
+                                  >
+                                    <Repeat className="w-3.5 h-3.5 text-indigo-600" /> Recorrente
+                                  </span>
+                                )}
+                              </div>
+                              <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-600">
+                                {catDef?.label || tx.category}
+                              </span>
+                            </td>
+
+                            {/* Projeto & Parceiro */}
+                            <td className="py-4 px-4 max-w-xs">
+                              {tx.projects ? (
+                                <Link
+                                  href={`/app/projetos/${tx.projects.id}/financeiro`}
+                                  className="font-bold text-blue-600 hover:underline block truncate"
+                                >
+                                  {tx.projects.title}
+                                </Link>
+                              ) : (
+                                <span className="text-slate-400 font-medium text-xs">
+                                  Geral do Escritório
+                                </span>
+                              )}
+
+                              {tx.companies && (
+                                <span className="text-xs text-slate-500 block truncate mt-0.5">
+                                  Parceiro: {tx.companies.name}
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Datas de Vencimento e Pagamento */}
+                            <td className="py-4 px-4 whitespace-nowrap">
+                              <span className="font-bold text-slate-700 block">
+                                {formatDateBR(tx.due_date)}
+                              </span>
+                              {isPaid && tx.payment_date && (
+                                <span className="text-xs text-emerald-600 font-medium block">
+                                  Pago em: {formatDateBR(tx.payment_date)}
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Forma de Pagamento */}
+                            <td className="py-4 px-4 whitespace-nowrap">
+                              <span className="text-xs font-semibold text-slate-600">
+                                {tx.payment_method || '-'}
+                              </span>
+                            </td>
+
+                            {/* Valor */}
+                            <td className="py-4 px-4 whitespace-nowrap text-right">
+                              <span
+                                className={`text-base font-mono font-extrabold ${
+                                  isIncome ? 'text-emerald-600' : 'text-rose-600'
+                                }`}
+                              >
+                                {isIncome ? '+' : '-'} {formatBRL(tx.amount)}
+                              </span>
+                            </td>
+
+                            {/* Ações */}
+                            <td className="py-4 px-4 whitespace-nowrap text-right">
+                              {canCreateEdit && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditTransaction(tx)}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                                  title="Editar Lançamento"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile / Tablet Responsive Cards (< 1280px) */}
+                <div className="block xl:hidden divide-y divide-slate-100">
+                  {filteredTransactions.map((tx) => {
+                    const isIncome = tx.type === 'income'
+                    const isPaid = tx.status === 'paid'
+                    const catDef = FINANCIAL_CATEGORIES.find(
+                      (c) => c.id === tx.category || c.label === tx.category
+                    )
+
+                    return (
+                      <div
+                        key={tx.id}
+                        className="p-4 space-y-3 hover:bg-slate-50/60 transition-colors"
+                      >
+                        {/* Topo do Card: Status + Categoria + Valor */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1.5 min-w-0 flex-1">
+                            <div className="flex items-center flex-wrap gap-1.5">
+                              {canCreateEdit ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleStatus(tx)}
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                                    isPaid
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : tx.status === 'overdue'
+                                      ? 'bg-rose-100 text-rose-800'
+                                      : 'bg-amber-100 text-amber-800'
+                                  }`}
+                                >
+                                  {isPaid ? (
+                                    <>
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                      <span>Pago</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                      <span>{tx.status === 'overdue' ? 'Atrasado' : 'Pendente'}</span>
+                                    </>
+                                  )}
+                                </button>
+                              ) : (
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-xs ${
+                                    isPaid
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : 'bg-amber-100 text-amber-800'
+                                  }`}
+                                >
+                                  {isPaid ? 'Pago' : 'Pendente'}
+                                </span>
+                              )}
+
+                              <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600">
+                                {catDef?.label || tx.category}
+                              </span>
+
+                              {tx.recurring_expense_id && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                  <Repeat className="w-3 h-3 text-indigo-600" /> Recorrente
+                                </span>
+                              )}
+                            </div>
+
+                            <p className="font-bold text-sm text-slate-800 leading-snug pt-0.5">
+                              {tx.title}
+                            </p>
+                          </div>
+
+                          {/* Valor em destaque */}
+                          <div className="text-right shrink-0">
+                            <span
+                              className={`text-base font-mono font-extrabold block ${
+                                isIncome ? 'text-emerald-600' : 'text-rose-600'
+                              }`}
+                            >
+                              {isIncome ? '+' : '-'} {formatBRL(tx.amount)}
+                            </span>
+                            {canCreateEdit && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditTransaction(tx)}
+                                className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700 cursor-pointer"
+                              >
+                                <Edit2 className="w-3 h-3" /> Editar
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Metadados / Projeto / Vencimento */}
+                        <div className="pt-2 border-t border-slate-100/80 flex flex-wrap items-center justify-between gap-y-1.5 text-xs text-slate-500">
+                          <div className="flex items-center gap-2">
+                            {tx.projects ? (
+                              <Link
+                                href={`/app/projetos/${tx.projects.id}/financeiro`}
+                                className="font-semibold text-blue-600 hover:underline"
+                              >
+                                {tx.projects.title}
+                              </Link>
+                            ) : (
+                              <span>Geral do Escritório</span>
+                            )}
+                            {tx.companies && (
+                              <>
+                                <span>•</span>
+                                <span className="text-slate-600 font-medium">Parceiro: {tx.companies.name}</span>
+                              </>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-3 font-mono text-slate-600 text-[11px]">
+                            <span>Venc: <strong>{formatDateBR(tx.due_date)}</strong></span>
+                            {tx.payment_method && (
+                              <span className="text-slate-400">({tx.payment_method})</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* ABA 3: LUCRATIVIDADE POR PROJETO */}
+      {/* SEÇÃO 3: LUCRATIVIDADE POR PROJETO */}
       {/* ========================================================================= */}
-      {activeTab === 'projetos' && (
+      {currentSubPage === 'lucratividade' && (
         <div className="space-y-6">
           <div className="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-3xl p-6 text-white shadow-md">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1338,9 +2641,9 @@ export default function FinancialManagerClient({
       )}
 
       {/* ========================================================================= */}
-      {/* ABA 4: PASSADO, PRESENTE E FUTURO (PROJEÇÃO DE FLUXO DE CAIXA) */}
+      {/* SEÇÃO 4: PASSADO, PRESENTE E FUTURO (PROJEÇÃO DE FLUXO DE CAIXA) */}
       {/* ========================================================================= */}
-      {activeTab === 'projecao' && (
+      {currentSubPage === 'projecao' && (
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-2">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">

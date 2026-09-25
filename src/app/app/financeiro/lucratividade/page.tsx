@@ -6,11 +6,11 @@ import { getFinancialPageData } from '@/lib/server/financial-page-data'
 import FinancialManagerClient from '@/components/financial/FinancialManagerClient'
 
 export const metadata = {
-  title: 'Visão Geral Financeira | Organizeasy',
-  description: 'Dashboard e resumo financeiro completo do escritório.',
+  title: 'Lucratividade por Projeto | Organizeasy',
+  description: 'Rentabilidade, custos operacionais e margem líquida de cada projeto.',
 }
 
-export default async function FinanceiroPage() {
+export default async function LucratividadePage() {
   const { supabase, activeOrg, isOwner, userPermissions } = await getActiveOrganization()
 
   if (!activeOrg) {
@@ -33,7 +33,7 @@ export default async function FinanceiroPage() {
   return (
     <FinancialManagerClient
       {...data}
-      currentSubPage="visao_geral"
+      currentSubPage="lucratividade"
       isOwner={isOwner}
       userPermissions={userPermissions}
     />

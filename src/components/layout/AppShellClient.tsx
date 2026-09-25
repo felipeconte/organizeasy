@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -15,6 +15,7 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   KanbanSquare,
   Briefcase,
   CircleDollarSign,
@@ -23,6 +24,8 @@ import {
   Check,
   PlusCircle,
   Loader2,
+  PieChart,
+  Sparkles,
 } from 'lucide-react'
 import { logoutAction } from '@/lib/actions/auth'
 import { switchActiveOrganizationAction } from '@/lib/actions/organization'
@@ -68,6 +71,20 @@ export function AppShellClient({
   const [isMounted, setIsMounted] = useState<boolean>(false)
   const [isOrgMenuOpen, setIsOrgMenuOpen] = useState<boolean>(false)
   const [switchingOrgId, setSwitchingOrgId] = useState<string | null>(null)
+  const [isFinancialMenuOpen, setIsFinancialMenuOpen] = useState<boolean>(() =>
+    pathname.startsWith('/app/financeiro')
+  )
+  const [isCollapsedFinancialOpen, setIsCollapsedFinancialOpen] = useState<boolean>(false)
+  const [collapsedFinancialPos, setCollapsedFinancialPos] = useState<{ top: number; left: number } | null>(null)
+  const collapsedFinancialBtnRef = useRef<HTMLButtonElement | null>(null)
+
+  // Sincroniza abertura do submenu Financeiro com a rota ativa sem cascateamento de render
+  const [prevPathname, setPrevPathname] = useState(pathname)
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname)
+    setIsFinancialMenuOpen(pathname.startsWith('/app/financeiro'))
+    setIsCollapsedFinancialOpen(false)
+  }
 
   // Sincroniza estado inicial com localStorage e cookie de forma segura para SSR
   useEffect(() => {
@@ -91,6 +108,7 @@ export function AppShellClient({
   }, [isCollapsed])
 
   const toggleSidebar = () => {
+    setIsCollapsedFinancialOpen(false)
     setIsCollapsed((prev) => {
       const next = !prev
       try {
@@ -142,6 +160,29 @@ export function AppShellClient({
       label: 'Financeiro',
       icon: CircleDollarSign,
       permissionKey: 'module_financial' as PermissionKey,
+      subItems: [
+        {
+          href: '/app/financeiro',
+          label: 'Visão Geral',
+          icon: PieChart,
+          exact: true,
+        },
+        {
+          href: '/app/financeiro/lancamentos',
+          label: 'Lançamentos',
+          icon: CircleDollarSign,
+        },
+        {
+          href: '/app/financeiro/lucratividade',
+          label: 'Lucratividade por Projeto',
+          icon: FolderGit2,
+        },
+        {
+          href: '/app/financeiro/projecao',
+          label: 'Passado, Presente e Futuro',
+          icon: Sparkles,
+        },
+      ],
     },
   ]
 
@@ -218,7 +259,10 @@ export function AppShellClient({
             )}
           </button>
 
-          <div className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden">
+          <div
+            onScroll={() => setIsCollapsedFinancialOpen(false)}
+            className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden"
+          >
             {/* Logo & Nome da Empresa / Seletor de Escritório */}
             <div className="p-3 border-b border-slate-100 relative">
               {isCollapsed ? (
@@ -320,8 +364,8 @@ export function AppShellClient({
                               setSwitchingOrgId(null)
                             }}
                             className={`w-full flex items-center justify-between gap-2.5 p-2 rounded-xl text-left transition-colors cursor-pointer ${isActive
-                                ? 'bg-blue-50/80 text-blue-900 font-semibold'
-                                : 'hover:bg-slate-50 text-slate-700'
+                              ? 'bg-blue-50/80 text-blue-900 font-semibold'
+                              : 'hover:bg-slate-50 text-slate-700'
                               }`}
                           >
                             <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -418,16 +462,101 @@ export function AppShellClient({
               {visibleMainNavItems.map((item) => {
                 const isActive = checkIsActive(item.href, item.exact)
                 const Icon = item.icon
+                const hasSub = 'subItems' in item && Boolean(item.subItems?.length)
+                const isParentActive = pathname.startsWith(item.href)
 
                 if (isCollapsed) {
+                  if (hasSub && item.subItems) {
+                    return (
+                      <div key={item.href} className="relative flex justify-center">
+                        <button
+                          ref={collapsedFinancialBtnRef}
+                          type="button"
+                          onClick={() => {
+                            if (collapsedFinancialBtnRef.current) {
+                              const rect = collapsedFinancialBtnRef.current.getBoundingClientRect()
+                              setCollapsedFinancialPos({
+                                top: Math.max(16, Math.min(rect.top - 4, window.innerHeight - 260)),
+                                left: rect.right + 10,
+                              })
+                            }
+                            setIsCollapsedFinancialOpen((prev) => !prev)
+                          }}
+                          title={item.label}
+                          className={`flex items-center justify-center w-11 h-11 mx-auto rounded-xl transition-all relative cursor-pointer ${isParentActive || isCollapsedFinancialOpen
+                            ? 'bg-slate-100 text-blue-600 font-semibold shadow-2xs ring-2 ring-blue-500/20'
+                            : 'text-slate-700 hover:bg-slate-100/80 hover:text-blue-600'
+                            }`}
+                          aria-label={`Abrir submenus de ${item.label}`}
+                          aria-expanded={isCollapsedFinancialOpen}
+                        >
+                          <Icon className="w-5 h-5 shrink-0" />
+                          <span className="absolute bottom-1 right-1 w-2 h-2 rounded-full bg-blue-600 border-2 border-white" />
+                        </button>
+
+                        {/* Submenu Suspenso apenas ao CLICAR */}
+                        {isCollapsedFinancialOpen && collapsedFinancialPos && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-40"
+                              onClick={() => setIsCollapsedFinancialOpen(false)}
+                            />
+                            <div
+                              className="fixed z-50 w-64 bg-white rounded-2xl border border-slate-200 shadow-2xl p-2 animate-in fade-in zoom-in-95 duration-150 text-left"
+                              style={{
+                                top: `${collapsedFinancialPos.top}px`,
+                                left: `${collapsedFinancialPos.left}px`,
+                              }}
+                            >
+                              <div className="px-3 py-2 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                                <span className="flex items-center gap-1.5 text-slate-800">
+                                  <Icon className="w-4 h-4 text-blue-600" />
+                                  {item.label}
+                                </span>
+                              </div>
+                              <div className="py-1 space-y-1">
+                                {item.subItems.map((sub) => {
+                                  const isSubActive = sub.exact
+                                    ? pathname === sub.href
+                                    : pathname === sub.href || pathname.startsWith(sub.href + '/')
+                                  const SubIcon = sub.icon
+
+                                  return (
+                                    <Link
+                                      key={sub.href}
+                                      href={sub.href}
+                                      onClick={() => setIsCollapsedFinancialOpen(false)}
+                                      className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-colors ${isSubActive
+                                        ? 'bg-blue-50 text-blue-700 font-bold shadow-2xs'
+                                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
+                                        }`}
+                                    >
+                                      {SubIcon && (
+                                        <SubIcon
+                                          className={`w-4 h-4 shrink-0 ${isSubActive ? 'text-blue-600' : 'text-slate-400'
+                                            }`}
+                                        />
+                                      )}
+                                      <span className="truncate">{sub.label}</span>
+                                    </Link>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )
+                  }
+
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
                       title={item.label}
                       className={`flex items-center justify-center w-11 h-11 mx-auto rounded-xl transition-all relative group ${isActive
-                          ? 'bg-slate-100 text-blue-600 font-semibold shadow-2xs'
-                          : 'text-slate-700 hover:bg-slate-100/80 hover:text-blue-600'
+                        ? 'bg-slate-100 text-blue-600 font-semibold shadow-2xs'
+                        : 'text-slate-700 hover:bg-slate-100/80 hover:text-blue-600'
                         }`}
                     >
                       <Icon className="w-5 h-5 shrink-0" />
@@ -444,13 +573,79 @@ export function AppShellClient({
                   )
                 }
 
+                if (hasSub && item.subItems) {
+                  return (
+                    <div key={item.href} className="space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsFinancialMenuOpen((prev) => !prev)}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all group select-none cursor-pointer ${isParentActive
+                          ? 'bg-slate-100 text-blue-600 font-semibold shadow-2xs'
+                          : 'text-slate-700 hover:bg-slate-100/80 hover:text-blue-600 font-medium'
+                          }`}
+                        aria-label={
+                          isFinancialMenuOpen
+                            ? `Recolher submenus de ${item.label}`
+                            : `Expandir submenus de ${item.label}`
+                        }
+                        title={isFinancialMenuOpen ? 'Recolher submenus' : 'Expandir submenus'}
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <Icon
+                            className={`w-4.5 h-4.5 shrink-0 ${isParentActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-blue-600'
+                              }`}
+                          />
+                          <span className="truncate">{item.label}</span>
+                        </div>
+                        <div className="p-1 rounded-lg hover:bg-slate-200/60 text-slate-400 group-hover:text-slate-600 transition-colors shrink-0">
+                          <ChevronDown
+                            className={`w-4 h-4 transition-transform duration-200 ${isFinancialMenuOpen ? 'rotate-180 text-blue-600' : ''
+                              }`}
+                          />
+                        </div>
+                      </button>
+
+                      {/* Submenus com animação suave e linha conectora */}
+                      {isFinancialMenuOpen && (
+                        <div className="ml-4 pl-3 border-l-2 border-slate-200/80 space-y-1 py-0.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                          {item.subItems.map((sub) => {
+                            const isSubActive = sub.exact
+                              ? pathname === sub.href
+                              : pathname === sub.href || pathname.startsWith(sub.href + '/')
+                            const SubIcon = sub.icon
+
+                            return (
+                              <Link
+                                key={sub.href}
+                                href={sub.href}
+                                className={`flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-sm transition-all ${isSubActive
+                                  ? 'bg-blue-50 text-blue-700 font-bold shadow-2xs'
+                                  : 'text-slate-600 hover:bg-slate-100/70 hover:text-blue-600 font-medium'
+                                  }`}
+                              >
+                                {SubIcon && (
+                                  <SubIcon
+                                    className={`w-4 h-4 shrink-0 ${isSubActive ? 'text-blue-600' : 'text-slate-400'
+                                      }`}
+                                  />
+                                )}
+                                <span className="truncate">{sub.label}</span>
+                              </Link>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                }
+
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
                     className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all group ${isActive
-                        ? 'bg-slate-100 text-blue-600 font-semibold shadow-2xs'
-                        : 'text-slate-700 hover:bg-slate-100/80 hover:text-blue-600 font-medium'
+                      ? 'bg-slate-100 text-blue-600 font-semibold shadow-2xs'
+                      : 'text-slate-700 hover:bg-slate-100/80 hover:text-blue-600 font-medium'
                       }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -494,8 +689,8 @@ export function AppShellClient({
                       href={item.href}
                       title={item.label}
                       className={`flex items-center justify-center w-11 h-11 mx-auto rounded-xl transition-all relative group ${isActive
-                          ? 'bg-slate-100 text-blue-600 font-semibold shadow-2xs'
-                          : 'text-slate-700 hover:bg-slate-100/80 hover:text-blue-600'
+                        ? 'bg-slate-100 text-blue-600 font-semibold shadow-2xs'
+                        : 'text-slate-700 hover:bg-slate-100/80 hover:text-blue-600'
                         }`}
                     >
                       <Icon className="w-5 h-5 shrink-0" />
@@ -508,8 +703,8 @@ export function AppShellClient({
                     key={item.href}
                     href={item.href}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${isActive
-                        ? 'bg-slate-100 text-blue-600 font-semibold shadow-2xs'
-                        : 'text-slate-700 hover:bg-slate-100/80 hover:text-blue-600 font-medium'
+                      ? 'bg-slate-100 text-blue-600 font-semibold shadow-2xs'
+                      : 'text-slate-700 hover:bg-slate-100/80 hover:text-blue-600 font-medium'
                       }`}
                   >
                     <Icon className="w-4.5 h-4.5 shrink-0" />
