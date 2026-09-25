@@ -617,9 +617,9 @@ export default function StageTemplatesManager({
 
       {/* MODAL: NOVO TEMPLATE */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => setShowCreateModal(false)} />
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl z-10 space-y-4 border border-slate-200 animate-in zoom-in-95">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl z-10 space-y-4 border border-slate-200 animate-in zoom-in-95 my-auto max-h-[calc(100dvh-2rem)] overflow-y-auto relative">
             <h3 className="text-lg font-bold text-slate-900">Novo Template de Tarefas</h3>
 
             <form onSubmit={handleCreateTemplate} className="space-y-3">
@@ -685,9 +685,9 @@ export default function StageTemplatesManager({
 
       {/* MODAL: EDITAR TEMPLATE */}
       {showEditTplModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => setShowEditTplModal(false)} />
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl z-10 space-y-4 border border-slate-200 animate-in zoom-in-95">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl z-10 space-y-4 border border-slate-200 animate-in zoom-in-95 my-auto max-h-[calc(100dvh-2rem)] overflow-y-auto relative">
             <h3 className="text-lg font-bold text-slate-900">Editar Template</h3>
 
             <form onSubmit={handleUpdateTemplate} className="space-y-3">
@@ -735,9 +735,9 @@ export default function StageTemplatesManager({
 
       {/* MODAL: ADICIONAR / EDITAR TAREFA */}
       {showItemModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => setShowItemModal(false)} />
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl z-10 space-y-4 border border-slate-200 animate-in zoom-in-95">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl z-10 space-y-4 border border-slate-200 animate-in zoom-in-95 my-auto max-h-[calc(100dvh-2rem)] overflow-y-auto relative">
             <h3 className="text-lg font-bold text-slate-900">
               {editingItem ? 'Editar Tarefa do Template' : 'Nova Tarefa no Template'}
             </h3>

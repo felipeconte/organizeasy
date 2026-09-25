@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'motion/react'
 import {
   X,
@@ -48,6 +48,9 @@ export interface LiquidMorphFloatingMenuProps {
   activeOrgId?: string
 }
 
+type OpenCategory = 'office' | 'config' | 'none'
+const STORAGE_KEY = 'organizeasy_floating_menu_active_category'
+
 export default function LiquidMorphFloatingMenu({
   officeName,
   orgLogoUrl,
@@ -61,55 +64,67 @@ export default function LiquidMorphFloatingMenu({
   activeOrgId,
 }: LiquidMorphFloatingMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [showOffice, setShowOffice] = useState(true)
-  const [showConfig, setShowConfig] = useState(false)
+  const [activeCategory, setActiveCategory] = useState<OpenCategory>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY)
+        if (saved === 'office' || saved === 'config' || saved === 'none') {
+          return saved as OpenCategory
+        }
+      } catch {
+        // Ignora erro em ambientes restritos de armazenamento
+      }
+    }
+    return 'office'
+  })
   const [showOrgSwitcher, setShowOrgSwitcher] = useState(false)
   const [switchingOrgId, setSwitchingOrgId] = useState<string | null>(null)
 
   const pathname = usePathname()
-  const router = useRouter()
   const menuRef = useRef<HTMLDivElement>(null)
 
-  // Fecha o menu quando a rota muda durante a renderização (padrão oficial do React 19 para prev props/state)
+  // Fecha o menu quando a rota muda sem apagar a categoria salva
   const [prevPathname, setPrevPathname] = useState(pathname)
   if (prevPathname !== pathname) {
     setPrevPathname(pathname)
     setIsOpen(false)
-    setShowOffice(true)
-    setShowConfig(false)
     setShowOrgSwitcher(false)
   }
 
-  // Alterna seletor de escritórios: quando abre, fecha as categorias para dar espaço total à lista
+  const showOffice = !showOrgSwitcher && activeCategory === 'office'
+  const showConfig = !showOrgSwitcher && activeCategory === 'config'
+
+  // Alterna seletor de escritórios: ao abrir, recolhe as categorias para dar espaço total à lista
   const toggleOrgSwitcher = () => {
-    setShowOrgSwitcher((prev) => {
-      const next = !prev
-      if (next) {
-        setShowOffice(false)
-        setShowConfig(false)
-      }
-      return next
-    })
+    setShowOrgSwitcher((prev) => !prev)
   }
 
-  // Alterna categoria Escritório: fecha o seletor de escritórios se estiver aberto
+  // Alterna categoria Escritório: ao abrir, fecha Configurações e seletor de escritórios e persiste escolha
   const toggleOffice = () => {
-    setShowOffice((prev) => {
-      const next = !prev
-      if (next) {
-        setShowOrgSwitcher(false)
+    setShowOrgSwitcher(false)
+    setActiveCategory((prev) => {
+      if (showOrgSwitcher && prev === 'office') {
+        return 'office'
       }
+      const next: OpenCategory = prev === 'office' ? 'none' : 'office'
+      try {
+        localStorage.setItem(STORAGE_KEY, next)
+      } catch { }
       return next
     })
   }
 
-  // Alterna categoria Configurações: fecha o seletor de escritórios se estiver aberto
+  // Alterna categoria Configurações: ao abrir, fecha Escritório e seletor de escritórios e persiste escolha
   const toggleConfig = () => {
-    setShowConfig((prev) => {
-      const next = !prev
-      if (next) {
-        setShowOrgSwitcher(false)
+    setShowOrgSwitcher(false)
+    setActiveCategory((prev) => {
+      if (showOrgSwitcher && prev === 'config') {
+        return 'config'
       }
+      const next: OpenCategory = prev === 'config' ? 'none' : 'config'
+      try {
+        localStorage.setItem(STORAGE_KEY, next)
+      } catch { }
       return next
     })
   }
@@ -163,28 +178,34 @@ export default function LiquidMorphFloatingMenu({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
             onClick={() => setIsOpen(false)}
-            className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-sm lg:hidden cursor-pointer"
+            className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-xs lg:hidden cursor-pointer"
             aria-hidden="true"
           />
         )}
       </AnimatePresence>
 
-      {/* Container Flutuante Centralizado na Base (nunca ultrapassa o topo da tela) */}
+      {/* Container Flutuante Centralizado e Grudado na Barra Inferior da Tela */}
       <div
         ref={menuRef}
-        className="fixed bottom-5 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 lg:hidden pointer-events-none w-[calc(100vw-2rem)] max-w-[390px] max-h-[calc(100dvh-2.5rem)] flex flex-col items-center justify-end"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        className="fixed bottom-0 left-0 right-0 w-full max-w-[100vw] z-50 lg:hidden pointer-events-none flex flex-col items-center justify-end pb-3 sm:pb-3.5"
+        style={{
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100%',
+          maxWidth: '100vw',
+          paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0.75rem))',
+        }}
       >
         <AnimatePresence mode="wait">
           {!isOpen ? (
-            /* Botão Pill Fechado - Liquid Glass */
+            /* Botão Pill Fechado - Tom de Azul Padrão do Sistema (blue-600) */
             <motion.button
               key="closed-pill"
               type="button"
-              layoutId="floating-menu-container"
               onClick={() => setIsOpen(true)}
-              className="pointer-events-auto group relative flex items-center justify-between gap-3 px-5 py-3 rounded-full bg-slate-900/85 backdrop-blur-xl border border-white/20 text-white shadow-[0_12px_36px_rgba(15,23,42,0.35)] hover:shadow-[0_16px_42px_rgba(15,23,42,0.45)] hover:bg-slate-900/95 active:scale-95 transition-all duration-200 cursor-pointer overflow-hidden"
-              initial={{ scale: 0.9, opacity: 0, y: 15 }}
+              className="pointer-events-auto group relative flex items-center justify-between gap-3 px-5 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 active:scale-95 border border-blue-400/40 text-white shadow-[0_8px_30px_rgba(37,99,235,0.45)] hover:shadow-[0_12px_36px_rgba(37,99,235,0.55)] transition-all duration-200 cursor-pointer overflow-hidden"
+              initial={{ scale: 0.9, opacity: 0, y: 10 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 10 }}
               transition={{
@@ -196,14 +217,14 @@ export default function LiquidMorphFloatingMenu({
               aria-expanded={false}
             >
               {/* Reflexo luminoso sutil */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
 
               <div className="flex items-center gap-2.5">
                 {/* Ícone ou Indicador do Módulo Ativo */}
                 {activeItem?.icon ? (
-                  <activeItem.icon className="w-4 h-4 text-blue-400 shrink-0" />
+                  <activeItem.icon className="w-4 h-4 text-white shrink-0" />
                 ) : (
-                  <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                  <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
                 )}
 
                 <span className="text-sm font-semibold tracking-wide text-white">
@@ -213,24 +234,23 @@ export default function LiquidMorphFloatingMenu({
                 {/* Badge de notificações pendentes se houver */}
                 {pendingClientUpdatesCount > 0 && (
                   <span className="flex h-2 w-2 relative">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-300 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400" />
                   </span>
                 )}
               </div>
 
               {/* Ícone de 2 barras horizontais paralelas estilizado */}
-              <div className="flex flex-col justify-center items-center gap-1 w-4.5 h-4.5 text-white/90">
-                <span className="w-4 h-0.5 bg-white/90 rounded-full transition-all group-hover:w-4.5" />
-                <span className="w-3.5 h-0.5 bg-white/70 rounded-full transition-all group-hover:w-4.5" />
+              <div className="flex flex-col justify-center items-center gap-1 w-4.5 h-4.5 text-white">
+                <span className="w-4 h-0.5 bg-white rounded-full transition-all group-hover:w-4.5" />
+                <span className="w-3.5 h-0.5 bg-blue-100 rounded-full transition-all group-hover:w-4.5" />
               </div>
             </motion.button>
           ) : (
-            /* Card Expandido - Liquid Glass Dark com altura limitada ao topo da tela */
+            /* Card Expandido - Tom de Azul Padrão do Sistema (blue-600) */
             <motion.div
               key="expanded-card"
-              layoutId="floating-menu-container"
-              className="pointer-events-auto relative w-full rounded-[28px] bg-slate-950/90 backdrop-blur-2xl border border-white/15 text-white shadow-[0_24px_60px_rgba(0,0,0,0.6)] overflow-hidden flex flex-col max-h-[calc(100dvh-3.5rem)]"
+              className="pointer-events-auto relative w-[calc(100vw-1.5rem)] max-w-[400px] mb-2 rounded-[28px] bg-blue-600 border border-blue-400/40 text-white shadow-[0_24px_60px_rgba(29,78,216,0.45)] overflow-hidden flex flex-col max-h-[calc(100dvh-4rem)]"
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 15 }}
@@ -243,15 +263,15 @@ export default function LiquidMorphFloatingMenu({
               aria-modal="true"
               aria-label="Menu principal"
             >
-              {/* Efeito Glow / Gradiente Líquido no topo */}
-              <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-blue-500/10 via-indigo-500/5 to-transparent pointer-events-none" />
+              {/* Efeito Glow / Gradiente no topo */}
+              <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-white/20 via-white/5 to-transparent pointer-events-none" />
 
               {/* Cabeçalho do Card: Informações do Escritório & Perfil */}
-              <div className="p-4 border-b border-white/10 shrink-0">
+              <div className="p-4 border-b border-blue-500/80 shrink-0">
                 <div className="flex items-center justify-between gap-3">
                   {/* Seletor / Nome do Escritório */}
                   <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className="h-10 w-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0 overflow-hidden p-1 shadow-inner">
+                    <div className="h-10 w-10 rounded-xl bg-white border border-blue-300/40 flex items-center justify-center shrink-0 overflow-hidden p-1 shadow-xs">
                       {orgLogoUrl ? (
                         <img
                           src={orgLogoUrl}
@@ -272,7 +292,7 @@ export default function LiquidMorphFloatingMenu({
                           {officeName}
                         </span>
                       </div>
-                      <span className="text-[11px] text-white/50 block truncate">
+                      <span className="text-[11px] text-blue-100 block truncate">
                         {userDisplayName} • {userRole}
                       </span>
                     </div>
@@ -285,8 +305,8 @@ export default function LiquidMorphFloatingMenu({
                       onClick={toggleOrgSwitcher}
                       className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors flex items-center gap-1 shrink-0 cursor-pointer ${
                         showOrgSwitcher
-                          ? 'bg-blue-600/30 text-blue-200 border-blue-400/30'
-                          : 'bg-white/10 hover:bg-white/15 border-white/10 text-white/80 hover:text-white'
+                          ? 'bg-white text-blue-700 border-white shadow-xs font-semibold'
+                          : 'bg-white/15 hover:bg-white/25 border-white/20 text-white'
                       }`}
                       title={showOrgSwitcher ? 'Fechar lista de escritórios' : 'Alternar Escritório'}
                     >
@@ -303,19 +323,19 @@ export default function LiquidMorphFloatingMenu({
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="mt-3 pt-3 border-t border-white/10 space-y-2 overflow-hidden"
+                      className="mt-3 pt-3 border-t border-blue-500/80 space-y-2 overflow-hidden"
                     >
                       <div className="flex items-center justify-between px-1">
-                        <span className="text-[10px] font-bold text-white/40 uppercase tracking-wider">
+                        <span className="text-[10px] font-bold text-blue-100/80 uppercase tracking-wider">
                           Seus Escritórios ({userOrganizations.length})
                         </span>
-                        <span className="text-[10px] text-white/40">
+                        <span className="text-[10px] text-blue-100/70">
                           Selecione para alternar
                         </span>
                       </div>
 
                       {/* Lista de Escritórios com Barra de Rolagem Suave */}
-                      <div className="max-h-[min(50dvh,320px)] overflow-y-auto overscroll-contain space-y-1.5 pr-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-white/30 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-white/5">
+                      <div className="max-h-[min(50dvh,320px)] overflow-y-auto overscroll-contain space-y-1.5 pr-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-blue-400/60 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-blue-700/40">
                         {userOrganizations.map((org) => {
                           const isCurrent = org.id === activeOrgId
                           const isSwitching = switchingOrgId === org.id
@@ -332,29 +352,31 @@ export default function LiquidMorphFloatingMenu({
                                 if (res.success) {
                                   setShowOrgSwitcher(false)
                                   setIsOpen(false)
-                                  router.refresh()
+                                  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+                                  window.location.href = '/app'
+                                  return
                                 }
                                 setSwitchingOrgId(null)
                               }}
                               className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs transition-colors text-left ${
                                 isCurrent
-                                  ? 'bg-blue-600/35 text-white font-semibold border border-blue-400/40 shadow-inner'
-                                  : 'text-white/70 hover:bg-white/10 hover:text-white border border-transparent'
+                                  ? 'bg-white text-blue-900 font-semibold border border-white/40 shadow-xs'
+                                  : 'text-blue-50 hover:bg-white/15 hover:text-white border border-transparent'
                               }`}
                             >
                               <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
                                 <Building2
                                   className={`w-3.5 h-3.5 shrink-0 ${
-                                    isCurrent ? 'text-blue-300' : 'text-white/40'
+                                    isCurrent ? 'text-blue-600' : 'text-blue-200'
                                   }`}
                                 />
                                 <span className="truncate">{org.name}</span>
                               </div>
                               {isSwitching ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-400 shrink-0" />
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-white shrink-0" />
                               ) : isCurrent ? (
-                                <span className="px-1.5 py-0.5 rounded-md bg-blue-500/20 text-[10px] font-bold text-blue-300 border border-blue-400/30 flex items-center gap-1 shrink-0">
-                                  <Check className="w-3 h-3 text-blue-400" /> Ativo
+                                <span className="px-1.5 py-0.5 rounded-md bg-blue-100 text-[10px] font-bold text-blue-800 border border-blue-200 flex items-center gap-1 shrink-0">
+                                  <Check className="w-3 h-3 text-blue-600" /> Ativo
                                 </span>
                               ) : null}
                             </button>
@@ -367,24 +389,24 @@ export default function LiquidMorphFloatingMenu({
               </div>
 
               {/* Corpo da Navegação com Categorias "Escritório" e "Configurações" */}
-              <div className="p-3 overflow-y-auto overscroll-contain flex-1 space-y-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
+              <div className="p-3 overflow-y-auto overscroll-contain flex-1 space-y-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-blue-400/50 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
                 {/* 1. Categoria: Escritório (Aberta por padrão, fecha ao abrir troca de escritórios) */}
                 <div>
                   <button
                     type="button"
                     onClick={toggleOffice}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-colors text-sm font-semibold cursor-pointer"
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-white/95 hover:text-white hover:bg-white/10 transition-colors text-sm font-semibold cursor-pointer"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="p-1 rounded-lg bg-white/5 text-white/70">
+                      <div className="p-1 rounded-lg bg-white/15 text-white">
                         <Building2 className="w-4 h-4" />
                       </div>
                       <span>Escritório</span>
                     </div>
                     {showOffice ? (
-                      <ChevronUp className="w-4 h-4 text-white/50" />
+                      <ChevronUp className="w-4 h-4 text-blue-200" />
                     ) : (
-                      <ChevronDown className="w-4 h-4 text-white/50" />
+                      <ChevronDown className="w-4 h-4 text-blue-200" />
                     )}
                   </button>
 
@@ -407,16 +429,16 @@ export default function LiquidMorphFloatingMenu({
                               onClick={() => setIsOpen(false)}
                               className={`group relative flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 text-sm ${
                                 isActive
-                                  ? 'bg-white/15 text-white font-semibold border border-white/20 shadow-inner'
-                                  : 'text-white/75 hover:text-white hover:bg-white/10'
+                                  ? 'bg-white text-blue-700 font-semibold shadow-xs border border-white/30'
+                                  : 'text-blue-50 hover:text-white hover:bg-white/15 font-medium'
                               }`}
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
                                 <div
                                   className={`p-1.5 rounded-lg transition-colors shrink-0 ${
                                     isActive
-                                      ? 'bg-blue-500/30 text-blue-300'
-                                      : 'bg-white/5 text-white/70 group-hover:text-white group-hover:bg-white/10'
+                                      ? 'bg-blue-50 text-blue-600'
+                                      : 'bg-white/15 text-white group-hover:bg-white/25'
                                   }`}
                                 >
                                   <Icon className="w-4 h-4" />
@@ -427,11 +449,11 @@ export default function LiquidMorphFloatingMenu({
                               </div>
 
                               {item.badge && item.badge > 0 ? (
-                                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
+                                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-400 text-slate-900 shadow-xs shrink-0">
                                   {item.badge}
                                 </span>
                               ) : isActive ? (
-                                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_8px_#60A5FA] shrink-0" />
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shadow-[0_0_8px_#3B82F6] shrink-0" />
                               ) : null}
                             </Link>
                           )
@@ -443,22 +465,22 @@ export default function LiquidMorphFloatingMenu({
 
                 {/* 2. Categoria: Configurações (Colapsada por padrão, fecha ao abrir troca de escritórios) */}
                 {configNavItems.length > 0 && (
-                  <div className="pt-1 border-t border-white/10">
+                  <div className="pt-1 border-t border-blue-500/80">
                     <button
                       type="button"
                       onClick={toggleConfig}
-                      className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-colors text-sm font-semibold cursor-pointer"
+                      className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-white/95 hover:text-white hover:bg-white/10 transition-colors text-sm font-semibold cursor-pointer"
                     >
                       <div className="flex items-center gap-2.5">
-                        <div className="p-1 rounded-lg bg-white/5 text-white/70">
+                        <div className="p-1 rounded-lg bg-white/15 text-white">
                           <Settings className="w-4 h-4" />
                         </div>
                         <span>Configurações</span>
                       </div>
                       {showConfig ? (
-                        <ChevronUp className="w-4 h-4 text-white/50" />
+                        <ChevronUp className="w-4 h-4 text-blue-200" />
                       ) : (
-                        <ChevronDown className="w-4 h-4 text-white/50" />
+                        <ChevronDown className="w-4 h-4 text-blue-200" />
                       )}
                     </button>
 
@@ -481,16 +503,16 @@ export default function LiquidMorphFloatingMenu({
                                 onClick={() => setIsOpen(false)}
                                 className={`group relative flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 text-sm ${
                                   isCfgActive
-                                    ? 'bg-white/15 text-white font-semibold border border-white/20 shadow-inner'
-                                    : 'text-white/75 hover:text-white hover:bg-white/10'
+                                    ? 'bg-white text-blue-700 font-semibold shadow-xs border border-white/30'
+                                    : 'text-blue-50 hover:text-white hover:bg-white/15 font-medium'
                                 }`}
                               >
                                 <div className="flex items-center gap-2.5 min-w-0">
                                   <div
                                     className={`p-1.5 rounded-lg transition-colors shrink-0 ${
                                       isCfgActive
-                                        ? 'bg-blue-500/30 text-blue-300'
-                                        : 'bg-white/5 text-white/70 group-hover:text-white group-hover:bg-white/10'
+                                        ? 'bg-blue-50 text-blue-600'
+                                        : 'bg-white/15 text-white group-hover:bg-white/25'
                                     }`}
                                   >
                                     <CfgIcon className="w-4 h-4" />
@@ -501,7 +523,7 @@ export default function LiquidMorphFloatingMenu({
                                 </div>
 
                                 {isCfgActive ? (
-                                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_8px_#60A5FA] shrink-0" />
+                                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shadow-[0_0_8px_#3B82F6] shrink-0" />
                                 ) : null}
                               </Link>
                             )
@@ -514,15 +536,15 @@ export default function LiquidMorphFloatingMenu({
               </div>
 
               {/* Rodapé do Menu Expandido (Sem o texto "Menu", apenas perfil, logout e fechar) */}
-              <div className="p-3 px-4 bg-white/5 border-t border-white/10 flex items-center justify-between shrink-0">
+              <div className="p-3 px-4 bg-blue-700/60 border-t border-blue-500/80 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
                   {/* Atalho direto para Perfil com Mini Avatar */}
                   <Link
                     href="/app/configuracoes/perfil"
                     onClick={() => setIsOpen(false)}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs sm:text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs sm:text-sm font-medium text-white hover:bg-white/15 transition-colors"
                   >
-                    <div className="w-6 h-6 rounded-full overflow-hidden bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0 border border-white/20 shadow-xs">
+                    <div className="w-6 h-6 rounded-full overflow-hidden bg-white/20 border border-white/40 flex items-center justify-center text-[10px] font-bold text-white shrink-0 shadow-xs">
                       {userAvatarUrl ? (
                         <img
                           src={userAvatarUrl}
@@ -541,7 +563,7 @@ export default function LiquidMorphFloatingMenu({
                     <button
                       type="submit"
                       title="Sair da Conta"
-                      className="p-1.5 rounded-lg text-white/40 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                      className="p-1.5 rounded-lg text-blue-200 hover:text-white hover:bg-rose-500/30 transition-colors cursor-pointer"
                     >
                       <LogOut className="w-4 h-4" />
                     </button>
@@ -552,7 +574,7 @@ export default function LiquidMorphFloatingMenu({
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  className="p-2 rounded-full hover:bg-white/15 text-white/80 hover:text-white transition-all active:scale-90 cursor-pointer"
+                  className="p-2 rounded-full hover:bg-white/20 text-white transition-all active:scale-90 cursor-pointer"
                   title="Fechar menu"
                   aria-label="Fechar menu"
                 >
@@ -563,6 +585,16 @@ export default function LiquidMorphFloatingMenu({
           )}
         </AnimatePresence>
       </div>
+
+      {/* Overlay de Transição ao Alternar Escritório no Mobile */}
+      {switchingOrgId && (
+        <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs flex flex-col items-center justify-center gap-3 text-white pointer-events-auto animate-in fade-in duration-150">
+          <div className="p-3.5 bg-blue-600 rounded-2xl border border-blue-400/40 shadow-2xl flex items-center gap-3 px-5">
+            <Loader2 className="w-5 h-5 animate-spin text-white" />
+            <span className="text-sm font-medium text-white">Carregando novo escritório...</span>
+          </div>
+        </div>
+      )}
     </>
   )
 }

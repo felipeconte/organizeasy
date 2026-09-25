@@ -312,8 +312,8 @@ export default function CompaniesManagerClient({
         </div>
 
         {/* Card Footer: Quick Contact & Action Buttons */}
-        <div className="px-5 py-3 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
+        <div className="px-4 sm:px-5 py-3 bg-slate-50/70 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             {waUrl && (
               <a
                 href={waUrl}
@@ -347,7 +347,7 @@ export default function CompaniesManagerClient({
             )}
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0 ml-auto">
             {canManage && (
               <button
                 onClick={() => handleOpenEdit(company)}
@@ -382,9 +382,9 @@ export default function CompaniesManagerClient({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-full">
       {/* Metric Cards Banner */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
         {/* Card 1: Total de Parceiros */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
           <div>
@@ -451,9 +451,9 @@ export default function CompaniesManagerClient({
       </div>
 
       {/* Control Bar: Search, Category Filter, Status Filter, Mode & Add Button */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
         {/* Search */}
-        <div className="relative flex-1 min-w-[240px]">
+        <div className="relative flex-1 w-full min-w-0">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
           <input
             type="text"
@@ -465,23 +465,25 @@ export default function CompaniesManagerClient({
         </div>
 
         {/* Filters and Actions */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
           {/* Category Filter */}
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-          >
-            <option value="todas">Todas as Especialidades</option>
-            {allCategories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
+          <div className="w-full sm:w-auto min-w-0">
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full sm:w-auto max-w-full truncate px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
+            >
+              <option value="todas">Todas as Especialidades</option>
+              {allCategories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* View Mode Toggle */}
-          <div className="hidden xl:flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+          <div className="hidden xl:flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
             <button
               onClick={() => setViewMode('grid')}
               title="Visualização em Grade"
@@ -510,7 +512,7 @@ export default function CompaniesManagerClient({
           {canManage && (
             <button
               onClick={handleOpenNew}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-xs shadow-indigo-500/20 shrink-0 cursor-pointer"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-xs shadow-indigo-500/20 shrink-0 cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Nova Empresa
             </button>
@@ -521,7 +523,7 @@ export default function CompaniesManagerClient({
       {/* Content Rendering: GRID or TABLE */}
       {filteredCompanies.length === 0 ? (
         /* Empty State */
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-12 text-center max-w-xl mx-auto my-8 shadow-xs">
+        <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-10 text-center max-w-xl mx-auto my-6 sm:my-8 shadow-xs">
           <div className="w-16 h-16 rounded-3xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mx-auto mb-4 shadow-xs">
             <Briefcase className="w-8 h-8" />
           </div>
@@ -536,14 +538,14 @@ export default function CompaniesManagerClient({
               : 'Cadastre marcenarias, marmorarias, lojas de iluminação e outros prestadores de serviços para vincular aos seus projetos e gerenciar comissões.'}
           </p>
 
-          <div className="mt-6 flex items-center justify-center gap-3">
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             {search || selectedCategory !== 'todas' ? (
               <button
                 onClick={() => {
                   setSearch('')
                   setSelectedCategory('todas')
                 }}
-                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-all"
+                className="w-full sm:w-auto px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-all cursor-pointer"
               >
                 Limpar Filtros
               </button>
@@ -551,7 +553,7 @@ export default function CompaniesManagerClient({
             {canManage && (
               <button
                 onClick={handleOpenNew}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-xs shadow-indigo-500/20"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-xs shadow-indigo-500/20 cursor-pointer"
               >
                 <Plus className="w-4 h-4" /> Cadastrar Primeira Empresa
               </button>

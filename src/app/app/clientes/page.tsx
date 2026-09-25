@@ -32,7 +32,7 @@ export default async function ClientesPage() {
   const initialClients = res.clients || []
 
   return (
-    <div className="space-y-6 antialiased max-w-7xl mx-auto">
+    <div className="space-y-6 antialiased max-w-7xl mx-auto w-full">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

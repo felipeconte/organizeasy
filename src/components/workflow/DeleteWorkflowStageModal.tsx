@@ -49,7 +49,7 @@ export default function DeleteWorkflowStageModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center p-4 antialiased">
+    <div className="fixed inset-0 z-[70] overflow-y-auto flex items-center justify-center p-3 sm:p-4 antialiased">
       {/* Backdrop */}
       <div
         onClick={() => !isPending && onClose()}
@@ -57,7 +57,7 @@ export default function DeleteWorkflowStageModal({
       />
 
       {/* Modal Dialog */}
-      <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6 space-y-5 z-10 animate-in zoom-in-95 duration-200">
+      <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-5 sm:p-6 space-y-5 z-10 animate-in zoom-in-95 duration-200 my-auto max-h-[calc(100dvh-2rem)] overflow-y-auto">
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">

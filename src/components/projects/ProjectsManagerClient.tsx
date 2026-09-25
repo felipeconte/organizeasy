@@ -512,9 +512,9 @@ export default function ProjectsManagerClient({
 
       {/* MODAL: CONFIRMAÇÃO DE EXCLUSÃO */}
       {deletingProject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => setDeletingProject(null)} />
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl z-10 space-y-4 border border-rose-100 animate-in zoom-in-95">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl z-10 space-y-4 border border-rose-100 animate-in zoom-in-95 max-h-[calc(100dvh-2rem)] overflow-y-auto my-auto relative">
             <div className="flex items-center gap-3 text-rose-600">
               <div className="p-3 bg-rose-50 rounded-2xl">
                 <AlertTriangle className="w-6 h-6" />

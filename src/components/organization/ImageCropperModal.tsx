@@ -293,9 +293,9 @@ export default function ImageCropperModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
       <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={onCancel} />
-      <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl z-10 space-y-4 border border-slate-200 animate-in zoom-in-95 max-h-[95vh] overflow-y-auto">
+      <div className="bg-white rounded-3xl max-w-md w-full p-4 sm:p-6 shadow-2xl z-10 space-y-4 border border-slate-200 animate-in zoom-in-95 max-h-[calc(100dvh-2rem)] overflow-y-auto my-auto relative">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2.5">

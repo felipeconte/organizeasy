@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 'use client'
 
 import { useState, useRef } from 'react'
@@ -832,133 +833,146 @@ export default function OfficeSettingsClient({
           /* DISPLAY VIEW */
           <div className="space-y-6">
             {/* Top Logo & Title Badge */}
-            <div className="flex items-center gap-4 pb-4 border-b border-slate-100">
-              <div className="relative group shrink-0">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center overflow-hidden border-2 border-white shadow-md">
-                  {org.logo_url ? (
-                    <img src={org.logo_url} alt={org.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <Building2 className="w-8 h-8" />
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 pb-4 border-b border-slate-100 min-w-0">
+              <div className="flex items-center gap-3.5 sm:block shrink-0">
+                <div className="relative group shrink-0">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center overflow-hidden border-2 border-white shadow-md">
+                    {org.logo_url ? (
+                      <img src={org.logo_url} alt={org.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <Building2 className="w-8 h-8" />
+                    )}
+                  </div>
+                  {canEditOffice && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (org.logo_url) {
+                            setLogoMenuOpen(!logoMenuOpen)
+                          } else {
+                            fileInputRef.current?.click()
+                          }
+                        }}
+                        className="absolute inset-0 bg-slate-900/50 rounded-2xl flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-md"
+                        title={org.logo_url ? 'Opções da logomarca' : 'Adicionar logomarca'}
+                      >
+                        <Camera className="w-5 h-5" />
+                      </button>
+
+                      {/* Dropdown Menu de opções quando a logo já existe */}
+                      {logoMenuOpen && org.logo_url && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setLogoMenuOpen(false)} />
+                          <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-200/80 p-1.5 z-50 animate-in fade-in-0 zoom-in-95">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLogoMenuOpen(false)
+                                setCropperRawImage(org.logo_url)
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-blue-600 hover:bg-blue-50/70 rounded-xl transition-colors text-left cursor-pointer"
+                            >
+                              <Crop className="w-4 h-4 text-blue-500" />
+                              Ajustar Enquadramento
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLogoMenuOpen(false)
+                                fileInputRef.current?.click()
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-blue-600 hover:bg-blue-50/70 rounded-xl transition-colors text-left cursor-pointer"
+                            >
+                              <UploadCloud className="w-4 h-4 text-slate-500" />
+                              Carregar Nova Logomarca
+                            </button>
+                            <div className="my-1 border-t border-slate-100" />
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setLogoMenuOpen(false)
+                                const confirmed = await confirm({
+                                  title: 'Remover logomarca',
+                                  message: 'Tem certeza que deseja remover a logomarca do escritório?',
+                                  confirmText: 'Sim, remover',
+                                  cancelText: 'Cancelar',
+                                  variant: 'danger',
+                                })
+                                if (confirmed) {
+                                  setOrg((prev) => ({ ...prev, logo_url: null }))
+                                  setFormData((prev) => ({ ...prev, logo_url: '' }))
+                                  const res = await updateOrganizationLogoAction(org.id, '')
+                                  if (res.success) {
+                                    showToast('Logomarca removida com sucesso.')
+                                  } else {
+                                    showAlert({
+                                      title: 'Erro',
+                                      message: res.error || 'Não foi possível remover a logomarca.',
+                                      variant: 'error',
+                                    })
+                                  }
+                                }
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-xl transition-colors text-left cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4 text-rose-500" />
+                              Remover Logomarca
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </>
                   )}
                 </div>
-                {canEditOffice && (
-                  <>
+                <div className="sm:hidden min-w-0 flex-1">
+                  <h3 className="text-lg font-bold text-slate-900 truncate">{org.name}</h3>
+                </div>
+              </div>
+
+              <div className="min-w-0 flex-1 w-full space-y-2">
+                <h3 className="text-xl font-bold text-slate-900 hidden sm:block truncate">{org.name}</h3>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full min-w-0">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-50 border border-blue-200/80 text-blue-700 text-xs font-semibold min-w-0 max-w-full overflow-hidden">
+                    <Globe className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span className="shrink-0 text-blue-800">Portal:</span>
+                    <span
+                      className="font-mono font-bold truncate text-[11px] sm:text-xs text-blue-900"
+                      title={`https://www.organizeasy.com.br/portal/${org.slug}`}
+                    >
+                      https://www.organizeasy.com.br/portal/{org.slug}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
                     <button
                       type="button"
-                      onClick={() => {
-                        if (org.logo_url) {
-                          setLogoMenuOpen(!logoMenuOpen)
-                        } else {
-                          fileInputRef.current?.click()
-                        }
-                      }}
-                      className="absolute inset-0 bg-slate-900/50 rounded-2xl flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-md"
-                      title={org.logo_url ? 'Opções da logomarca' : 'Adicionar logomarca'}
+                      onClick={handleCopyOfficePortalLink}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition-colors cursor-pointer"
+                      title="Copiar link do Portal do Cliente"
                     >
-                      <Camera className="w-5 h-5" />
+                      {copiedPortalLink ? (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="text-emerald-700 font-bold">Copiado!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Copiar Link</span>
+                        </>
+                      )}
                     </button>
-
-                    {/* Dropdown Menu de opções quando a logo já existe */}
-                    {logoMenuOpen && org.logo_url && (
-                      <>
-                        <div className="fixed inset-0 z-40" onClick={() => setLogoMenuOpen(false)} />
-                        <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-200/80 p-1.5 z-50 animate-in fade-in-0 zoom-in-95">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setLogoMenuOpen(false)
-                              setCropperRawImage(org.logo_url)
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-blue-600 hover:bg-blue-50/70 rounded-xl transition-colors text-left cursor-pointer"
-                          >
-                            <Crop className="w-4 h-4 text-blue-500" />
-                            Ajustar Enquadramento
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setLogoMenuOpen(false)
-                              fileInputRef.current?.click()
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-blue-600 hover:bg-blue-50/70 rounded-xl transition-colors text-left cursor-pointer"
-                          >
-                            <UploadCloud className="w-4 h-4 text-slate-500" />
-                            Carregar Nova Logomarca
-                          </button>
-                          <div className="my-1 border-t border-slate-100" />
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              setLogoMenuOpen(false)
-                              const confirmed = await confirm({
-                                title: 'Remover logomarca',
-                                message: 'Tem certeza que deseja remover a logomarca do escritório?',
-                                confirmText: 'Sim, remover',
-                                cancelText: 'Cancelar',
-                                variant: 'danger',
-                              })
-                              if (confirmed) {
-                                setOrg((prev) => ({ ...prev, logo_url: null }))
-                                setFormData((prev) => ({ ...prev, logo_url: '' }))
-                                const res = await updateOrganizationLogoAction(org.id, '')
-                                if (res.success) {
-                                  showToast('Logomarca removida com sucesso.')
-                                } else {
-                                  showAlert({
-                                    title: 'Erro',
-                                    message: res.error || 'Não foi possível remover a logomarca.',
-                                    variant: 'error',
-                                  })
-                                }
-                              }
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-xl transition-colors text-left cursor-pointer"
-                          >
-                            <Trash2 className="w-4 h-4 text-rose-500" />
-                            Remover Logomarca
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-900">{org.name}</h3>
-                <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200/80 text-blue-700 text-xs font-semibold">
-                    <Globe className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Portal:</span>
-                    <span className="font-mono font-bold">https://www.organizeasy.com.br/portal/{org.slug}</span>
+                    <a
+                      href={`/portal/${org.slug}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 text-xs font-medium transition-colors cursor-pointer"
+                      title="Abrir Portal do Cliente em nova aba"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Abrir Portal</span>
+                    </a>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleCopyOfficePortalLink}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition-colors cursor-pointer"
-                    title="Copiar link do Portal do Cliente"
-                  >
-                    {copiedPortalLink ? (
-                      <>
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        <span className="text-emerald-700 font-bold">Copiado!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5 text-slate-500" />
-                        <span>Copiar Link</span>
-                      </>
-                    )}
-                  </button>
-                  <a
-                    href={`/portal/${org.slug}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 text-xs font-medium transition-colors cursor-pointer"
-                    title="Abrir Portal do Cliente em nova aba"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span>Abrir Portal</span>
-                  </a>
                 </div>
               </div>
             </div>
@@ -999,7 +1013,7 @@ export default function OfficeSettingsClient({
 
       {/* CARD: MEMBROS e COLABORADORES */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
           <div>
             <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
               <Users className="w-4 h-4 text-blue-600" /> Membros e Colaboradores
@@ -1016,7 +1030,7 @@ export default function OfficeSettingsClient({
                 setNewMemberEmail('')
                 setShowAddMemberModal(true)
               }}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all shadow-xs cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all shadow-xs cursor-pointer shrink-0 self-start sm:self-auto"
             >
               <Plus className="w-4 h-4" /> Adicionar Membro
             </button>
@@ -1038,24 +1052,24 @@ export default function OfficeSettingsClient({
                 : m.fullName || m.email || 'Membro da Equipe'
 
               return (
-                <div key={m.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">
+                <div key={m.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-w-0">
+                  <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 sm:mt-0">
                       {isCurrentUser ? 'EU' : <UserCheck className="w-4 h-4" />}
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-slate-900">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                        <span className="text-sm font-bold text-slate-900 break-words sm:truncate max-w-full">
                           {memberDisplayName}
                         </span>
                         {isOwner && (
-                          <span className="px-2 py-0.5 rounded text-xs font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          <span className="px-2 py-0.5 rounded text-xs font-extrabold bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
                             Proprietário
                           </span>
                         )}
                         {m.profile_name && !isOwner && (
                           <span
-                            className="px-2 py-0.5 rounded text-xs font-semibold text-white"
+                            className="px-2 py-0.5 rounded text-xs font-semibold text-white shrink-0"
                             style={{ backgroundColor: m.profile_color || '#2563EB' }}
                           >
                             {m.profile_name}
@@ -1063,7 +1077,7 @@ export default function OfficeSettingsClient({
                         )}
                       </div>
                       {!isCurrentUser && m.email && m.fullName && (
-                        <span className="text-xs text-slate-500 block mt-0.5">
+                        <span className="text-xs text-slate-500 block mt-0.5 break-all sm:truncate">
                           {m.email}
                         </span>
                       )}
@@ -1114,7 +1128,7 @@ export default function OfficeSettingsClient({
                         <select
                           value={m.role}
                           disabled={isOwner}
-                          onChange={(e) => handleUpdateRole(m.id, e.target.value as any)}
+                          onChange={(e) => handleUpdateRole(m.id, e.target.value as 'owner' | 'admin' | 'collaborator' | 'intern')}
                           className={`text-xs font-bold px-3 py-1.5 rounded-lg border outline-hidden cursor-pointer ${roleConfig.bg} ${roleConfig.text} ${roleConfig.border} disabled:opacity-80`}
                         >
                           <option value="owner">Proprietário</option>
@@ -1229,100 +1243,103 @@ export default function OfficeSettingsClient({
 
       {/* MODAL: ADICIONAR MEMBRO POR CONVITE */}
       {showAddMemberModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs"
             onClick={() => setShowAddMemberModal(false)}
           />
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl z-10 space-y-4 border border-slate-200 animate-in zoom-in-95">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[calc(100dvh-2rem)] flex flex-col shadow-2xl z-10 border border-slate-200 animate-in zoom-in-95 relative my-auto overflow-hidden">
+            <div className="flex items-center justify-between p-4 sm:p-5 pb-3 border-b border-slate-100 shrink-0">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <Users className="w-5 h-5 text-blue-600" /> Convidar Membro para a Equipe
               </h3>
               <button
+                type="button"
                 onClick={() => setShowAddMemberModal(false)}
-                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="text-slate-400 hover:text-slate-600 cursor-pointer p-1 rounded-lg hover:bg-slate-100 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Error Notification inside modal */}
-            {memberModalError && (
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5 text-xs text-rose-700">
-                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                <span>{memberModalError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleAddMember} className="space-y-4 text-sm">
-              <div>
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
-                  E-mail do Convidado *
-                </label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    required
-                    value={newMemberEmail}
-                    onChange={(e) => {
-                      setNewMemberEmail(e.target.value)
-                      if (memberModalError) setMemberModalError(null)
-                    }}
-                    placeholder="usuario@escritorio.com.br"
-                    className="w-full text-sm border border-slate-200 rounded-xl p-3 pl-9 outline-hidden focus:border-blue-500 bg-white"
-                  />
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                </div>
-                <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-                  Um e-mail será enviado com um link exclusivo para o colaborador acessar o escritório. Não é obrigatório ter cadastro prévio no Organizeasy.
-                </p>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
-                  Perfil de Acesso
-                </label>
-                {profilesList.length > 0 ? (
-                  <select
-                    value={newMemberProfileId}
-                    onChange={(e) => setNewMemberProfileId(e.target.value)}
-                    className="w-full text-sm border border-slate-200 rounded-xl p-3 outline-hidden focus:border-blue-500 bg-white cursor-pointer"
-                  >
-                    <option value="">Selecione o perfil...</option>
-                    {profilesList
-                      .filter((p) => !p.is_owner_profile)
-                      .map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                  </select>
-                ) : (
-                  <select
-                    value={newMemberRole}
-                    onChange={(e) => setNewMemberRole(e.target.value as any)}
-                    className="w-full text-sm border border-slate-200 rounded-xl p-3 outline-hidden focus:border-blue-500 bg-white cursor-pointer"
-                  >
-                    <option value="collaborator">Colaborador (Pode gerenciar tarefas e projetos)</option>
-                    <option value="admin">Administrador (Controle total das configurações)</option>
-                    <option value="intern">Estagiário (Acesso operacional)</option>
-                  </select>
+            <form onSubmit={handleAddMember} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4 text-sm">
+                {/* Error Notification inside modal */}
+                {memberModalError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5 text-xs text-rose-700">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    <span>{memberModalError}</span>
+                  </div>
                 )}
+
+                <div>
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
+                    E-mail do Convidado *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="email"
+                      required
+                      value={newMemberEmail}
+                      onChange={(e) => {
+                        setNewMemberEmail(e.target.value)
+                        if (memberModalError) setMemberModalError(null)
+                      }}
+                      placeholder="usuario@escritorio.com.br"
+                      className="w-full text-sm border border-slate-200 rounded-xl p-3 pl-9 outline-hidden focus:border-blue-500 bg-white"
+                    />
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                    Um e-mail será enviado com um link exclusivo para o colaborador acessar o escritório. Não é obrigatório ter cadastro prévio no Organizeasy.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
+                    Perfil de Acesso
+                  </label>
+                  {profilesList.length > 0 ? (
+                    <select
+                      value={newMemberProfileId}
+                      onChange={(e) => setNewMemberProfileId(e.target.value)}
+                      className="w-full text-sm border border-slate-200 rounded-xl p-3 outline-hidden focus:border-blue-500 bg-white cursor-pointer"
+                    >
+                      <option value="">Selecione o perfil...</option>
+                      {profilesList
+                        .filter((p) => !p.is_owner_profile)
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                    </select>
+                  ) : (
+                    <select
+                      value={newMemberRole}
+                      onChange={(e) => setNewMemberRole(e.target.value as 'admin' | 'collaborator' | 'intern')}
+                      className="w-full text-sm border border-slate-200 rounded-xl p-3 outline-hidden focus:border-blue-500 bg-white cursor-pointer"
+                    >
+                      <option value="collaborator">Colaborador (Pode gerenciar tarefas e projetos)</option>
+                      <option value="admin">Administrador (Controle total das configurações)</option>
+                      <option value="intern">Estagiário (Acesso operacional)</option>
+                    </select>
+                  )}
+                </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 p-4 sm:p-5 pt-3 border-t border-slate-100 bg-slate-50/60 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowAddMemberModal(false)}
-                  className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                  className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer text-center"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={savingMember || !newMemberEmail.trim()}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all shadow-xs disabled:opacity-50 cursor-pointer text-center"
                 >
                   {savingMember && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   {savingMember ? 'Enviando convite...' : 'Enviar Convite por E-mail'}
@@ -1335,13 +1352,13 @@ export default function OfficeSettingsClient({
 
       {/* MODAL: TRANSFERIR PROPRIEDADE DO ESCRITÓRIO (IRREVOGÁVEL) */}
       {showTransferModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div
             className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs"
             onClick={() => !transferring && setShowTransferModal(false)}
           />
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl z-10 space-y-5 border border-amber-200 animate-in zoom-in-95 relative">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[calc(100dvh-2rem)] flex flex-col shadow-2xl z-10 border border-amber-200 animate-in zoom-in-95 relative my-auto overflow-hidden">
+            <div className="flex items-center justify-between p-4 sm:p-5 pb-3 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2.5 text-amber-700">
                 <KeyRound className="w-5 h-5 text-amber-600" />
                 <h3 className="text-base font-bold text-slate-900">
@@ -1352,148 +1369,150 @@ export default function OfficeSettingsClient({
                 type="button"
                 onClick={() => setShowTransferModal(false)}
                 disabled={transferring}
-                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="text-slate-400 hover:text-slate-600 cursor-pointer p-1 rounded-lg hover:bg-slate-100 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Alerta de Irrevogabilidade */}
-            <div className="p-4 bg-amber-50 border border-amber-200/80 rounded-xl flex items-start gap-3 text-xs text-amber-900">
-              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <strong className="block font-bold">AÇÃO IRREVOGÁVEL E DEFINITIVA</strong>
-                <span>
-                  Ao confirmar, você transferirá a titularidade e o controle total deste escritório ({org.name}) para o membro
-                  escolhido. O novo proprietário passará a ter poder irrestrito sobre a equipe, configurações e projetos.
-                </span>
-              </div>
-            </div>
+            <form onSubmit={handleTransferOwnership} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4 text-sm">
+                {/* Alerta de Irrevogabilidade */}
+                <div className="p-4 bg-amber-50 border border-amber-200/80 rounded-xl flex items-start gap-3 text-xs text-amber-900">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <strong className="block font-bold">AÇÃO IRREVOGÁVEL E DEFINITIVA</strong>
+                    <span>
+                      Ao confirmar, você transferirá a titularidade e o controle total deste escritório ({org.name}) para o membro
+                      escolhido. O novo proprietário passará a ter poder irrestrito sobre a equipe, configurações e projetos.
+                    </span>
+                  </div>
+                </div>
 
-            {transferError && (
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{transferError}</span>
-              </div>
-            )}
+                {transferError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{transferError}</span>
+                  </div>
+                )}
 
-            <form onSubmit={handleTransferOwnership} className="space-y-4 text-sm">
-              <div>
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
-                  1. Selecione o Novo Proprietário *
-                </label>
-                <select
-                  required
-                  value={targetMemberId}
-                  onChange={(e) => setTargetMemberId(e.target.value)}
-                  className="w-full text-xs sm:text-sm border border-slate-200 rounded-xl p-3 outline-hidden focus:border-blue-500 bg-white cursor-pointer"
-                >
-                  <option value="">Selecione um membro da equipe...</option>
-                  {members
-                    .filter((m) => m.user_id !== currentUserId)
-                    .map((m) => (
-                      <option key={m.user_id} value={m.user_id}>
-                        {m.fullName || m.email || 'Membro'} ({m.email})
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
-                  2. O que você deseja fazer com a sua conta? *
-                </label>
-                <div className="space-y-2.5 pt-1">
-                  <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:border-slate-300 cursor-pointer transition-colors bg-slate-50/50">
-                    <input
-                      type="radio"
-                      name="afterAction"
-                      value="change_profile"
-                      checked={transferAfterAction === 'change_profile'}
-                      onChange={() => setTransferAfterAction('change_profile')}
-                      className="mt-0.5 text-blue-600 focus:ring-blue-500"
-                    />
-                    <div className="text-xs">
-                      <strong className="block font-semibold text-slate-800">
-                        Permanecer no escritório com outro cargo
-                      </strong>
-                      <span className="text-slate-500 text-[11px]">
-                        Você continuará membro da equipe, atuando sob o novo perfil selecionado.
-                      </span>
-                    </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                    1. Selecione o Novo Proprietário *
                   </label>
+                  <select
+                    required
+                    value={targetMemberId}
+                    onChange={(e) => setTargetMemberId(e.target.value)}
+                    className="w-full text-xs sm:text-sm border border-slate-200 rounded-xl p-3 outline-hidden focus:border-blue-500 bg-white cursor-pointer"
+                  >
+                    <option value="">Selecione um membro da equipe...</option>
+                    {members
+                      .filter((m) => m.user_id !== currentUserId)
+                      .map((m) => (
+                        <option key={m.user_id} value={m.user_id}>
+                          {m.fullName || m.email || 'Membro'} ({m.email})
+                        </option>
+                      ))}
+                  </select>
+                </div>
 
-                  {transferAfterAction === 'change_profile' && (
-                    <div className="pl-6 pt-1">
-                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                        Seu novo perfil neste escritório:
-                      </label>
-                      <select
-                        value={transferNewProfileId}
-                        onChange={(e) => setTransferNewProfileId(e.target.value)}
-                        className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-hidden focus:border-blue-500 bg-white cursor-pointer"
-                      >
-                        {profilesList
-                          .filter((p) => !p.is_owner_profile)
-                          .map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                  )}
+                <div>
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                    2. O que você deseja fazer com a sua conta? *
+                  </label>
+                  <div className="space-y-2.5 pt-1">
+                    <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:border-slate-300 cursor-pointer transition-colors bg-slate-50/50">
+                      <input
+                        type="radio"
+                        name="afterAction"
+                        value="change_profile"
+                        checked={transferAfterAction === 'change_profile'}
+                        onChange={() => setTransferAfterAction('change_profile')}
+                        className="mt-0.5 text-blue-600 focus:ring-blue-500"
+                      />
+                      <div className="text-xs">
+                        <strong className="block font-semibold text-slate-800">
+                          Permanecer no escritório com outro cargo
+                        </strong>
+                        <span className="text-slate-500 text-[11px]">
+                          Você continuará membro da equipe, atuando sob o novo perfil selecionado.
+                        </span>
+                      </div>
+                    </label>
 
-                  <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:border-slate-300 cursor-pointer transition-colors bg-slate-50/50">
+                    {transferAfterAction === 'change_profile' && (
+                      <div className="pl-6 pt-1">
+                        <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                          Seu novo perfil neste escritório:
+                        </label>
+                        <select
+                          value={transferNewProfileId}
+                          onChange={(e) => setTransferNewProfileId(e.target.value)}
+                          className="w-full text-xs border border-slate-200 rounded-lg p-2.5 outline-hidden focus:border-blue-500 bg-white cursor-pointer"
+                        >
+                          {profilesList
+                            .filter((p) => !p.is_owner_profile)
+                            .map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:border-slate-300 cursor-pointer transition-colors bg-slate-50/50">
+                      <input
+                        type="radio"
+                        name="afterAction"
+                        value="leave_office"
+                        checked={transferAfterAction === 'leave_office'}
+                        onChange={() => setTransferAfterAction('leave_office')}
+                        className="mt-0.5 text-blue-600 focus:ring-blue-500"
+                      />
+                      <div className="text-xs">
+                        <strong className="block font-semibold text-rose-700">
+                          Sair completamente deste escritório
+                        </strong>
+                        <span className="text-slate-500 text-[11px]">
+                          Sua conta será desvinculada deste escritório. Se você fizer parte de outro escritório, você será direcionado para ele; caso contrário, irá para o Onboarding.
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Checkbox de confirmação consciente */}
+                <div className="pt-2">
+                  <label className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50/70 border border-amber-200 cursor-pointer">
                     <input
-                      type="radio"
-                      name="afterAction"
-                      value="leave_office"
-                      checked={transferAfterAction === 'leave_office'}
-                      onChange={() => setTransferAfterAction('leave_office')}
-                      className="mt-0.5 text-blue-600 focus:ring-blue-500"
+                      type="checkbox"
+                      required
+                      checked={transferConfirmed}
+                      onChange={(e) => setTransferConfirmed(e.target.checked)}
+                      className="mt-0.5 rounded text-amber-600 focus:ring-amber-500"
                     />
-                    <div className="text-xs">
-                      <strong className="block font-semibold text-rose-700">
-                        Sair completamente deste escritório
-                      </strong>
-                      <span className="text-slate-500 text-[11px]">
-                        Sua conta será desvinculada deste escritório. Se você fizer parte de outro escritório, você será direcionado para ele; caso contrário, irá para o Onboarding.
-                      </span>
-                    </div>
+                    <span className="text-[11px] text-amber-900 font-medium leading-snug">
+                      Estou ciente de que esta ação é <strong>IRREVOGÁVEL</strong> e transfere imediatamente a administração total do escritório para o membro selecionado.
+                    </span>
                   </label>
                 </div>
               </div>
 
-              {/* Checkbox de confirmação consciente */}
-              <div className="pt-2">
-                <label className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50/70 border border-amber-200 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    required
-                    checked={transferConfirmed}
-                    onChange={(e) => setTransferConfirmed(e.target.checked)}
-                    className="mt-0.5 rounded text-amber-600 focus:ring-amber-500"
-                  />
-                  <span className="text-[11px] text-amber-900 font-medium leading-snug">
-                    Estou ciente de que esta ação é <strong>IRREVOGÁVEL</strong> e transfere imediatamente a administração total do escritório para o membro selecionado.
-                  </span>
-                </label>
-              </div>
-
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5 p-4 sm:p-5 pt-3 border-t border-slate-100 bg-slate-50/60 shrink-0">
                 <button
                   type="button"
                   disabled={transferring}
                   onClick={() => setShowTransferModal(false)}
-                  className="px-4 py-2 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                  className="px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer text-center"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={transferring || !targetMemberId || !transferConfirmed}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-xs cursor-pointer"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-xs cursor-pointer text-center"
                 >
                   {transferring && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   {transferring ? 'Transferindo...' : 'Confirmar Transferência Irrevogável'}

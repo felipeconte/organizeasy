@@ -651,7 +651,7 @@ export default function OverviewDashboardClient({
             </div>
 
             {/* Abas de Filtro */}
-            <div className="flex items-center overflow-x-auto max-w-full bg-slate-100/90 p-1 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 shrink-0">
+            <div className="flex items-center overflow-x-auto max-w-full bg-slate-100/90 p-1 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 shrink-0 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <button
                 onClick={() => setFilterTab('all')}
                 className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 ${filterTab === 'all'
@@ -786,52 +786,55 @@ export default function OverviewDashboardClient({
                     </div>
                   </div>
 
-                  {/* Bloco 3: Status com o Cliente */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    {info.hasStageInApproval ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200/80 shadow-2xs">
-                        <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-                        Aguardando Cliente
-                      </span>
-                    ) : info.percent === 100 || project.status === 'concluido' ? (
-                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
-                        <CheckCircle2 className="w-4 h-4" /> Concluído
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/70">
-                        <Layers className="w-4 h-4" /> Em Produção
-                      </span>
-                    )}
-                  </div>
+                  {/* Bloco 3 e 4: Unificados com layout responsivo no Mobile e Desktop */}
+                  <div className="flex items-center justify-between gap-3 pt-2.5 lg:pt-0 border-t border-slate-100/80 lg:border-0 shrink-0 w-full lg:w-auto">
+                    {/* Bloco 3: Status com o Cliente */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {info.hasStageInApproval ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200/80 shadow-2xs">
+                          <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                          Aguardando Cliente
+                        </span>
+                      ) : info.percent === 100 || project.status === 'concluido' ? (
+                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                          <CheckCircle2 className="w-4 h-4" /> Concluído
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/70">
+                          <Layers className="w-4 h-4" /> Em Produção
+                        </span>
+                      )}
+                    </div>
 
-                  {/* Bloco 4: Ações Rápidas */}
-                  <div className="flex items-center gap-2 shrink-0 justify-end">
-                    {project.portalToken && (
-                      <button
-                        onClick={() => handleCopyPortalLink(project.id, project.portalToken)}
-                        title="Copiar link do Portal do Cliente"
-                        className="py-2 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200/70 text-sm font-semibold transition-all flex items-center gap-1.5 cursor-pointer"
+                    {/* Bloco 4: Ações Rápidas */}
+                    <div className="flex items-center gap-2 shrink-0 justify-end">
+                      {project.portalToken && (
+                        <button
+                          onClick={() => handleCopyPortalLink(project.id, project.portalToken)}
+                          title="Copiar link do Portal do Cliente"
+                          className="py-2 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200/70 text-sm font-semibold transition-all flex items-center gap-1.5 cursor-pointer"
+                        >
+                          {copiedProjectId === project.id ? (
+                            <>
+                              <Check className="w-4 h-4 text-emerald-600" />
+                              <span className="text-emerald-700 text-xs">Copiado</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-4 h-4 text-slate-400" />
+                              <span className="hidden sm:inline text-xs">Portal</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+
+                      <Link
+                        href={`/app/projetos/${project.id}`}
+                        className="py-2 px-3.5 sm:px-4 rounded-xl bg-slate-100 hover:bg-blue-600 text-slate-700 hover:text-white text-xs sm:text-sm font-semibold transition-all shadow-2xs cursor-pointer inline-flex items-center gap-1.5"
                       >
-                        {copiedProjectId === project.id ? (
-                          <>
-                            <Check className="w-4 h-4 text-emerald-600" />
-                            <span className="text-emerald-700 text-xs">Copiado</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-4 h-4 text-slate-400" />
-                            <span className="hidden sm:inline text-xs">Portal</span>
-                          </>
-                        )}
-                      </button>
-                    )}
-
-                    <Link
-                      href={`/app/projetos/${project.id}`}
-                      className="py-2 px-4 rounded-xl bg-slate-100 hover:bg-blue-600 text-slate-700 hover:text-white text-sm font-semibold transition-all shadow-2xs cursor-pointer inline-flex items-center gap-1.5"
-                    >
-                      Ver detalhes <ArrowRight className="w-4 h-4" />
-                    </Link>
+                        Ver detalhes <ArrowRight className="w-4 h-4" />
+                      </Link>
+                    </div>
                   </div>
                 </div>
               )

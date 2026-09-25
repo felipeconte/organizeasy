@@ -809,9 +809,9 @@ export default function EditProjectModal({
   if (!isOpen || !project) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
       <div className="fixed inset-0" onClick={handleAttemptClose} />
-      <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-8 z-10 flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden my-auto z-10 flex flex-col max-h-[calc(100dvh-2rem)]">
         {/* Loading Overlay */}
         {loading && (
           <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-xs flex flex-col items-center justify-center gap-3 animate-in fade-in duration-200">
@@ -899,7 +899,40 @@ export default function EditProjectModal({
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                 Status do Projeto
               </label>
-              <div className="pt-0.5 overflow-x-auto pb-1 scrollbar-none">
+
+              {/* Grid 2x2 para telas menores / smartphone (elimina a rolagem horizontal) */}
+              <div className="grid grid-cols-2 gap-2 sm:hidden">
+                {PROJECT_STATUS_JELLY_ITEMS.map((item) => {
+                  const isSelected = editStatus === item.value
+                  return (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => setEditStatus(item.value)}
+                      className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        isSelected
+                          ? 'text-white shadow-md'
+                          : 'bg-slate-50/80 hover:bg-slate-100 text-slate-600 border-slate-200/90 hover:border-slate-300 hover:text-slate-900 active:scale-[0.98]'
+                      }`}
+                      style={
+                        isSelected
+                          ? {
+                              backgroundColor: item.activeColor,
+                              borderColor: item.activeColor,
+                              boxShadow: `0 4px 14px ${item.shadowColor || 'rgba(0,0,0,0.15)'}`,
+                            }
+                          : undefined
+                      }
+                    >
+                      <span className="shrink-0">{item.icon}</span>
+                      <span>{item.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* JellyRadio horizontal em telas maiores (sm+) */}
+              <div className="hidden sm:block pt-0.5 overflow-x-auto pb-1 scrollbar-none">
                 <JellyRadio
                   items={PROJECT_STATUS_JELLY_ITEMS}
                   value={editStatus}
