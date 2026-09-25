@@ -30,6 +30,7 @@ import type { UserOrganizationItem } from '@/types/organization'
 import { BreadcrumbProvider } from '@/contexts/BreadcrumbContext'
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs'
 import { PermissionKey, ProfilePermissions } from '@/types/profiles'
+import LiquidMorphFloatingMenu from '@/components/ui/liquid-morph-floating-menu'
 
 interface AppShellClientProps {
   organizationId?: string
@@ -71,22 +72,24 @@ export function AppShellClient({
 
   // Sincroniza estado inicial com localStorage e cookie de forma segura para SSR
   useEffect(() => {
-    setIsMounted(true)
-    try {
-      const saved = localStorage.getItem('organizeasy_sidebar_collapsed') ?? localStorage.getItem('orgarq_sidebar_collapsed')
-      if (saved !== null) {
-        const savedBool = saved === 'true'
-        if (savedBool !== isCollapsed) {
-          setIsCollapsed(savedBool)
+    requestAnimationFrame(() => {
+      setIsMounted(true)
+      try {
+        const saved = localStorage.getItem('organizeasy_sidebar_collapsed') ?? localStorage.getItem('orgarq_sidebar_collapsed')
+        if (saved !== null) {
+          const savedBool = saved === 'true'
+          if (savedBool !== isCollapsed) {
+            setIsCollapsed(savedBool)
+          }
+          document.cookie = `organizeasy_sidebar_collapsed=${savedBool}; path=/; max-age=31536000; SameSite=Lax`
+        } else {
+          document.cookie = `organizeasy_sidebar_collapsed=${isCollapsed}; path=/; max-age=31536000; SameSite=Lax`
         }
-        document.cookie = `organizeasy_sidebar_collapsed=${savedBool}; path=/; max-age=31536000; SameSite=Lax`
-      } else {
-        document.cookie = `organizeasy_sidebar_collapsed=${isCollapsed}; path=/; max-age=31536000; SameSite=Lax`
+      } catch {
+        // Ignora erro de acesso ao localStorage se restrito
       }
-    } catch {
-      // Ignora erro de acesso ao localStorage se restrito
-    }
-  }, [])
+    })
+  }, [isCollapsed])
 
   const toggleSidebar = () => {
     setIsCollapsed((prev) => {
@@ -185,7 +188,7 @@ export function AppShellClient({
   }
 
   const visibleMainNavItems = mainNavItems.filter((item) => checkPerm(item.permissionKey))
-  const visibleConfigNavItems = configNavItems.filter((item) => checkPerm(item.permissionKey as any))
+  const visibleConfigNavItems = configNavItems.filter((item) => checkPerm(item.permissionKey))
 
   const checkIsActive = (href: string, exact?: boolean) => {
     if (exact) return pathname === href
@@ -199,7 +202,7 @@ export function AppShellClient({
       <aside
         className={`${
           isCollapsed ? 'w-20' : 'w-64'
-        } bg-white border-r border-slate-200/80 flex flex-col justify-between shrink-0 fixed inset-y-0 z-20 ${
+        } bg-white border-r border-slate-200/80 hidden lg:flex flex-col justify-between shrink-0 fixed inset-y-0 z-20 ${
           isMounted ? 'transition-all duration-300 ease-in-out' : ''
         }`}
       >
@@ -601,19 +604,33 @@ export function AppShellClient({
       {/* Conteúdo Principal com padding dinâmico */}
       <div
         className={`${
-          isCollapsed ? 'pl-20' : 'pl-64'
-        } flex-1 flex flex-col min-w-0 ${
+          isCollapsed ? 'lg:pl-20' : 'lg:pl-64'
+        } pl-0 flex-1 flex flex-col min-w-0 ${
           isMounted ? 'transition-all duration-300 ease-in-out' : ''
         }`}
       >
-        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-8 py-3.5 flex items-center justify-between">
+        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between">
           <Breadcrumbs />
         </header>
 
-        <main className="p-8 lg:p-8 flex-1 max-w-[1600px] w-full mx-auto space-y-6">
+        <main className="p-4 sm:p-6 lg:p-8 pb-28 lg:pb-8 flex-1 max-w-[1600px] w-full mx-auto space-y-6">
           {children}
         </main>
       </div>
+
+      {/* Menu Flutuante Inferior para Mobile e Tablet (< lg) */}
+      <LiquidMorphFloatingMenu
+        officeName={officeName}
+        orgLogoUrl={orgLogoUrl}
+        userDisplayName={userDisplayName}
+        userAvatarUrl={userAvatarUrl}
+        userRole={userRole}
+        mainNavItems={visibleMainNavItems}
+        configNavItems={visibleConfigNavItems}
+        pendingClientUpdatesCount={pendingClientUpdatesCount}
+        userOrganizations={userOrganizations}
+        activeOrgId={activeOrgId || organizationId}
+      />
     </div>
   </BreadcrumbProvider>
   )

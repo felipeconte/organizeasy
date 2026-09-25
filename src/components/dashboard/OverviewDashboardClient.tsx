@@ -651,10 +651,10 @@ export default function OverviewDashboardClient({
             </div>
 
             {/* Abas de Filtro */}
-            <div className="flex items-center bg-slate-100/90 p-1 rounded-xl text-sm font-semibold text-slate-600">
+            <div className="flex items-center overflow-x-auto max-w-full bg-slate-100/90 p-1 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 shrink-0">
               <button
                 onClick={() => setFilterTab('all')}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${filterTab === 'all'
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 ${filterTab === 'all'
                   ? 'bg-white text-slate-900 shadow-xs font-bold'
                   : 'hover:text-slate-900'
                   }`}
@@ -663,7 +663,7 @@ export default function OverviewDashboardClient({
               </button>
               <button
                 onClick={() => setFilterTab('in_progress')}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${filterTab === 'in_progress'
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 ${filterTab === 'in_progress'
                   ? 'bg-white text-slate-900 shadow-xs font-bold'
                   : 'hover:text-slate-900'
                   }`}
@@ -672,7 +672,7 @@ export default function OverviewDashboardClient({
               </button>
               <button
                 onClick={() => setFilterTab('awaiting_approval')}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${filterTab === 'awaiting_approval'
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${filterTab === 'awaiting_approval'
                   ? 'bg-white text-amber-900 shadow-xs font-bold'
                   : 'hover:text-slate-900'
                   }`}
@@ -684,7 +684,7 @@ export default function OverviewDashboardClient({
               </button>
               <button
                 onClick={() => setFilterTab('completed')}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${filterTab === 'completed'
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 ${filterTab === 'completed'
                   ? 'bg-white text-slate-900 shadow-xs font-bold'
                   : 'hover:text-slate-900'
                   }`}
@@ -733,7 +733,7 @@ export default function OverviewDashboardClient({
                   className="py-4.5 px-5 hover:bg-slate-50/80 transition-colors flex flex-col lg:flex-row lg:items-center justify-between gap-4"
                 >
                   {/* Bloco 1: Identificação do Projeto */}
-                  <div className="space-y-1 min-w-[280px] lg:max-w-[340px]">
+                  <div className="space-y-1 min-w-0 sm:min-w-[280px] lg:max-w-[340px]">
                     <div className="flex items-center gap-2">
                       <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono text-xs font-bold shrink-0">
                         {project.code}
@@ -753,7 +753,7 @@ export default function OverviewDashboardClient({
                   </div>
 
                   {/* Bloco 2: Fase Atual & Barra de Progresso */}
-                  <div className="space-y-1.5 min-w-[220px] lg:flex-1 max-w-sm">
+                  <div className="space-y-1.5 min-w-0 sm:min-w-[220px] lg:flex-1 max-w-sm">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-semibold text-slate-700 truncate">
                         {info.currentStage ? info.currentStage.name : 'Sem etapas'}
