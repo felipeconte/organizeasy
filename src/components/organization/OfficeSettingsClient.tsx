@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   Building2,
   Users,
@@ -211,12 +211,49 @@ export default function OfficeSettingsClient({
   }
 
   const [copiedPortalLink, setCopiedPortalLink] = useState(false)
+  const [portalBaseUrl, setPortalBaseUrl] = useState('https://www.organizeasy.com.br')
+  const [portalDisplayHost, setPortalDisplayHost] = useState('www.organizeasy.com.br')
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname
+      const isLocal =
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname.endsWith('.localhost') ||
+        hostname.startsWith('192.168.') ||
+        hostname.startsWith('10.')
+
+      if (isLocal) {
+        setPortalBaseUrl(window.location.origin)
+        setPortalDisplayHost(window.location.host)
+      } else {
+        const prodUrl =
+          (process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes('localhost'))
+            ? process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
+            : 'https://www.organizeasy.com.br'
+        setPortalBaseUrl(prodUrl)
+        setPortalDisplayHost(prodUrl.replace(/^https?:\/\//, ''))
+      }
+    }
+  }, [])
 
   const handleCopyOfficePortalLink = () => {
-    const portalUrl =
-      typeof window !== 'undefined'
-        ? `${window.location.origin}/portal/${org.slug}`
-        : `/portal/${org.slug}`
+    const isLocal =
+      typeof window !== 'undefined' &&
+      (window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname.endsWith('.localhost') ||
+        window.location.hostname.startsWith('192.168.') ||
+        window.location.hostname.startsWith('10.'))
+
+    const baseUrl = isLocal
+      ? window.location.origin
+      : ((process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes('localhost'))
+        ? process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
+        : 'https://www.organizeasy.com.br')
+
+    const portalUrl = `${baseUrl}/portal/${org.slug || ''}`
     navigator.clipboard.writeText(portalUrl)
     setCopiedPortalLink(true)
     showToast('Link do Portal do Cliente copiado!')
@@ -712,7 +749,7 @@ export default function OfficeSettingsClient({
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                    Identificador / Slug (URL) *
+                    Identificador (URL) *
                   </label>
                   <span className="text-[10px] text-slate-400">
                     Minúsculo, sem acentos, com hífen
@@ -959,12 +996,11 @@ export default function OfficeSettingsClient({
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full min-w-0">
                   <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-50 border border-blue-200/80 text-blue-700 text-xs font-semibold min-w-0 max-w-full overflow-hidden">
                     <Globe className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                    <span className="shrink-0 text-blue-800">Portal:</span>
                     <span
                       className="font-mono font-bold truncate text-[11px] sm:text-xs text-blue-900"
-                      title={`https://www.organizeasy.com.br/portal/${org.slug}`}
+                      title={`${portalDisplayHost}/portal/${org.slug || ''}`}
                     >
-                      https://www.organizeasy.com.br/portal/{org.slug}
+                      {portalDisplayHost}/portal/{org.slug || ''}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 flex-wrap">
@@ -987,7 +1023,7 @@ export default function OfficeSettingsClient({
                       )}
                     </button>
                     <a
-                      href={`/portal/${org.slug}`}
+                      href={`${portalBaseUrl}/portal/${org.slug || ''}`}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 text-xs font-medium transition-colors cursor-pointer"
