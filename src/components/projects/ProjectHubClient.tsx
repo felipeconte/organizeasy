@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect, Fragment } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   ListTodo,
   Kanban as KanbanIcon,
@@ -70,8 +71,10 @@ import {
   calculateDueDateFromDuration,
   calculateDurationDays,
   getTaskTimelineStatus,
-  TaskTimelineStatusInfo
+  TaskTimelineStatusInfo,
+  DurationType,
 } from '@/lib/date-utils'
+import DurationTypeToggle from '@/components/ui/DurationTypeToggle'
 import TaskDetailDrawer, {
   TaskDetailData,
   MemberOption
@@ -83,9 +86,16 @@ import {
   DEFAULT_WORKFLOW_STAGES,
   STAGE_COLOR_CONFIG,
   getStageConfig,
+  getStageStyle,
+  getBadgeInlineStyle,
+  getDotInlineStyle,
+  getKanbanColumnInlineStyle,
+  getKanbanHeaderInlineStyle,
+  getGanttBarInlineStyle,
   canMoveToFinalStage,
   getFinalStage
 } from '@/lib/workflow-stages'
+import WorkflowColorPicker from '@/components/workflow/WorkflowColorPicker'
 import {
   createWorkflowStageAction,
   renameWorkflowStageAction,
@@ -140,6 +150,7 @@ export default function ProjectHubClient({
   isOwner: propIsOwner,
   userPermissions: propPermissions,
 }: ProjectHubClientProps) {
+  const router = useRouter()
   const confirm = useConfirm()
   const showAlert = useAlert()
   const { can, isOwner: contextIsOwner } = usePermissions()
@@ -147,6 +158,10 @@ export default function ProjectHubClient({
   const canManageTasks = effectiveIsOwner || can('tasks_manage')
   const canConfigureStages = effectiveIsOwner || can('settings_stages')
   const canOverrideApproval = effectiveIsOwner || can('tasks_override_approval')
+
+  const handleOpenTask = (task: TaskDetailData) => {
+    router.push(`/app/projetos/${projectId}/tarefas/${task.id}`)
+  }
 
   const [manualApprovalStage, setManualApprovalStage] = useState<{
     stageId: string
@@ -447,7 +462,7 @@ export default function ProjectHubClient({
       progressSum += taskProg
 
       // Status do cronograma
-      const statusInfo = getTaskTimelineStatus(st.start_date, st.due_date, isFinal)
+      const statusInfo = getTaskTimelineStatus(st.start_date, st.due_date, isFinal, (st as any).duration_type || 'corridos')
       if (statusInfo.type === 'extrapolou') {
         overdue++
       } else if (
@@ -658,6 +673,7 @@ export default function ProjectHubClient({
     start_date: string
     due_date: string
     duration_days: number | ''
+    duration_type: DurationType
     status: TaskDetailData['status']
     is_client_approval_required: boolean
     parent_stage_id: string | null
@@ -668,6 +684,7 @@ export default function ProjectHubClient({
     start_date: '',
     due_date: '',
     duration_days: '',
+    duration_type: 'corridos',
     status: 'a_iniciar',
     is_client_approval_required: true,
     parent_stage_id: null,
@@ -676,9 +693,9 @@ export default function ProjectHubClient({
   const handleNewTaskStartDateChange = (newStart: string) => {
     let newDue = newTaskData.due_date
     if (newStart && newTaskData.duration_days !== '' && Number(newTaskData.duration_days) > 0) {
-      newDue = calculateDueDateFromDuration(newStart, Number(newTaskData.duration_days))
+      newDue = calculateDueDateFromDuration(newStart, Number(newTaskData.duration_days), newTaskData.duration_type)
     } else if (newStart && newDue) {
-      const calculatedDays = calculateDurationDays(newStart, newDue)
+      const calculatedDays = calculateDurationDays(newStart, newDue, newTaskData.duration_type)
       if (calculatedDays) {
         setNewTaskData((prev) => ({
           ...prev,
@@ -696,15 +713,29 @@ export default function ProjectHubClient({
     const parsed = val === '' ? '' : Math.max(1, parseInt(val) || 1)
     let newDue = newTaskData.due_date
     if (newTaskData.start_date && parsed !== '') {
-      newDue = calculateDueDateFromDuration(newTaskData.start_date, Number(parsed))
+      newDue = calculateDueDateFromDuration(newTaskData.start_date, Number(parsed), newTaskData.duration_type)
     }
     setNewTaskData((prev) => ({ ...prev, duration_days: parsed, due_date: newDue }))
+  }
+
+  const handleNewTaskDurationTypeChange = (newType: DurationType) => {
+    let newDue = newTaskData.due_date
+    if (newTaskData.start_date && newTaskData.duration_days !== '' && Number(newTaskData.duration_days) > 0) {
+      newDue = calculateDueDateFromDuration(newTaskData.start_date, Number(newTaskData.duration_days), newType)
+    } else if (newTaskData.start_date && newDue) {
+      const reCalculated = calculateDurationDays(newTaskData.start_date, newDue, newType)
+      if (reCalculated) {
+        setNewTaskData((prev) => ({ ...prev, duration_type: newType, duration_days: reCalculated }))
+        return
+      }
+    }
+    setNewTaskData((prev) => ({ ...prev, duration_type: newType, due_date: newDue }))
   }
 
   const handleNewTaskDueDateChange = (newDue: string) => {
     let newDuration: number | '' = newTaskData.duration_days
     if (newTaskData.start_date && newDue) {
-      const calculatedDays = calculateDurationDays(newTaskData.start_date, newDue)
+      const calculatedDays = calculateDurationDays(newTaskData.start_date, newDue, newTaskData.duration_type)
       if (calculatedDays) {
         newDuration = calculatedDays
       }
@@ -1046,6 +1077,7 @@ export default function ProjectHubClient({
       start_date: '',
       due_date: '',
       duration_days: '',
+      duration_type: 'corridos',
       status: initialStatus,
       is_client_approval_required: !parentStageId,
       parent_stage_id: parentStageId,
@@ -1142,6 +1174,7 @@ export default function ProjectHubClient({
       assigned_to: newTaskData.assigned_to || null,
       start_date: newTaskData.start_date || null,
       due_date: newTaskData.due_date || null,
+      duration_type: newTaskData.duration_type,
       status: newTaskData.status,
       is_client_approval_required: newTaskData.is_client_approval_required,
       parent_stage_id: newTaskData.parent_stage_id || null,
@@ -1156,7 +1189,7 @@ export default function ProjectHubClient({
         setExpandedStageIds((prev) => new Set([...prev, newTaskData.parent_stage_id!]))
       }
       setIsCreateModalOpen(false)
-      setSelectedTask(created)
+      handleOpenTask(created)
     } else {
       await showAlert({
         title: 'Erro ao criar tarefa',
@@ -1816,15 +1849,21 @@ export default function ProjectHubClient({
     }
 
     const stageConfig = getStageConfig(st.status, workflowStages)
-    const colStyle = STAGE_COLOR_CONFIG[stageConfig.color] || STAGE_COLOR_CONFIG.blue
+    const colStyle = stageConfig.style || getStageStyle(stageConfig.color)
     const isFinalStage = Boolean(stageConfig.is_final_stage)
 
     return (
-      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${colStyle.badge}`}>
+      <span
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${colStyle.badge}`}
+        style={getBadgeInlineStyle(colStyle)}
+      >
         {isFinalStage ? (
           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
         ) : (
-          <span className={`w-1.5 h-1.5 rounded-full ${colStyle.dot}`} />
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${colStyle.dot}`}
+            style={getDotInlineStyle(colStyle)}
+          />
         )}
         {stageConfig.name}
       </span>
@@ -2092,7 +2131,7 @@ export default function ProjectHubClient({
                     st.status === 'concluido' ||
                     workflowStages.find((ws) => ws.id === st.status)?.is_final_stage
                   )
-                  const taskTimeline = getTaskTimelineStatus(st.start_date, st.due_date, isFinal)
+                  const taskTimeline = getTaskTimelineStatus(st.start_date, st.due_date, isFinal, (st as any).duration_type || 'corridos')
 
                   return (
                     <Fragment key={st.id}>
@@ -2102,7 +2141,7 @@ export default function ProjectHubClient({
                         onDragOver={(e) => canManageTasks && item.level === 0 && handleListDragOver(e, st.id)}
                         onDragLeave={handleListDragLeave}
                         onDrop={(e) => item.level === 0 && handleListDrop(e, st.id)}
-                        onClick={() => setSelectedTask(st)}
+                        onClick={() => handleOpenTask(st)}
                         className={`transition-all cursor-pointer group select-none relative ${item.level > 0
                           ? 'bg-slate-50/50 hover:bg-blue-50/50 border-l-3 border-l-indigo-400'
                           : 'hover:bg-blue-50/40'
@@ -2278,7 +2317,7 @@ export default function ProjectHubClient({
                             </span>
                             {taskTimeline.durationDays != null && (
                               <span className="text-xs text-slate-500 font-medium">
-                                ⏱️ {taskTimeline.durationDays} {taskTimeline.durationDays === 1 ? 'dia' : 'dias'}
+                                ⏱️ {taskTimeline.durationDays} {taskTimeline.durationDays === 1 ? 'dia' : 'dias'}{(st as any).duration_type === 'uteis' ? ' úteis' : ' corridos'}
                               </span>
                             )}
                           </div>
@@ -2348,7 +2387,7 @@ export default function ProjectHubClient({
 
                             <button
                               type="button"
-                              onClick={() => setSelectedTask(st)}
+                              onClick={() => handleOpenTask(st)}
                               className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                               title="Editar / Ver detalhes da tarefa"
                             >
@@ -2445,7 +2484,7 @@ export default function ProjectHubClient({
                     a.stage_order - b.stage_order
                 )
               const isColActive = activeDropCol === col.id
-              const colStyle = STAGE_COLOR_CONFIG[col.color] || STAGE_COLOR_CONFIG.blue
+              const colStyle = getStageStyle(col.color)
               const isEditingThisCol = editingColId === col.id
 
               return (
@@ -2458,6 +2497,7 @@ export default function ProjectHubClient({
                     ? 'bg-blue-50/90 border-blue-400 ring-2 ring-blue-500/20 shadow-sm'
                     : `${colStyle.kanbanBg} ${colStyle.kanbanBorder}`
                     }`}
+                  style={!isColActive ? getKanbanColumnInlineStyle(colStyle) : undefined}
                 >
                   <div className="space-y-3">
                     {/* Column Header */}
@@ -2475,25 +2515,14 @@ export default function ProjectHubClient({
                             }}
                             className="w-full text-xs font-bold px-2.5 py-1.5 bg-white border border-blue-500 rounded-lg text-slate-900 outline-none shadow-2xs"
                           />
-                          <div className="flex items-center justify-between gap-1">
-                            <div className="flex flex-wrap gap-1">
-                              {COLOR_OPTIONS.map((c) => {
-                                const cCfg = STAGE_COLOR_CONFIG[c]
-                                const isSel = editingColColor === c
-                                return (
-                                  <button
-                                    key={c}
-                                    type="button"
-                                    onClick={() => setEditingColColor(c)}
-                                    title={cCfg.name}
-                                    className={`w-4 h-4 rounded-md flex items-center justify-center cursor-pointer transition-all ${isSel ? 'ring-2 ring-blue-600 scale-110' : 'opacity-70 hover:opacity-100'
-                                      }`}
-                                    style={{ backgroundColor: cCfg.previewHex }}
-                                  />
-                                );
-                              })}
-                            </div>
-                            <div className="flex items-center gap-1">
+                          <WorkflowColorPicker
+                            selectedColor={editingColColor}
+                            onChange={setEditingColColor}
+                            stageName={editingColName || col.name}
+                            compact
+                          />
+                          <div className="flex items-center justify-between gap-1 pt-1 border-t border-slate-100">
+                            <div>
                               {workflowStages.length > 1 && (
                                 <button
                                   type="button"
@@ -2507,21 +2536,23 @@ export default function ProjectHubClient({
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               )}
+                            </div>
+                            <div className="flex items-center gap-1.5">
                               <button
                                 type="button"
                                 onClick={() => setEditingColId(null)}
-                                className="p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-100 cursor-pointer"
+                                className="px-2 py-1 text-xs font-semibold text-slate-500 hover:text-slate-700 rounded hover:bg-slate-100 cursor-pointer"
                                 title="Cancelar"
                               >
-                                <X className="w-3.5 h-3.5" />
+                                Cancelar
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleSaveRenameCol(col.id)}
-                                className="p-1 text-emerald-600 hover:text-emerald-700 rounded hover:bg-emerald-50 cursor-pointer"
+                                className="px-2.5 py-1 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg cursor-pointer shadow-2xs"
                                 title="Salvar"
                               >
-                                <Check className="w-3.5 h-3.5" />
+                                Salvar
                               </button>
                             </div>
                           </div>
@@ -2529,7 +2560,10 @@ export default function ProjectHubClient({
                       ) : (
                         <div className="flex items-center justify-between group/col-header">
                           <div className="flex items-center gap-1.5 min-w-0">
-                            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${colStyle.dot}`} />
+                            <span
+                              className={`w-2.5 h-2.5 rounded-full shrink-0 ${colStyle.dot}`}
+                              style={getDotInlineStyle(colStyle)}
+                            />
                             <span
                               onClick={() => {
                                 setEditingColId(col.id)
@@ -2537,6 +2571,7 @@ export default function ProjectHubClient({
                                 setEditingColColor(col.color)
                               }}
                               className={`text-sm font-bold ${colStyle.kanbanHeader} truncate cursor-pointer hover:underline`}
+                              style={getKanbanHeaderInlineStyle(colStyle)}
                               title="Clique para renomear ou editar etapa"
                             >
                               {col.name}
@@ -2595,7 +2630,7 @@ export default function ProjectHubClient({
                             onDrop={(e) => canManageTasks && handleKanbanCardDrop(e, st, col.id)}
                             onClick={() => {
                               if (!hasDraggedKanbanBoardRef.current) {
-                                setSelectedTask(st)
+                                handleOpenTask(st)
                               }
                             }}
                             className={`bg-white p-4 rounded-xl border shadow-xs space-y-2.5 hover:shadow-md hover:border-blue-300 transition-all ${canManageTasks ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} group relative ${isDragging
@@ -2672,7 +2707,7 @@ export default function ProjectHubClient({
                                       type="button"
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        setSelectedTask(parentTask)
+                                        handleOpenTask(parentTask)
                                       }}
                                       className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-md hover:bg-indigo-100 transition-colors max-w-full truncate cursor-pointer"
                                       title={`Abrir tarefa principal: ${parentTask.name}`}
@@ -2713,7 +2748,7 @@ export default function ProjectHubClient({
                                 col.id === 'concluido' ||
                                 workflowStages.find((ws) => ws.id === col.id)?.is_final_stage
                               )
-                              const taskTimeline = getTaskTimelineStatus(st.start_date, st.due_date, isTaskFinal)
+                              const taskTimeline = getTaskTimelineStatus(st.start_date, st.due_date, isTaskFinal, (st as any).duration_type || 'corridos')
                               let taskProgress = st.progress_percent || 0
                               if (isTaskFinal) {
                                 taskProgress = 100
@@ -2738,8 +2773,11 @@ export default function ProjectHubClient({
                                     </span>
 
                                     {taskTimeline.durationDays != null && (
-                                      <span className="text-slate-500 font-medium">
-                                        ⏱️ {taskTimeline.durationDays}d
+                                      <span
+                                        className="text-slate-500 font-medium"
+                                        title={(st as any).duration_type === 'uteis' ? 'Duração em dias úteis' : 'Duração em dias corridos'}
+                                      >
+                                        ⏱️ {taskTimeline.durationDays}{(st as any).duration_type === 'uteis' ? 'd úteis' : 'd'}
                                       </span>
                                     )}
                                   </div>
@@ -2825,25 +2863,12 @@ export default function ProjectHubClient({
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
                       Cor da Etapa
                     </label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {COLOR_OPTIONS.map((c) => {
-                        const cfg = STAGE_COLOR_CONFIG[c]
-                        const isSel = newColColor === c
-                        return (
-                          <button
-                            key={c}
-                            type="button"
-                            onClick={() => setNewColColor(c)}
-                            title={cfg.name}
-                            className={`w-6 h-6 rounded-lg flex items-center justify-center cursor-pointer transition-all ${isSel ? 'ring-2 ring-blue-600 scale-110 shadow-xs' : 'opacity-70 hover:opacity-100'
-                              }`}
-                            style={{ backgroundColor: cfg.previewHex }}
-                          >
-                            {isSel && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
-                          </button>
-                        )
-                      })}
-                    </div>
+                    <WorkflowColorPicker
+                      selectedColor={newColColor}
+                      onChange={setNewColColor}
+                      stageName={newColName || 'Nova Etapa'}
+                      compact
+                    />
                   </div>
                   <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                     <button
@@ -2982,7 +3007,7 @@ export default function ProjectHubClient({
                       key={st.id}
                       onClick={() => {
                         if (!hasDraggedTimelineRef.current) {
-                          setSelectedTask(st)
+                          handleOpenTask(st)
                         }
                       }}
                       style={{ paddingLeft: item.level > 0 ? `${12 + item.level * 20}px` : '16px' }}
@@ -3138,7 +3163,7 @@ export default function ProjectHubClient({
                         key={st.id}
                         onClick={() => {
                           if (!hasDraggedTimelineRef.current) {
-                            setSelectedTask(st)
+                            handleOpenTask(st)
                           }
                         }}
                         className={`h-14 border-b border-slate-100 relative flex items-center hover:bg-blue-50/40 transition-colors group cursor-pointer ${item.level > 0 ? 'bg-slate-50/40' : ''
@@ -3198,6 +3223,7 @@ export default function ProjectHubClient({
                               style={{
                                 left: `${leftPct}%`,
                                 width: `${widthPct}%`,
+                                ...getGanttBarInlineStyle(stageStyle),
                               }}
                               title={`${st.parent_stage_id ? '[Subtarefa] ' : ''}${st.name} (${formatDateRangeBR(st.start_date, st.due_date)})`}
                             >
@@ -3376,9 +3402,16 @@ export default function ProjectHubClient({
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
-                    Duração Sugerida
-                  </label>
+                  <div className="flex items-center justify-between gap-1 mb-1.5">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                      Duração Sugerida
+                    </label>
+                    <DurationTypeToggle
+                      value={newTaskData.duration_type}
+                      onChange={handleNewTaskDurationTypeChange}
+                      size="sm"
+                    />
+                  </div>
                   <div className="relative border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50/50 focus-within:bg-white focus-within:border-blue-500">
                     <input
                       type="number"
@@ -3386,10 +3419,10 @@ export default function ProjectHubClient({
                       value={newTaskData.duration_days}
                       onChange={(e) => handleNewTaskDurationChange(e.target.value)}
                       placeholder="Ex: 5"
-                      className="w-full text-sm font-bold text-slate-800 bg-transparent outline-hidden pr-8 font-mono"
+                      className="w-full text-sm font-bold text-slate-800 bg-transparent outline-hidden pr-24 font-mono"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-medium pointer-events-none">
-                      dias
+                      {newTaskData.duration_type === 'uteis' ? 'dias úteis' : 'dias corridos'}
                     </span>
                   </div>
                 </div>

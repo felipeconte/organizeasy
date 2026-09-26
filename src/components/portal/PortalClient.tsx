@@ -39,6 +39,9 @@ import {
   WorkflowStage,
   STAGE_COLOR_CONFIG,
   getStageConfig,
+  getStageStyle,
+  getBadgeInlineStyle,
+  getDotInlineStyle,
   DEFAULT_WORKFLOW_STAGES,
 } from '@/lib/workflow-stages'
 
@@ -269,7 +272,8 @@ export default function PortalClient({
       const clientObj = projectClients.find((c) => c.id === selectedClientId)
       if (modalAction === 'approved') {
         if (res.isFullyApproved) {
-          selectedStage.status = 'concluido'
+          const approvedCfg = workflowStages.find((ws) => ws.is_approved_stage) || workflowStages.find((ws) => ws.id === 'aprovado')
+          selectedStage.status = approvedCfg?.id || 'aprovado'
           selectedStage.progress_percent = 100
         }
         if (selectedStage.approvalProgress && clientObj) {
@@ -281,7 +285,8 @@ export default function PortalClient({
           })
         }
       } else {
-        selectedStage.status = 'em_producao'
+        const revCfg = workflowStages.find((ws) => ws.is_revision_stage) || workflowStages.find((ws) => ws.id === 'pendencia')
+        selectedStage.status = revCfg?.id || 'pendencia'
       }
 
       setModalAction(null)
@@ -289,7 +294,7 @@ export default function PortalClient({
     }
   }
 
-  const completedCount = approvalStages.filter((s) => s.status === 'concluido' || s.status === 'aprovado').length
+  const completedCount = approvalStages.filter((s) => s.status === 'concluido' || s.status === 'aprovado' || s.status === 'finalizado').length
   const totalCount = approvalStages.length
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
@@ -437,7 +442,7 @@ export default function PortalClient({
               {approvalStages.map((st, index) => {
                 const stepNumber = index + 1
                 const stageConfig = getStageConfig(st.status, workflowStages)
-                const colStyle = STAGE_COLOR_CONFIG[stageConfig.color] || STAGE_COLOR_CONFIG.blue
+                const colStyle = stageConfig.style || getStageStyle(stageConfig.color)
 
                 const manualApprovalData = st.manualApproval || (() => {
                   const overrideComment = (st.comments as any[])?.find(
@@ -456,8 +461,13 @@ export default function PortalClient({
 
                 const isApproved =
                   st.status === 'concluido' ||
+                  st.status === 'aprovado' ||
+                  st.status === 'finalizado' ||
                   stageConfig.id === 'concluido' ||
                   stageConfig.id === 'aprovado' ||
+                  stageConfig.id === 'finalizado' ||
+                  stageConfig.is_approved_stage ||
+                  stageConfig.is_final_stage ||
                   Boolean(manualApprovalData)
 
                 const isPendingApproval = Boolean(
@@ -503,8 +513,12 @@ export default function PortalClient({
                         <div>
                           <span
                             className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border shadow-2xs ${colStyle.badge}`}
+                            style={getBadgeInlineStyle(colStyle)}
                           >
-                            <span className={`w-2 h-2 rounded-full ${colStyle.dot}`} />
+                            <span
+                              className={`w-2 h-2 rounded-full ${colStyle.dot}`}
+                              style={getDotInlineStyle(colStyle)}
+                            />
                             {stageConfig.name}
                           </span>
                         </div>
@@ -576,7 +590,7 @@ export default function PortalClient({
                           <div className="flex items-center justify-between gap-2 flex-wrap">
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300/70">
                               <ShieldCheck className="w-3.5 h-3.5 text-amber-700" />
-                              Aprovação Manual pela Equipe
+                              Aprovação manual pelo escritório
                             </span>
                             <span className="text-slate-500 font-medium text-[11px]">
                               Aprovador: <strong className="text-slate-800 font-semibold">{manualApprovalData.approverName}</strong>

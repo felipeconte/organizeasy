@@ -32,6 +32,8 @@ import {
 } from '@/lib/actions/templates'
 
 import { useConfirm, useAlert } from '@/components/ui/ConfirmDialog'
+import { DurationType } from '@/lib/date-utils'
+import DurationTypeToggle from '@/components/ui/DurationTypeToggle'
 
 export interface TemplateItemData {
   id: string
@@ -40,6 +42,7 @@ export interface TemplateItemData {
   description: string | null
   stage_order: number
   default_duration_days: number | null
+  default_duration_type?: DurationType | null
   is_client_approval_required: boolean
 }
 
@@ -82,11 +85,13 @@ export default function StageTemplatesManager({
     name: string
     description: string
     default_duration_days: number | ''
+    default_duration_type: DurationType
     is_client_approval_required: boolean
   }>({
     name: '',
     description: '',
     default_duration_days: '',
+    default_duration_type: 'corridos',
     is_client_approval_required: true,
   })
 
@@ -235,6 +240,7 @@ export default function StageTemplatesManager({
         name: item.name,
         description: item.description || '',
         default_duration_days: item.default_duration_days != null ? item.default_duration_days : '',
+        default_duration_type: item.default_duration_type === 'uteis' ? 'uteis' : 'corridos',
         is_client_approval_required: item.is_client_approval_required,
       })
     } else {
@@ -243,6 +249,7 @@ export default function StageTemplatesManager({
         name: '',
         description: '',
         default_duration_days: '',
+        default_duration_type: 'corridos',
         is_client_approval_required: true,
       })
     }
@@ -264,6 +271,7 @@ export default function StageTemplatesManager({
         name: itemForm.name,
         description: itemForm.description,
         default_duration_days: durationValue,
+        default_duration_type: itemForm.default_duration_type,
         is_client_approval_required: itemForm.is_client_approval_required,
       })
       setLoading(false)
@@ -281,6 +289,7 @@ export default function StageTemplatesManager({
                       name: itemForm.name,
                       description: itemForm.description,
                       default_duration_days: durationValue,
+                      default_duration_type: itemForm.default_duration_type,
                       is_client_approval_required: itemForm.is_client_approval_required,
                     }
                     : i
@@ -297,6 +306,7 @@ export default function StageTemplatesManager({
         name: itemForm.name,
         description: itemForm.description,
         default_duration_days: durationValue,
+        default_duration_type: itemForm.default_duration_type,
         is_client_approval_required: itemForm.is_client_approval_required,
       })
       setLoading(false)
@@ -546,8 +556,15 @@ export default function StageTemplatesManager({
                   {/* Metadata & Controls */}
                   <div className="flex items-center justify-between sm:justify-end gap-3 text-xs shrink-0 pl-11 sm:pl-0">
                     {item.default_duration_days != null && item.default_duration_days > 0 ? (
-                      <span className="text-slate-500 font-mono text-xs bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200/60">
-                        ⏱️ {item.default_duration_days} dias
+                      <span
+                        className={`font-mono text-xs px-2.5 py-1 rounded-md border flex items-center gap-1 ${
+                          item.default_duration_type === 'uteis'
+                            ? 'bg-amber-50/80 border-amber-200/80 text-amber-800'
+                            : 'bg-slate-50 border-slate-200/60 text-slate-600'
+                        }`}
+                        title={item.default_duration_type === 'uteis' ? 'Duração calculada em dias úteis' : 'Duração calculada em dias corridos'}
+                      >
+                        ⏱️ {item.default_duration_days} {item.default_duration_type === 'uteis' ? 'dias úteis' : 'dias corridos'}
                       </span>
                     ) : (
                       <span className="text-slate-400 font-mono text-[11px]">
@@ -768,22 +785,31 @@ export default function StageTemplatesManager({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    Duração Sugerida (dias) <span className="text-slate-400 font-normal">(Opcional)</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={itemForm.default_duration_days}
-                    onChange={(e) =>
-                      setItemForm({
-                        ...itemForm,
-                        default_duration_days: e.target.value === '' ? '' : parseInt(e.target.value) || '',
-                      })
-                    }
-                    placeholder="Vazio (sem prazo)"
-                    className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-hidden focus:border-blue-500"
-                  />
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <label className="text-xs font-bold text-slate-700 block">
+                      Duração Sugerida <span className="text-slate-400 font-normal">(Opcional)</span>
+                    </label>
+                  </div>
+                  <div className="space-y-1.5">
+                    <input
+                      type="number"
+                      min={1}
+                      value={itemForm.default_duration_days}
+                      onChange={(e) =>
+                        setItemForm({
+                          ...itemForm,
+                          default_duration_days: e.target.value === '' ? '' : parseInt(e.target.value) || '',
+                        })
+                      }
+                      placeholder="Vazio (sem prazo)"
+                      className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-hidden focus:border-blue-500 font-mono"
+                    />
+                    <DurationTypeToggle
+                      value={itemForm.default_duration_type}
+                      onChange={(val) => setItemForm({ ...itemForm, default_duration_type: val })}
+                      size="sm"
+                    />
+                  </div>
                 </div>
 
                 <div>

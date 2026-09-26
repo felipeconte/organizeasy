@@ -66,8 +66,10 @@ import {
   formatDateTimeBR,
   calculateDueDateFromDuration,
   calculateDurationDays,
-  getTaskTimelineStatus
+  getTaskTimelineStatus,
+  DurationType,
 } from '@/lib/date-utils'
+import DurationTypeToggle from '@/components/ui/DurationTypeToggle'
 import { useConfirm, useAlert, usePromptSaveOrDiscard } from '@/components/ui/ConfirmDialog'
 import {
   WorkflowStage,
@@ -100,6 +102,7 @@ export interface TaskDetailData {
   start_date: string | null
   due_date: string | null
   duration_days?: number | null
+  duration_type?: DurationType | null
   is_client_approval_required: boolean
   is_locked_for_client: boolean
   checklist?: ChecklistItem[]
@@ -161,6 +164,7 @@ export default function TaskDetailDrawer({
     start_date: string
     due_date: string
     duration_days: number | ''
+    duration_type: DurationType
     status: TaskDetailData['status']
     is_client_approval_required: boolean
   }>({
@@ -170,6 +174,7 @@ export default function TaskDetailDrawer({
     start_date: '',
     due_date: '',
     duration_days: '',
+    duration_type: 'corridos',
     status: 'a_iniciar',
     is_client_approval_required: true,
   })
@@ -182,6 +187,7 @@ export default function TaskDetailDrawer({
     start_date: string
     due_date: string
     duration_days: number | ''
+    duration_type: DurationType
     status: TaskDetailData['status']
     is_client_approval_required: boolean
   }>({
@@ -191,6 +197,7 @@ export default function TaskDetailDrawer({
     start_date: '',
     due_date: '',
     duration_days: '',
+    duration_type: 'corridos',
     status: 'a_iniciar',
     is_client_approval_required: true,
   })
@@ -246,10 +253,11 @@ export default function TaskDetailDrawer({
   // Sincroniza estado quando o stage selecionado mudar
   useEffect(() => {
     if (stage) {
+      const initialType: DurationType = stage.duration_type === 'uteis' ? 'uteis' : 'corridos'
       const initialDur: number | '' =
         stage.duration_days != null
           ? Number(stage.duration_days)
-          : (calculateDurationDays(stage.start_date, stage.due_date) ?? '')
+          : (calculateDurationDays(stage.start_date, stage.due_date, initialType) ?? '')
 
       const initial: {
         name: string
@@ -258,6 +266,7 @@ export default function TaskDetailDrawer({
         start_date: string
         due_date: string
         duration_days: number | ''
+        duration_type: DurationType
         status: string
         is_client_approval_required: boolean
       } = {
@@ -267,6 +276,7 @@ export default function TaskDetailDrawer({
         start_date: stage.start_date || '',
         due_date: stage.due_date || '',
         duration_days: initialDur,
+        duration_type: initialType,
         status: stage.status,
         is_client_approval_required: stage.is_client_approval_required ?? true,
       }
@@ -291,9 +301,9 @@ export default function TaskDetailDrawer({
   const handleStartDateChange = (newStart: string) => {
     let newDue = formData.due_date
     if (newStart && formData.duration_days !== '' && Number(formData.duration_days) > 0) {
-      newDue = calculateDueDateFromDuration(newStart, Number(formData.duration_days))
+      newDue = calculateDueDateFromDuration(newStart, Number(formData.duration_days), formData.duration_type)
     } else if (newStart && newDue) {
-      const calculatedDays = calculateDurationDays(newStart, newDue)
+      const calculatedDays = calculateDurationDays(newStart, newDue, formData.duration_type)
       if (calculatedDays) {
         setFormData((prev) => ({
           ...prev,
@@ -311,15 +321,29 @@ export default function TaskDetailDrawer({
     const parsed = val === '' ? '' : Math.max(1, parseInt(val) || 1)
     let newDue = formData.due_date
     if (formData.start_date && parsed !== '') {
-      newDue = calculateDueDateFromDuration(formData.start_date, Number(parsed))
+      newDue = calculateDueDateFromDuration(formData.start_date, Number(parsed), formData.duration_type)
     }
     setFormData((prev) => ({ ...prev, duration_days: parsed, due_date: newDue }))
+  }
+
+  const handleDurationTypeChange = (newType: DurationType) => {
+    let newDue = formData.due_date
+    if (formData.start_date && formData.duration_days !== '' && Number(formData.duration_days) > 0) {
+      newDue = calculateDueDateFromDuration(formData.start_date, Number(formData.duration_days), newType)
+    } else if (formData.start_date && newDue) {
+      const reCalculated = calculateDurationDays(formData.start_date, newDue, newType)
+      if (reCalculated) {
+        setFormData((prev) => ({ ...prev, duration_type: newType, duration_days: reCalculated }))
+        return
+      }
+    }
+    setFormData((prev) => ({ ...prev, duration_type: newType, due_date: newDue }))
   }
 
   const handleDueDateChange = (newDue: string) => {
     let newDuration: number | '' = formData.duration_days
     if (formData.start_date && newDue) {
-      const calculatedDays = calculateDurationDays(formData.start_date, newDue)
+      const calculatedDays = calculateDurationDays(formData.start_date, newDue, formData.duration_type)
       if (calculatedDays) {
         newDuration = calculatedDays
       }
@@ -370,6 +394,7 @@ export default function TaskDetailDrawer({
       start_date: formData.start_date || null,
       due_date: formData.due_date || null,
       duration_days: typeof formData.duration_days === 'number' ? formData.duration_days : null,
+      duration_type: formData.duration_type,
       status: formData.status,
       is_client_approval_required: formData.is_client_approval_required,
       checklist,
@@ -390,6 +415,7 @@ export default function TaskDetailDrawer({
       assigned_to: formData.assigned_to || null,
       start_date: formData.start_date || null,
       due_date: formData.due_date || null,
+      duration_type: formData.duration_type,
       status: formData.status,
       is_client_approval_required: formData.is_client_approval_required,
     })
@@ -664,7 +690,7 @@ export default function TaskDetailDrawer({
 
   const currentStageConfig = (workflowStages || DEFAULT_WORKFLOW_STAGES).find((s) => s.id === formData.status)
   const isTaskFinalized = Boolean(currentStageConfig?.is_final_stage || formData.status === 'concluido')
-  const timelineStatus = getTaskTimelineStatus(formData.start_date, formData.due_date, isTaskFinalized)
+  const timelineStatus = getTaskTimelineStatus(formData.start_date, formData.due_date, isTaskFinalized, formData.duration_type)
 
   const handleStatusSelectChange = async (newStatus: string) => {
     if (!stage) return
@@ -1340,7 +1366,7 @@ export default function TaskDetailDrawer({
 
               <div>
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
-                  Instruções e Escopo de Trabalho
+                  Descrição da Tarefa
                 </label>
                 <textarea
                   rows={3}
@@ -1444,11 +1470,18 @@ export default function TaskDetailDrawer({
                 />
               </div>
 
-              {/* Duração Sugerida (dias) */}
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
-                  <Clock className="w-3.5 h-3.5 text-indigo-600" /> Duração Sugerida (dias)
-                </label>
+              {/* Duração Sugerida (dias) & Modo de Contagem */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-indigo-600" /> Duração Sugerida
+                  </label>
+                  <DurationTypeToggle
+                    value={formData.duration_type}
+                    onChange={handleDurationTypeChange}
+                    size="sm"
+                  />
+                </div>
                 <div className="relative">
                   <input
                     type="number"
@@ -1456,12 +1489,17 @@ export default function TaskDetailDrawer({
                     value={formData.duration_days}
                     onChange={(e) => handleDurationChange(e.target.value)}
                     placeholder="Ex: 5"
-                    className="w-full text-sm bg-white border border-slate-200 rounded-xl pl-3 pr-11 py-2 text-slate-800 outline-hidden focus:border-blue-500 font-mono font-bold"
+                    className="w-full text-sm bg-white border border-slate-200 rounded-xl pl-3 pr-24 py-2 text-slate-800 outline-hidden focus:border-blue-500 font-mono font-bold"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-medium pointer-events-none">
-                    dias
+                    {formData.duration_type === 'uteis' ? 'dias úteis' : 'dias corridos'}
                   </span>
                 </div>
+                {formData.duration_type === 'uteis' && (
+                  <p className="text-[11px] text-amber-700 bg-amber-50/80 px-2 py-0.5 rounded-md border border-amber-200/60 animate-in fade-in">
+                    💼 Não contabiliza fins de semana e feriados nacionais.
+                  </p>
+                )}
               </div>
 
               {/* Status do Cronograma Banner */}
@@ -1937,7 +1975,7 @@ export default function TaskDetailDrawer({
                   }}
                   className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:underline cursor-pointer"
                 >
-                  <Plus className="w-4 h-4" /> Anexar Arquivo/Prancha
+                  <Plus className="w-4 h-4" /> Anexar Arquivo
                 </button>
               </div>
 

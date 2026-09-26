@@ -44,6 +44,7 @@ export default async function OfficeProfilePage() {
     email: user.email || null,
     logo_url: activeOrg.logo_url,
     owner_id: activeOrg.owner_id,
+    default_duration_type: (orgData as any)?.default_duration_type || (activeOrg as any)?.default_duration_type || 'corridos',
   }
 
   // 2. Busca todos os perfis de acesso do escritório

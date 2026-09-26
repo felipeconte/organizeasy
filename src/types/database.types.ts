@@ -735,6 +735,7 @@ export type Database = {
           slug: string
           updated_at: string
           workflow_stages: Json | null
+          default_duration_type?: 'corridos' | 'uteis' | null
         }
         Insert: {
           cau_caubr?: string | null
@@ -750,6 +751,7 @@ export type Database = {
           slug: string
           updated_at?: string
           workflow_stages?: Json | null
+          default_duration_type?: 'corridos' | 'uteis' | null
         }
         Update: {
           cau_caubr?: string | null
@@ -765,6 +767,7 @@ export type Database = {
           slug?: string
           updated_at?: string
           workflow_stages?: Json | null
+          default_duration_type?: 'corridos' | 'uteis' | null
         }
         Relationships: []
       }
@@ -951,6 +954,7 @@ export type Database = {
           deleted_by: string | null
           description: string | null
           due_date: string | null
+          duration_type?: 'corridos' | 'uteis' | null
           id: string
           is_client_approval_required: boolean
           is_locked_for_client: boolean
@@ -975,6 +979,7 @@ export type Database = {
           deleted_by?: string | null
           description?: string | null
           due_date?: string | null
+          duration_type?: 'corridos' | 'uteis' | null
           id?: string
           is_client_approval_required?: boolean
           is_locked_for_client?: boolean
@@ -999,6 +1004,7 @@ export type Database = {
           deleted_by?: string | null
           description?: string | null
           due_date?: string | null
+          duration_type?: 'corridos' | 'uteis' | null
           id?: string
           is_client_approval_required?: boolean
           is_locked_for_client?: boolean
@@ -1386,6 +1392,7 @@ export type Database = {
           checklist: Json
           created_at: string
           default_duration_days: number | null
+          default_duration_type?: 'corridos' | 'uteis' | null
           description: string | null
           id: string
           is_client_approval_required: boolean
@@ -1397,6 +1404,7 @@ export type Database = {
           checklist?: Json
           created_at?: string
           default_duration_days?: number | null
+          default_duration_type?: 'corridos' | 'uteis' | null
           description?: string | null
           id?: string
           is_client_approval_required?: boolean
@@ -1408,6 +1416,7 @@ export type Database = {
           checklist?: Json
           created_at?: string
           default_duration_days?: number | null
+          default_duration_type?: 'corridos' | 'uteis' | null
           description?: string | null
           id?: string
           is_client_approval_required?: boolean

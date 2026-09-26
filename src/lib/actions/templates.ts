@@ -84,6 +84,7 @@ export async function createTemplateAction(
         description: item.description,
         stage_order: item.stage_order,
         default_duration_days: item.default_duration_days,
+        default_duration_type: (item as any).default_duration_type || 'corridos',
         is_client_approval_required: item.is_client_approval_required,
         checklist: item.checklist || [],
       }))
@@ -199,6 +200,7 @@ export async function addTemplateItemAction(
     name: string
     description?: string
     default_duration_days?: number | null
+    default_duration_type?: 'corridos' | 'uteis' | null
     is_client_approval_required?: boolean
   }
 ) {
@@ -236,6 +238,7 @@ export async function addTemplateItemAction(
       description: itemData.description ? sanitizeText(itemData.description) : null,
       stage_order: nextOrder,
       default_duration_days: durationVal,
+      default_duration_type: itemData.default_duration_type === 'uteis' ? 'uteis' : 'corridos',
       is_client_approval_required: itemData.is_client_approval_required ?? true,
       checklist: [],
     })
@@ -256,6 +259,7 @@ export async function updateTemplateItemAction(
     name?: string
     description?: string
     default_duration_days?: number | null
+    default_duration_type?: 'corridos' | 'uteis' | null
     is_client_approval_required?: boolean
   }
 ) {
@@ -275,6 +279,9 @@ export async function updateTemplateItemAction(
       itemData.default_duration_days != null && !isNaN(Number(itemData.default_duration_days))
         ? Number(itemData.default_duration_days)
         : null
+  }
+  if (itemData.default_duration_type !== undefined) {
+    updatePayload.default_duration_type = itemData.default_duration_type === 'uteis' ? 'uteis' : 'corridos'
   }
   if (itemData.is_client_approval_required !== undefined) updatePayload.is_client_approval_required = itemData.is_client_approval_required
 

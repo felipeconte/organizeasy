@@ -131,6 +131,8 @@ export async function updateOrganizationAction(
     return { success: false, error: 'Este identificador (slug) já está em uso por outro escritório. Escolha outro.' }
   }
 
+  const rawDurationType = formData.get('default_duration_type') as string
+
   const updatePayload: Record<string, any> = {
     name,
     slug: cleanSlug,
@@ -139,12 +141,22 @@ export async function updateOrganizationAction(
     phone: phone || null,
     email: email || null,
     logo_url: logo_url || null,
+    ...(rawDurationType === 'uteis' || rawDurationType === 'corridos'
+      ? { default_duration_type: rawDurationType }
+      : {}),
   }
 
   let { error } = await supabase
     .from('organizations')
     .update(updatePayload as any)
     .eq('id', orgId)
+
+  // Fallback se a coluna default_duration_type ainda não existir no schema remoto
+  if (error && (error.message?.includes('default_duration_type') || error.code === '42703')) {
+    delete updatePayload.default_duration_type
+    const retry = await supabase.from('organizations').update(updatePayload as any).eq('id', orgId)
+    error = retry.error
+  }
 
   // Fallback se a coluna professional_council_id ainda não existir no schema remoto (bancos legados com cau_caubr)
   if (error && (error.message?.includes('professional_council_id') || error.code === '42703')) {

@@ -25,8 +25,14 @@ import {
   WorkflowStage,
   WorkflowStageColor,
   STAGE_COLOR_CONFIG,
-  DEFAULT_WORKFLOW_STAGES
+  DEFAULT_WORKFLOW_STAGES,
+  getStageStyle,
+  getBadgeInlineStyle,
+  getDotInlineStyle,
+  getKanbanColumnInlineStyle,
+  getKanbanHeaderInlineStyle,
 } from '@/lib/workflow-stages'
+import WorkflowColorPicker from '@/components/workflow/WorkflowColorPicker'
 import {
   saveWorkflowStagesAction,
   resetWorkflowStagesAction,
@@ -267,7 +273,7 @@ export default function WorkflowStagesManager({
     const isConfirmed = await confirm({
       title: 'Restaurar Etapas Padrão do Sistema?',
       message:
-        'Esta ação irá redefinir o fluxo para as 4 etapas padrão ("A Iniciar", "Em Andamento", "Em Aprovação" e "Aprovado"). Todas as tarefas vinculadas aos projetos serão automaticamente movidas para a etapa "A Iniciar". Deseja continuar?',
+        'Esta ação irá redefinir o fluxo para as 8 etapas padrão ("A Iniciar", "Em Andamento", "Em Revisão", "Em Aprovação", "Pendência", "Aprovado", "Finalizado" e "Cancelado"). Todas as tarefas vinculadas aos projetos serão automaticamente movidas para a etapa "A Iniciar". Deseja continuar?',
       confirmText: 'Restaurar e Mover Tarefas',
       cancelText: 'Cancelar',
       variant: 'warning',
@@ -409,8 +415,8 @@ export default function WorkflowStagesManager({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="md:col-span-2">
+          <div className="space-y-4">
+            <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
                 Nome da Etapa *
               </label>
@@ -430,27 +436,13 @@ export default function WorkflowStagesManager({
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                Tema de Cor / Badge
+                Tema de Cor / Badge (Cores Padrão ou Seletor RGB / Gradiente)
               </label>
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {COLOR_OPTIONS.map((c) => {
-                  const cfg = STAGE_COLOR_CONFIG[c]
-                  const isSelected = newColor === c
-                  return (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setNewColor(c)}
-                      title={cfg.name}
-                      className={`w-7 h-7 rounded-xl flex items-center justify-center transition-all cursor-pointer ${isSelected ? 'ring-2 ring-offset-2 ring-blue-600 scale-110 shadow-xs' : 'opacity-80 hover:opacity-100'
-                        }`}
-                      style={{ backgroundColor: cfg.previewHex }}
-                    >
-                      {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
-                    </button>
-                  )
-                })}
-              </div>
+              <WorkflowColorPicker
+                selectedColor={newColor}
+                onChange={(c) => setNewColor(c)}
+                stageName={newName || 'Nova Etapa'}
+              />
             </div>
           </div>
 
@@ -544,7 +536,7 @@ export default function WorkflowStagesManager({
       {/* Stages List */}
       <div className="space-y-3">
         {stages.map((stage, index) => {
-          const cfg = STAGE_COLOR_CONFIG[stage.color] || STAGE_COLOR_CONFIG.blue
+          const cfg = getStageStyle(stage.color)
           const isEditing = editingId === stage.id
 
           return (
@@ -558,48 +550,32 @@ export default function WorkflowStagesManager({
               {isEditing ? (
                 /* Edit Mode */
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="md:col-span-2">
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Nome da Etapa
-                      </label>
-                      <input
-                        type="text"
-                        autoFocus
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveEdit(stage.id)
-                          if (e.key === 'Escape') setEditingId(null)
-                        }}
-                        className="w-full text-xs font-semibold px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Nome da Etapa
+                    </label>
+                    <input
+                      type="text"
+                      autoFocus
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveEdit(stage.id)
+                        if (e.key === 'Escape') setEditingId(null)
+                      }}
+                      className="w-full text-xs font-semibold px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                    />
+                  </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Cor da Etapa
-                      </label>
-                      <div className="flex flex-wrap gap-1.5 pt-0.5">
-                        {COLOR_OPTIONS.map((c) => {
-                          const optCfg = STAGE_COLOR_CONFIG[c]
-                          const isSelected = editColor === c
-                          return (
-                            <button
-                              key={c}
-                              type="button"
-                              onClick={() => setEditColor(c)}
-                              title={optCfg.name}
-                              className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all cursor-pointer ${isSelected ? 'ring-2 ring-offset-2 ring-blue-600 scale-110' : 'opacity-70 hover:opacity-100'
-                                }`}
-                              style={{ backgroundColor: optCfg.previewHex }}
-                            >
-                              {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Cor da Etapa (Cores Padrão ou Seletor RGB / Gradiente)
+                    </label>
+                    <WorkflowColorPicker
+                      selectedColor={editColor}
+                      onChange={(c) => setEditColor(c)}
+                      stageName={editName || stage.name}
+                    />
                   </div>
 
                   {/* Opções de Papéis na Edição da Etapa */}
@@ -718,8 +694,14 @@ export default function WorkflowStagesManager({
                       </span>
 
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${cfg.badge}`}>
-                          <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${cfg.badge}`}
+                          style={getBadgeInlineStyle(cfg)}
+                        >
+                          <span
+                            className={`w-2 h-2 rounded-full ${cfg.dot}`}
+                            style={getDotInlineStyle(cfg)}
+                          />
                           {stage.name}
                         </span>
 
@@ -809,15 +791,23 @@ export default function WorkflowStagesManager({
         {/* Mini Kanban Preview */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2">
           {stages.map((st) => {
-            const cfg = STAGE_COLOR_CONFIG[st.color] || STAGE_COLOR_CONFIG.blue
+            const cfg = getStageStyle(st.color)
             return (
               <div
                 key={st.id}
                 className={`p-3.5 rounded-xl border ${cfg.kanbanBg} ${cfg.kanbanBorder} space-y-2`}
+                style={getKanbanColumnInlineStyle(cfg)}
               >
                 <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/60">
-                  <span className={`text-xs font-bold flex items-center gap-1.5 ${cfg.kanbanHeader}`}>
-                    <span className={`w-2 h-2 rounded-full ${cfg.dot}`} /> {st.name}
+                  <span
+                    className={`text-xs font-bold flex items-center gap-1.5 ${cfg.kanbanHeader}`}
+                    style={getKanbanHeaderInlineStyle(cfg)}
+                  >
+                    <span
+                      className={`w-2 h-2 rounded-full ${cfg.dot}`}
+                      style={getDotInlineStyle(cfg)}
+                    />{' '}
+                    {st.name}
                   </span>
                   <span className="text-[10px] font-bold text-slate-400 bg-white px-1.5 py-0.5 rounded shadow-2xs">
                     0
@@ -836,10 +826,17 @@ export default function WorkflowStagesManager({
         <div className="pt-4 border-t border-slate-100 flex items-center gap-2 flex-wrap text-xs text-slate-600">
           <span className="font-bold text-slate-700 text-xs">Legenda no Gantt:</span>
           {stages.map((st) => {
-            const cfg = STAGE_COLOR_CONFIG[st.color] || STAGE_COLOR_CONFIG.blue
+            const cfg = getStageStyle(st.color)
             return (
-              <span key={st.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-xs font-semibold">
-                <span className="w-2.5 h-2.5 rounded shadow-2xs" style={{ backgroundColor: cfg.previewHex }} />
+              <span
+                key={st.id}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-xs font-semibold"
+                style={getBadgeInlineStyle(cfg)}
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded shadow-2xs"
+                  style={{ backgroundColor: cfg.previewHex }}
+                />
                 {st.name}
               </span>
             )

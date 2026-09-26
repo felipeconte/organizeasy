@@ -55,6 +55,8 @@ import {
   slugify,
 } from '@/lib/formatters-and-validators'
 import ImageCropperModal from './ImageCropperModal'
+import DurationTypeToggle from '@/components/ui/DurationTypeToggle'
+import { DurationType } from '@/lib/date-utils'
 
 export interface OrganizationData {
   id: string
@@ -67,6 +69,7 @@ export interface OrganizationData {
   email: string | null
   logo_url: string | null
   owner_id: string
+  default_duration_type?: DurationType | null
 }
 
 export interface MemberData {
@@ -148,6 +151,7 @@ export default function OfficeSettingsClient({
     phone: initialOrg.phone || '',
     email: initialOrg.email || currentUserEmail || '',
     logo_url: initialOrg.logo_url || '',
+    default_duration_type: (initialOrg.default_duration_type as DurationType) || 'corridos',
   })
 
   // Status de validação do documento em tempo real
@@ -289,6 +293,7 @@ export default function OfficeSettingsClient({
     data.append('phone', formData.phone.trim())
     data.append('email', formData.email.trim())
     data.append('logo_url', formData.logo_url.trim())
+    data.append('default_duration_type', formData.default_duration_type)
 
     const res = await updateOrganizationAction(org.id, data)
     setSavingOrg(false)
@@ -304,6 +309,7 @@ export default function OfficeSettingsClient({
         phone: formData.phone.trim() || null,
         email: formData.email.trim() || null,
         logo_url: formData.logo_url.trim() || null,
+        default_duration_type: formData.default_duration_type,
       })
       setIsEditing(false)
       showToast('Dados do escritório atualizados com sucesso!')
@@ -607,6 +613,7 @@ export default function OfficeSettingsClient({
                 phone: org.phone || '',
                 email: org.email || currentUserEmail || '',
                 logo_url: org.logo_url || '',
+                default_duration_type: (org.default_duration_type as DurationType) || 'corridos',
               })
               setIsEditing(true)
             }}
@@ -798,6 +805,22 @@ export default function OfficeSettingsClient({
                   className="w-full text-sm border border-slate-200 rounded-xl p-3 outline-hidden focus:border-blue-500 bg-white"
                 />
               </div>
+
+              <div className="col-span-full pt-3 pb-1 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                    Padrão de Cálculo de Prazos
+                  </label>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Define como as novas etapas e tarefas calcularão a data final por padrão.
+                  </p>
+                </div>
+                <DurationTypeToggle
+                  value={formData.default_duration_type}
+                  onChange={(val) => setFormData({ ...formData, default_duration_type: val })}
+                  size="md"
+                />
+              </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
@@ -812,6 +835,7 @@ export default function OfficeSettingsClient({
                     phone: org.phone || '',
                     email: org.email || currentUserEmail || '',
                     logo_url: org.logo_url || '',
+                    default_duration_type: (org.default_duration_type as DurationType) || 'corridos',
                   })
                   setIsEditing(false)
                 }}
@@ -1005,6 +1029,13 @@ export default function OfficeSettingsClient({
               <div className="space-y-1">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">Telefone / WhatsApp</span>
                 <span className="text-sm text-slate-800 font-medium block">{org.phone || 'Não informado'}</span>
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">Padrão de Prazos</span>
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
+                  {org.default_duration_type === 'uteis' ? '💼 Dias Úteis (sem fds/feriados)' : '📅 Dias Corridos (padrão)'}
+                </span>
               </div>
             </div>
           </div>

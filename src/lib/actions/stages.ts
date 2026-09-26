@@ -69,7 +69,7 @@ export async function updateStageStatusAction(
     }
   }
 
-  const progressPercent = targetStageCfg?.is_final_stage || newStatus === 'concluido' ? 100 : newStatus === 'a_iniciar' ? 0 : 50
+  const progressPercent = targetStageCfg?.is_final_stage || newStatus === 'finalizado' || newStatus === 'concluido' ? 100 : newStatus === 'a_iniciar' ? 0 : 50
 
   const updatePayload: Record<string, any> = {
     status: newStatus,
@@ -81,6 +81,7 @@ export async function updateStageStatusAction(
   const isTargetApproved = Boolean(
     targetStageCfg?.is_approved_stage ||
     targetStageCfg?.name?.toLowerCase().includes('aprovad') ||
+    newStatus === 'aprovado' ||
     newStatus === 'concluido'
   )
 
@@ -158,7 +159,7 @@ export async function reorderStagesAction(
     const payload: Record<string, any> = { stage_order: item.stage_order }
     if (item.status) {
       payload.status = item.status
-      if (item.status === 'concluido') payload.progress_percent = 100
+      if (item.status === 'finalizado' || item.status === 'concluido') payload.progress_percent = 100
       else if (item.status === 'a_iniciar') payload.progress_percent = 0
     }
     return supabase
@@ -192,7 +193,7 @@ export async function reorderKanbanStagesAction(
     const payload: Record<string, any> = { kanban_order: item.kanban_order }
     if (item.status) {
       payload.status = item.status
-      if (item.status === 'concluido') payload.progress_percent = 100
+      if (item.status === 'finalizado' || item.status === 'concluido') payload.progress_percent = 100
       else if (item.status === 'a_iniciar') payload.progress_percent = 0
     }
     return (supabase
@@ -253,6 +254,7 @@ export async function updateStageFullDetailsAction(
     is_client_approval_required?: boolean
     parent_stage_id?: string | null
     overrideJustification?: string
+    duration_type?: 'corridos' | 'uteis' | null
   }
 ) {
   const { supabase, user, project } = await requireProjectAccess(projectId)
@@ -265,6 +267,9 @@ export async function updateStageFullDetailsAction(
   if (data.assigned_to !== undefined) updatePayload.assigned_to = data.assigned_to || null
   if (data.start_date !== undefined) updatePayload.start_date = data.start_date || null
   if (data.due_date !== undefined) updatePayload.due_date = data.due_date || null
+  if (data.duration_type !== undefined) {
+    updatePayload.duration_type = data.duration_type === 'uteis' ? 'uteis' : 'corridos'
+  }
   if (data.is_client_approval_required !== undefined) updatePayload.is_client_approval_required = data.is_client_approval_required
   if (data.status !== undefined) {
     // Busca workflow stages para validação de etapa final
@@ -294,13 +299,14 @@ export async function updateStageFullDetailsAction(
       updatePayload.progress_percent = 100
       updatePayload.is_locked_for_client = true
     } else {
-      if (data.status === 'concluido') updatePayload.progress_percent = 100
+      if (data.status === 'finalizado' || data.status === 'concluido') updatePayload.progress_percent = 100
       if (data.status === 'a_iniciar') updatePayload.progress_percent = 0
     }
 
     const isTargetApproved = Boolean(
       targetStageCfg?.is_approved_stage ||
       targetStageCfg?.name?.toLowerCase().includes('aprovad') ||
+      data.status === 'aprovado' ||
       data.status === 'concluido'
     )
 
@@ -424,6 +430,7 @@ export async function createStageAction(
     status?: string
     is_client_approval_required?: boolean
     parent_stage_id?: string | null
+    duration_type?: 'corridos' | 'uteis' | null
   }
 ) {
   const { supabase, project } = await requireProjectAccess(projectId)
@@ -456,6 +463,7 @@ export async function createStageAction(
       assigned_to: data.assigned_to || null,
       start_date: data.start_date || null,
       due_date: data.due_date || null,
+      duration_type: data.duration_type === 'uteis' ? 'uteis' : 'corridos',
       is_client_approval_required: data.is_client_approval_required ?? true,
       checklist: [],
       comments: [],

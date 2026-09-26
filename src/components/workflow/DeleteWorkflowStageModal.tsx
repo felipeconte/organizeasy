@@ -5,7 +5,9 @@ import { Trash2, AlertTriangle, ArrowRight, Loader2, X } from 'lucide-react'
 import {
   WorkflowStage,
   STAGE_COLOR_CONFIG,
-  getStageConfig
+  getStageConfig,
+  getBadgeInlineStyle,
+  getDotInlineStyle,
 } from '@/lib/workflow-stages'
 
 export interface DeleteWorkflowStageModalProps {
@@ -69,8 +71,14 @@ export default function DeleteWorkflowStageModal({
                 Excluir Etapa
               </h3>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold border ${stageCfg.badge}`}>
-                  <span className={`w-2 h-2 rounded-full ${stageCfg.dot}`} />
+                <span
+                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold border ${stageCfg.badge}`}
+                  style={getBadgeInlineStyle(stageCfg)}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full ${stageCfg.dot}`}
+                    style={getDotInlineStyle(stageCfg)}
+                  />
                   {stageToDelete.name}
                 </span>
               </div>

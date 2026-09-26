@@ -470,8 +470,8 @@ export async function submitClientApprovalAction(
   const revisionStage = getRevisionStage(normalizedStages)
 
   const targetStatus = actionType === 'approved'
-    ? (approvedStage?.id || 'concluido')
-    : (revisionStage?.id || 'em_producao')
+    ? (approvedStage?.id || 'aprovado')
+    : (revisionStage?.id || 'pendencia')
 
   // 7. Registra na tabela stage_approvals
   await supabase.from('stage_approvals').insert({

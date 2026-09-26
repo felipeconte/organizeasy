@@ -34,7 +34,7 @@ export default function LoginPage() {
           />
         </Link>
         <h2 className="text-xl font-bold text-slate-800 tracking-tight">
-          Acesse seu escritório no Organizeasy
+          Acesse seu escritório
         </h2>
         <p className="text-xs text-slate-500">
           Entre com suas credenciais para gerenciar projetos, equipe e clientes
